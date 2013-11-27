@@ -44,6 +44,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
+file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
 
 find_package(SFML 2 COMPONENTS system network)
@@ -54,6 +55,7 @@ add_subdirectory(client)
 add_subdirectory(server-cli)
 add_subdirectory(client-cli)
 
+file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/bin")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/bin")
 
 add_subdirectory(tools/crc32_collide_test)
