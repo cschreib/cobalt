@@ -1,0 +1,20 @@
+---------------------------
+1] Compilation instructions
+---------------------------
+
+  Prerequisites:
+
+You will need to install the following libraries before compiling:
+1. SFML 2.0: http://www.sfml-dev.org/index.php
+
+  Compiling on Linux:
+  
+1. Open a terminal and navigate to this directory.
+2. If it does not exist, create a new directory called 'build' (or whatever you like).
+3. Navigate to this new directory.
+4. Invoque 'cmake':
+   > cmake ../
+5. 'cmake' will then tell you if any library is missing or not found. Fix the problems if any.
+6. Compile everything using 'make':
+   > make
+7. When the process is over, the compiled binaries are placed in the 'bin' folder.
