@@ -58,7 +58,8 @@ int main(int argc, const char* argv[]) {
         double n = now();
         if (n - start > 2) {
             start = n;
-            net.send_request<request::ping>(client::netcom::server_actor_id, [n](){
+            net.send_checked_request<request::ping>(client::netcom::server_actor_id,
+            [n](){
                 double tn = now();
                 note("pong from server (", seconds_str(tn - n), ")");
             }, [](){

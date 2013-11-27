@@ -225,7 +225,7 @@ namespace netcom_impl {
         void receive_(type_list<T, Args...> tl, in_packet_t&& p, Args2&& ... args) {
             T t;
             p >> t;
-            receive_(tl.pop_front(), p, std::forward<Args2>(args)..., std::move(t));
+            receive_(tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
         }
 
         template<typename ... Args>
@@ -260,7 +260,7 @@ namespace netcom_impl {
         void fail_(type_list<T, Args...> tl, in_packet_t&& p, Args2&& ... args) {
             T t;
             p >> t;
-            fail_(tl.pop_front(), p, std::forward<Args2>(args)..., std::move(t));
+            fail_(tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
         }
 
         template<typename ... Args>
@@ -311,7 +311,7 @@ namespace netcom_impl {
         void answer(Args&& ... args);
 
         template<typename ... Args>
-        void failure(Args&& ... args);
+        void fail(Args&& ... args);
     };
 
     // RAII class to keep requests alive.
@@ -945,7 +945,7 @@ public :
     // will be taken. The request can be cancelled by the returned request_keeper_t at any time if
     // not needed anymore.
     template<typename RequestType, typename ... Args, typename FR>
-    request_keeper_t send_request(actor_id_t aid, Args&& ... args, FR&& receive_func) {
+    request_keeper_t send_request(actor_id_t aid, FR&& receive_func, Args&& ... args) {
         using RArgs = function_arguments<FR>;
 
         static_assert(type_list_size<RArgs>::value ==
@@ -972,8 +972,8 @@ public :
     // by process_packets() when the corresponding answer is received. The request can be cancelled
     // by the returned request_keeper_t at any time if not needed anymore.
     template<typename RequestType, typename FR, typename FF, typename UF, typename ... Args>
-    request_keeper_t send_request(actor_id_t aid, Args&& ... args, FR&& receive_func,
-        FF&& failure_func, UF&& unhandled_func = no_op) {
+    request_keeper_t send_checked_request(actor_id_t aid, FR&& receive_func,
+        FF&& failure_func, UF&& unhandled_func, Args&& ... args) {
 
         using RArgs = function_arguments<FR>;
         using FArgs = function_arguments<FF>;
@@ -1083,7 +1083,7 @@ private :
 
 public :
     template<typename>
-    friend class netcom_impl::netcom_request_t;
+    friend struct netcom_impl::netcom_request_t;
 
     template<typename T>
     using request_t = netcom_impl::netcom_request_t<T>;
@@ -1122,7 +1122,7 @@ namespace netcom_impl {
 
     template<typename RequestType>
     template<typename ... Args>
-    void netcom_request_t<RequestType>::failure(Args&& ... args) {
+    void netcom_request_t<RequestType>::fail(Args&& ... args) {
         if (answered_) throw request_already_answered<RequestType>();
         net_.send_failure_<RequestType>(aid_, rid_, std::forward<Args>(args)...);
         answered_ = true;
