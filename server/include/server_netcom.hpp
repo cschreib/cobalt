@@ -10,9 +10,19 @@ namespace server {
         netcom();
         ~netcom();
 
+        /// Define the maximum number of simultaneously connected clients.
+        /** If the limit is decreased and there are more connected clients than what is now allowed,
+            no client will be disconnected. This will only prevent new clients to connect, until the
+            new client limit is reached.
+        **/
         void set_max_client(std::size_t max_client);
 
+        /// Start the server, listening to the given port.
         void run(std::uint16_t port);
+
+        /// Shut down the server cleanly (called by the destructor).
+        /** Calling this function on a server that is not running has no effect.
+        **/
         void terminate();
 
     private :
