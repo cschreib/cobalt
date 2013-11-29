@@ -4,9 +4,11 @@ project(cobalt-common)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 set(SRC_LIST 
+    ${PROJECT_SOURCE_DIR}/any.cpp
     ${PROJECT_SOURCE_DIR}/config.cpp
     ${PROJECT_SOURCE_DIR}/crc32.cpp
     ${PROJECT_SOURCE_DIR}/netcom_base.cpp
+    ${PROJECT_SOURCE_DIR}/packet.cpp
     ${PROJECT_SOURCE_DIR}/space.cpp
     ${PROJECT_SOURCE_DIR}/filesystem_common.cpp
     ${PROJECT_SOURCE_DIR}/string.cpp
