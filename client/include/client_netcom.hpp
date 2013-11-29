@@ -51,7 +51,7 @@ namespace client {
         std::uint16_t port_;
 
         std::atomic<bool> is_connected_;
-        bool       terminate_thread_;
+        std::atomic<bool> terminate_thread_;
         sf::Thread listener_thread_;
     };
 }

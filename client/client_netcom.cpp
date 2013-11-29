@@ -3,9 +3,7 @@
 #include <iostream>
 
 namespace client {
-    netcom::netcom() :
-        is_connected_(false),
-        terminate_thread_(false),
+    netcom::netcom() : is_connected_(false), terminate_thread_(false),
         listener_thread_(std::bind(&netcom::loop_, this)) {}
 
     netcom::~netcom() {

@@ -17,6 +17,9 @@ namespace server {
         **/
         void set_max_client(std::size_t max_client);
 
+        /// Will return true as long as the server is listening to incoming connections.
+        bool is_connected() const;
+
         /// Start the server, listening to the given port.
         void run(std::uint16_t port);
 
@@ -47,7 +50,8 @@ namespace server {
         client_list_t             clients_;
         sorted_vector<actor_id_t, std::greater<request_id_t>> available_ids_;
 
-        bool       terminate_thread_;
+        std::atomic<bool> is_connected_;
+        std::atomic<bool> terminate_thread_;
         sf::Thread listener_thread_;
     };
 }

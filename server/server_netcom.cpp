@@ -1,8 +1,8 @@
 #include "server_netcom.hpp"
 
 namespace server {
-    netcom::netcom() : listen_port_(0), max_client_(1), terminate_thread_(false),
-        listener_thread_(std::bind(&netcom::loop_, this)) {
+    netcom::netcom() : listen_port_(0), max_client_(1), is_connected_(false), 
+        terminate_thread_(false), listener_thread_(std::bind(&netcom::loop_, this)) {
 
         available_ids_.reserve(max_client_);
         for (std::size_t i = 0; i < max_client_; ++i) {
@@ -33,7 +33,11 @@ namespace server {
         max_client_ = max_client;
     }
 
-    void netcom::run(unsigned short port) {
+    bool netcom::is_connected() const {
+        return is_connected_;
+    }
+
+    void netcom::run(std::uint16_t port) {
         terminate();
         terminate_thread_ = false;
         listen_port_ = port;
@@ -53,6 +57,8 @@ namespace server {
 
             if (terminate_thread_) return;
         }
+
+        is_connected_ = true;
         
         send_message<message::server::internal::start_listening_port>(self_actor_id, listen_port_);
 
@@ -175,6 +181,8 @@ namespace server {
         output_.clear();
         selector_.clear();
         listener_.close();
+        
+        is_connected_ = false;
     }
 
     bool netcom::make_id_(actor_id_t& id) {
