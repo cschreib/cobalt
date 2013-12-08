@@ -116,7 +116,7 @@ public :
         process, and all its content is transfered into this
         new sorted_vector.
     **/
-    explicit sorted_vector_t(base&& s) : base(s) {}
+    explicit sorted_vector_t(base&& s) : base(std::move(s)) {}
 
     /// Default constructor, with comparator.
     /** Creates an empty vector and sets the comparator function.
@@ -278,7 +278,7 @@ public :
         process, and all its content is transfered into this
         new sorted_vector.
     **/
-    explicit sorted_vector_t(base&& s) : base(s) {}
+    explicit sorted_vector_t(base&& s) : base(std::move(s)) {}
 
     /// Default constructor, with comparator.
     /** Creates an empty vector and sets the comparator function.
