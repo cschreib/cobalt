@@ -55,9 +55,9 @@ namespace request {
 // Exception thrown when too many requests are issued at once.
 // Each request is given a unique ID, so that the netcom class can easilly route the packets to
 // the proper callback functions. This exception is thrown when it is not possible to produce a
-// unique ID anymore. If this happens, then there is most likely a bug: either the received does not
+// unique ID anymore. If this happens, then there is most likely a bug: either the receiver does not
 // answer to any request, and they pile up here awaiting for an answer, or you are sending more
-// requests than what the received can handle in a given time interval.
+// requests than what the receiver can handle in a given time interval.
 // Can be thrown by: netcom::send_request().
 struct too_many_requests : public std::runtime_error {
     too_many_requests() : std::runtime_error("error.netcom.too_many_requests") {}
@@ -79,17 +79,15 @@ struct request_already_watched : public std::runtime_error {
     request_already_watched() : std::runtime_error("error.netcom.request_already_watched") {}
 };
 
-// Exception thrown when more than one answer is sent for a given request. This answer must be given
-// by user code, on which this code has no control. The only way to deal with this situation is thus
-// to throw this exception. This is a bug in the user code.
+// Exception thrown when more than one answer is sent for a given request. This is a bug in the user
+// code.
 template<typename RequestType>
 struct request_already_answered : public std::runtime_error {
     request_already_answered() : std::runtime_error("error.netcom.request_already_answered") {}
 };
 
-// Exception thrown when no answer is sent to a given request. This answer must be given
-// by user code, on which this code has no control. The only way to deal with this situation is thus
-// to throw this exception. This is a bug in the user code.
+// Exception thrown when a request is received and sent to a registered handler, but this handler
+// does not provide any answer (even a failure). This is a bug in the user code.
 template<typename RequestType>
 struct request_not_answered : public std::runtime_error {
     request_not_answered() : std::runtime_error("error.netcom.request_not_answered") {}
@@ -707,12 +705,12 @@ namespace netcom_impl {
         watch_pool_t& operator= (const watch_pool_t&) = delete;
         watch_pool_t& operator= (watch_pool_t&&) = default;
 
-        watch_pool_t& operator << (watch_keeper_t w) {
+        watch_pool_t& operator << (watch_keeper_t&& w) {
             add(std::move(w));
             return *this;
         }
 
-        void add(watch_keeper_t w) {
+        void add(watch_keeper_t&& w) {
             watchers_.push_back(std::move(w));
         }
 
