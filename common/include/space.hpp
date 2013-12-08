@@ -165,7 +165,7 @@ namespace space {
         /** \note After this call, this cell becomes empty and the
                   object becomes owned by the caller.
             \note If T provides an accessible member function named 'notify_parent_cell'
-                  that takes a naked pointer to a space::cell<T> as its first and only
+                  that takes a reference to a space::cell<T> as its first and only
                   argument, then this function will call it to notify T that it no
                   longer has any parent. If you declare this function as private, do not
                   forget to befriend space::cell<T>.
