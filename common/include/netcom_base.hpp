@@ -18,8 +18,10 @@ using request_id_t = std::uint16_t;
 using request_packet_id_t = std::uint32_t;
 // Physical type of a message packet identifier.
 using message_packet_id_t = std::uint32_t;
-// Unique ID associated to an actor (for clients: the server, for server: the clients).
-// It is only local and does not circulate over the network.
+// Unique ID associated to an actor.
+// The server can communicate to several different actors (the clients), while the clients can only
+// communicate with the server. Nevertheless, actor IDs can circulate over the network if a client
+// wants to send a message to another client, using the server as a bridge.
 using actor_id_t = std::uint16_t;
 
 class netcom_base;
@@ -438,7 +440,7 @@ namespace netcom_impl {
     template<typename RType, typename RFunc>
     struct request_watch_impl : public request_watch_t {
         request_watch_impl(RFunc&& rf) :
-            request_watch_t(RType::id), receive_func_(rf) {}
+            request_watch_t(RType::packet_id__), receive_func_(rf) {}
 
         using receive_types = typename RType::types;
 
@@ -869,7 +871,7 @@ protected :
 
         out_packet_t p;
         p << netcom_impl::packet_type::message;
-        p << MessageType::id;
+        p << MessageType::packet_id__;
         serialize_(arg_types(), p, std::forward<Args>(args)...);
 
         return p;
@@ -888,7 +890,7 @@ protected :
 
         out_packet_t p;
         p << netcom_impl::packet_type::request;
-        p << RequestType::id;
+        p << RequestType::packet_id__;
         p << rid;
         serialize_(arg_types(), p, std::forward<Args>(args)...);
 
@@ -938,7 +940,7 @@ public :
 
         send_(std::move(p));
 
-        return request_keeper_t(*this, RequestType::id, rid);
+        return request_keeper_t(*this, RequestType::packet_id__, rid);
     }
 
     // Send a request with the provided arguments, and register three callback functions to handle
@@ -978,7 +980,7 @@ public :
 
         send_(std::move(p));
 
-        return request_keeper_t(*this, RequestType::id, rid);
+        return request_keeper_t(*this, RequestType::packet_id__, rid);
     }
 
     // Import helper classes in this scope for the user
@@ -997,9 +999,11 @@ public :
 
         netcom_impl::watch_id_t wid = make_message_watch_id_();
 
-        auto iter = message_watches_.find(MessageType::id);
+        auto iter = message_watches_.find(MessageType::packet_id__);
         if (iter == message_watches_.end()) {
-            iter = message_watches_.insert(netcom_impl::message_watch_group_t(MessageType::id));
+            iter = message_watches_.insert(
+                netcom_impl::message_watch_group_t(MessageType::packet_id__)
+            );
         }
 
         using watch_type = netcom_impl::message_watch_impl<MessageType, FR>;
@@ -1074,7 +1078,7 @@ public :
         static_assert(are_convertible<arg_types, RArgs>::value,
             "receive function arguments do not match request types");
 
-        auto iter = request_watches_.find(RequestType::id);
+        auto iter = request_watches_.find(RequestType::packet_id__);
         if (iter != request_watches_.end()) throw request_already_watched<RequestType>();
 
         using watch_type = netcom_impl::request_watch_impl<RequestType, FR>;
@@ -1106,56 +1110,56 @@ namespace netcom_impl {
     template<typename RequestType>
     void request_selector_t<RequestType>::cancel() {
         if (cancelled_) return;
-        net_.cancel_request_watch_(RequestType::id);
+        net_.cancel_request_watch_(RequestType::packet_id__);
         cancelled_ = true;
     }
 
     template<typename RequestType>
     bool request_selector_t<RequestType>::cancelled() const {
         if (cancelled_) return true;
-        cancelled_ = net_.request_watch_cancelled_(RequestType::id);
+        cancelled_ = net_.request_watch_cancelled_(RequestType::packet_id__);
         return cancelled_;
     }
 
     template<typename RequestType>
     void request_selector_t<RequestType>::hold() {
         if (cancelled_ && held_) return;
-        net_.hold_request_watch_(RequestType::id);
+        net_.hold_request_watch_(RequestType::packet_id__);
         held_ = true;
     }
 
     template<typename RequestType>
     void request_selector_t<RequestType>::release() {
         if (!held_) return;
-        net_.release_request_watch_(RequestType::id);
+        net_.release_request_watch_(RequestType::packet_id__);
         held_ = false;
     }
     
     template<typename MessageType>
     void message_selector_t<MessageType>::cancel() {
         if (cancelled_) return;
-        net_.cancel_message_watch_(MessageType::id, id_);
+        net_.cancel_message_watch_(MessageType::packet_id__, id_);
         cancelled_ = true;
     }
 
     template<typename MessageType>
     bool message_selector_t<MessageType>::cancelled() const {
         if (cancelled_) return true;
-        cancelled_ = net_.message_watch_cancelled_(MessageType::id, id_);
+        cancelled_ = net_.message_watch_cancelled_(MessageType::packet_id__, id_);
         return cancelled_;
     }
 
     template<typename MessageType>
     void message_selector_t<MessageType>::hold() {
         if (cancelled_ && held_) return;
-        net_.hold_message_watch_(MessageType::id, id_);
+        net_.hold_message_watch_(MessageType::packet_id__, id_);
         held_ = true;
     }
 
     template<typename MessageType>
     void message_selector_t<MessageType>::release() {
         if (!held_) return;
-        net_.release_message_watch_(MessageType::id, id_);
+        net_.release_message_watch_(MessageType::packet_id__, id_);
         held_ = false;
     }
 }
