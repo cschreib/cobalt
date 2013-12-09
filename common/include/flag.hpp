@@ -93,35 +93,35 @@ template<typename ... Args>
 struct flag_set {
     constexpr flag_set() {}
 
-    template<typename ... Args2, typename enable = typename std::enable_if<flag_impl::are_any_of<Args2..., flag_impl::separator, Args...>::value>::type>
+    template<typename ... Args2, typename enable = typename std::enable_if<flag_impl::are_any_of<Args2..., separator, Args...>::value>::type>
     explicit constexpr flag_set(Args2&& ... args) : value(build(0, std::forward<Args2>(args)...)) {
     }
 
     constexpr flag_set(const flag_set& f) : value(f.value) {}
 
-    template<typename T, typename ... Args2, typename enable = typename std::enable_if<flag_impl::are_any_of<T, Args2..., flag_impl::separator, Args...>::value>::type>
+    template<typename T, typename ... Args2, typename enable = typename std::enable_if<flag_impl::are_any_of<T, Args2..., separator, Args...>::value>::type>
     void set(T t, Args2&& ... args) {
         value |= static_cast<int>(t);
         set(std::forward<Args2>(args)...);
     }
 
-    template<typename T, typename enable = typename std::enable_if<flag_impl::is_any_of<T, Args...>::value>::type>
+    template<typename T, typename enable = typename std::enable_if<is_any_of<T, Args...>::value>::type>
     void set(T t) {
         value |= static_cast<int>(t);
     }
 
-    template<typename T, typename enable = typename std::enable_if<flag_impl::is_any_of<T, Args...>::value>::type>
+    template<typename T, typename enable = typename std::enable_if<is_any_of<T, Args...>::value>::type>
     flag_set& operator << (T t) {
         set(t);
         return *this;
     }
 
-    template<typename T, typename enable = typename std::enable_if<flag_impl::is_any_of<T, Args...>::value>::type>
+    template<typename T, typename enable = typename std::enable_if<is_any_of<T, Args...>::value>::type>
     bool operator == (T t) {
         return ((value & (1 << flag_impl::get_pos<T, Args ...>::value)) == static_cast<int>(t));
     }
 
-    template<typename T, typename enable = typename std::enable_if<flag_impl::is_any_of<T, Args...>::value>::type>
+    template<typename T, typename enable = typename std::enable_if<is_any_of<T, Args...>::value>::type>
     bool operator != (T t) {
         return ((value & (1 << flag_impl::get_pos<T, Args ...>::value)) != static_cast<int>(t));
     }
