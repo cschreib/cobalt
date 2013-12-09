@@ -201,4 +201,42 @@ public :
     }
 };
 
+namespace std {
+    template<typename T, typename C>
+    struct iterator_traits<ptr_iterator_base<T,C>> {
+        using difference_type = typename iterator_traits<T>::difference_type;
+        using value_type = typename std::remove_pointer<typename iterator_traits<T>::value_type>::type;
+        using pointer = value_type*;
+        using reference = value_type&;
+        using iterator_category = typename iterator_traits<T>::iterator_category;
+    };
+
+    template<typename T, typename C>
+    struct iterator_traits<const_ptr_iterator_base<T,C>> {
+        using difference_type = typename iterator_traits<T>::difference_type;
+        using value_type = typename std::remove_pointer<typename iterator_traits<T>::value_type>::type;
+        using pointer = value_type*;
+        using reference = value_type&;
+        using iterator_category = typename iterator_traits<T>::iterator_category;
+    };
+
+    template<typename T, typename C>
+    struct iterator_traits<reverse_ptr_iterator_base<T,C>> {
+        using difference_type = typename iterator_traits<T>::difference_type;
+        using value_type = typename std::remove_pointer<typename iterator_traits<T>::value_type>::type;
+        using pointer = value_type*;
+        using reference = value_type&;
+        using iterator_category = typename iterator_traits<T>::iterator_category;
+    };
+
+    template<typename T, typename C>
+    struct iterator_traits<const_reverse_ptr_iterator_base<T,C>> {
+        using difference_type = typename iterator_traits<T>::difference_type;
+        using value_type = typename std::remove_pointer<typename iterator_traits<T>::value_type>::type;
+        using pointer = value_type*;
+        using reference = value_type&;
+        using iterator_category = typename iterator_traits<T>::iterator_category;
+    };
+}
+
 #endif
