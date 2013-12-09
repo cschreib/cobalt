@@ -68,11 +68,11 @@ namespace server {
         };
 
         ID_STRUCT(unknown_client) {
-            using types = type_list<std::uint16_t>;
+            using types = type_list<actor_id_t>;
         };
 
         ID_STRUCT(client_connected) {
-            using types = type_list<std::uint16_t, std::string>;
+            using types = type_list<actor_id_t, std::string>;
         };
 
         ID_STRUCT(client_disconnected) {
@@ -80,7 +80,7 @@ namespace server {
                 connection_lost
             };
 
-            using types = type_list<std::uint16_t, reason>;
+            using types = type_list<actor_id_t, reason>;
         };
     }
 
