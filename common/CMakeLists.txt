@@ -5,6 +5,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 
 set(SRC_LIST 
     ${PROJECT_SOURCE_DIR}/any.cpp
+    ${PROJECT_SOURCE_DIR}/color32.cpp
     ${PROJECT_SOURCE_DIR}/config.cpp
     ${PROJECT_SOURCE_DIR}/crc32.cpp
     ${PROJECT_SOURCE_DIR}/netcom_base.cpp
