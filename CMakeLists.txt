@@ -43,25 +43,29 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   # using Visual Studio C++
 endif()
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
+file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/bin")
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
 
 find_package(SFML 2 COMPONENTS system network)
 
+# build the common library
 add_subdirectory(common)
+
+# build server & client libraries
 add_subdirectory(server)
 add_subdirectory(client)
+
+# build server & client frontends
 add_subdirectory(server-cli)
 add_subdirectory(client-cli)
 
-file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/bin")
+# build test tools
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/bin")
-
 add_subdirectory(tools/crc32_collide_test)
-
 enable_testing()
-
 add_test(crc32-collide-test
     ${PROJECT_SOURCE_DIR}/tools/bin/crc32-collide-test ${PROJECT_SOURCE_DIR}
 )
