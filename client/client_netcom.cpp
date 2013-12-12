@@ -52,10 +52,10 @@ namespace client {
                     message_packet_id_t id;
                     op >> id;
                     switch (id) {
-                    case message::server::connection_granted::id :
+                    case message::server::connection_granted::packet_id__ :
                         input_.push(std::move(top.to_input()));
                         break;
-                    case message::server::connection_denied::id :
+                    case message::server::connection_denied::packet_id__ :
                         input_.push(std::move(top.to_input()));
                         return;
                     default : 
