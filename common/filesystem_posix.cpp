@@ -6,6 +6,7 @@
 #include <fnmatch.h>
 #include <cstring>
 #include <cstdio>
+#include <ctime>
 
 namespace file {
     namespace impl {
@@ -219,5 +220,12 @@ namespace file {
         }
 
         return true;
+    }
+
+    bool is_older(const std::string& file1, const std::string& file2) {
+        struct stat st1, st2;
+        if (stat(file1.c_str(), &st1) != 0) return false;
+        if (stat(file2.c_str(), &st2) != 0) return false;
+        return std::difftime(st1.st_ctime, st2.st_ctime) < 0.0;
     }
 }

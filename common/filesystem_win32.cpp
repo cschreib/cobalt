@@ -108,4 +108,12 @@ namespace file {
 
         return true;
     }
+
+    bool is_older(const std::string& file1, const std::string& file2) {
+        WIN32_FILE_ATTRIBUTE_DATA st1 = {0};
+        WIN32_FILE_ATTRIBUTE_DATA st2 = {0};
+        GetFileAttributesEx(file1.c_str(), GetFileExInfoStandard, &st1);
+        GetFileAttributesEx(file2.c_str(), GetFileExInfoStandard, &st2);
+        return CompareFileTime(&st1.ftCreationTime, &st2.ftCreationTime) < 0;
+    }
 }

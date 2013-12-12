@@ -18,6 +18,16 @@ namespace string {
         return s;
     }
 
+    std::string join(const std::vector<std::string>& vs, const std::string& delim) {
+        if (vs.empty()) return "";
+        std::string res = vs[0];
+        for (std::size_t i = 1; i < vs.size(); ++i) {
+            res += delim + vs[i];
+        }
+
+        return res;
+    }
+
     std::string to_upper(std::string s) {
         for (auto& c : s) {
             c = ::toupper(c);
@@ -93,7 +103,7 @@ namespace string {
         std::size_t p = 0, op = 0;
         while ((p = s.find(pattern, op)) != s.npos) {
             ret.push_back(s.substr(op, p - op));
-            op = p+1;
+            op = p+pattern.size();
         }
 
         ret.push_back(s.substr(op));

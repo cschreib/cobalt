@@ -65,4 +65,10 @@ sf::Packet& operator << (sf::Packet& p, const std::array<T,N>& t) {
     return p;
 }
 
+#ifdef NO_AUTOGEN
+    #define PACKET_AUTOGEN_FOLDER ""
+#else
+    #define PACKET_AUTOGEN_FOLDER "autogen/packets/"
+#endif
+
 #endif

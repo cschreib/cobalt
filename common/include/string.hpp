@@ -40,6 +40,7 @@ namespace string {
     }
 
     std::string trim(std::string ts, const std::string& chars = " \t");
+    std::string join(const std::vector<std::string>& vs, const std::string& delim = "");
     std::string to_upper(std::string ts);
     std::string to_lower(std::string ts);
     std::string erase_begin(std::string ts, std::size_t n = 1);

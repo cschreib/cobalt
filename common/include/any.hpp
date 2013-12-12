@@ -110,7 +110,7 @@ struct any {
     any(any&& a);
 
     template<typename T>
-    any(T&& t) : type_(any_impl::any_traits<T>::type) {
+    explicit any(T&& t) : type_(any_impl::any_traits<T>::type) {
         any_impl::any_traits<T>::insert(std::forward<T>(t), data_, size_);
     }
 

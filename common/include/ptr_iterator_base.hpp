@@ -1,6 +1,8 @@
 #ifndef ITERATOR_BASE_HPP
 #define ITERATOR_BASE_HPP
 
+#include <iterator>
+
 template<typename T, typename C>
 class ptr_iterator_base;
 

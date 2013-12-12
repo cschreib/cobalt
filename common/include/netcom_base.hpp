@@ -54,6 +54,10 @@ namespace request {
     };
 }
 
+#ifndef NO_AUTOGEN
+#include "autogen/packets/netcom_base.hpp" 
+#endif
+
 // Exception thrown when too many requests are issued at once.
 // Each request is given a unique ID, so that the netcom class can easilly route the packets to
 // the proper callback functions. This exception is thrown when it is not possible to produce a
