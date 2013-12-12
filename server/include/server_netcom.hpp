@@ -113,4 +113,8 @@ namespace server {
 }
 }
 
+#ifndef NO_AUTOGEN
+#include "autogen/packets/server_netcom.hpp" 
+#endif
+
 #endif
