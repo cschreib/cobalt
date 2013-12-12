@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 2.6)
 project(cobalt-common)
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${SFML_INCLUDE_DIR})
+
+add_definitions(-DNO_AUTOGEN)
 
 set(SRC_LIST 
     ${PROJECT_SOURCE_DIR}/any.cpp
