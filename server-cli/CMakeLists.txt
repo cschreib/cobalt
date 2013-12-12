@@ -4,6 +4,7 @@ project(cobalt-server-cli)
 include_directories(${PROJECT_SOURCE_DIR}/../common/include)
 include_directories(${PROJECT_SOURCE_DIR}/../server/include)
 include_directories(${PROJECT_SOURCE_DIR}/../client/include)
+include_directories(${SFML_INCLUDE_DIR})
 
 add_executable(cobalt-server-cli
     main.cpp
