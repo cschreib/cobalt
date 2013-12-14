@@ -3,9 +3,11 @@ project(cobalt-client)
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR}/../common/include)
+include_directories(${PROJECT_SOURCE_DIR}/../common-netcom/include)
 include_directories(${PROJECT_SOURCE_DIR}/../server/include)
 include_directories(${SFML_INCLUDE_DIR})
 
 add_library(cobalt-client STATIC
     client_netcom.cpp
+    client_player_list.cpp
 )

@@ -59,57 +59,50 @@ namespace server {
 namespace message {
 namespace server {
     namespace internal {
-        ID_STRUCT(cannot_listen_port) {
-            using types = type_list<std::uint16_t>;
+        NETCOM_PACKET(cannot_listen_port) {
+            std::uint16_t port;
         };
 
-        ID_STRUCT(start_listening_port) {
-            using types = type_list<std::uint16_t>;
+        NETCOM_PACKET(start_listening_port) {
+            std::uint16_t port;
         };
 
-        ID_STRUCT(unknown_client) {
-            using types = type_list<actor_id_t>;
+        NETCOM_PACKET(unknown_client) {
+            actor_id_t id;
         };
 
-        ID_STRUCT(client_connected) {
-            using types = type_list<actor_id_t, std::string>;
+        NETCOM_PACKET(client_connected) {
+            actor_id_t id;
+            std::string ip;
         };
 
-        ID_STRUCT(client_disconnected) {
+        NETCOM_PACKET(client_disconnected) {
+            actor_id_t id;
+
             enum class reason : std::uint8_t {
                 connection_lost
-            };
-
-            using types = type_list<actor_id_t, reason>;
+            } rsn;
         };
     }
 
-    ID_STRUCT(connection_established) {
-        using types = type_list<>;
-    };
+    NETCOM_PACKET(connection_established) {};
 
-    ID_STRUCT(connection_failed) {
+    NETCOM_PACKET(connection_failed) {
         enum class reason : std::uint8_t {
             cannot_authenticate,
             disconnected,
             timed_out
-        };
-
-        using types = type_list<reason>;
+        } rsn;
     };
 
-    ID_STRUCT(connection_denied) {
+    NETCOM_PACKET(connection_denied) {
         enum class reason : std::uint8_t {
             too_many_clients,
             unexpected_packet
-        };
-
-        using types = type_list<reason>;
+        } rsn;
     };
 
-    ID_STRUCT(connection_granted) {
-        using types = type_list<>;
-    };
+    NETCOM_PACKET(connection_granted) {};
 }
 }
 

@@ -15,7 +15,7 @@ netcom_base::netcom_base() {
     }
 }
 
-void netcom_base::serialize_(type_list<>, out_packet_t& p) {}
+// void netcom_base::serialize_(type_list<>, out_packet_t& p) {}
 
 void netcom_base::send_(out_packet_t&& p) {
     if (p.to == invalid_actor_id) throw invalid_actor();
@@ -191,7 +191,7 @@ bool netcom_base::process_unhandled_(in_packet_t&& p) {
     auto iter = requests_.find(id);
     if (iter == requests_.end() || (*iter)->cancelled) return false;
 
-    (*iter)->unhandled(std::move(p));
+    (*iter)->unhandled();
     cancel_request_(iter);
     return true;
 }

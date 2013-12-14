@@ -21,16 +21,4 @@ constexpr std::uint32_t operator "" _crc32(const char* str, std::size_t length) 
     return recursive_crc32(0, str, 0, length, 0, 0x4C11DB7);
 }
 
-namespace crc32_impl {
-    template<std::uint32_t ID>
-    struct base {
-        static const std::uint32_t packet_id__ = ID;
-    };
-
-    template<std::uint32_t ID>
-    const std::uint32_t base<ID>::packet_id__;
-}
-
-#define ID_STRUCT(name) struct name : public crc32_impl::base<#name ## _crc32>
-
 #endif

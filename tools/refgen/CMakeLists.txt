@@ -11,8 +11,9 @@ add_executable(refgen
 target_link_libraries(refgen cobalt-common)
 target_link_libraries(refgen ${CLANG_LIBS})
 
-add_custom_command(TARGET refgen POST_BUILD
-    COMMAND ${PROJECT_SOURCE_DIR}/../bin/refgen ${PROJECT_SOURCE_DIR}/../../
+add_custom_target(refgen-gen ALL
+    COMMAND ${PROJECT_SOURCE_DIR}/../bin/refgen
+    ${PROJECT_SOURCE_DIR}/../../
     -std=c++11
     -I${PROJECT_SOURCE_DIR}/../../common/include
     -I${PROJECT_SOURCE_DIR}/../../server/include
@@ -20,3 +21,6 @@ add_custom_command(TARGET refgen POST_BUILD
     -I${SFML_INCLUDE_DIR}
     -DNO_AUTOGEN
 )
+
+add_custom_target(refgen-clean COMMAND ${PROJECT_SOURCE_DIR}/../bin/refgen 
+    ${PROJECT_SOURCE_DIR}/../../ clean)

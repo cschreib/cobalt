@@ -52,15 +52,19 @@ namespace server {
     void netcom::loop_() {
         // Try to open the port
         while (listener_.listen(listen_port_) != sf::Socket::Done && !terminate_thread_) {
-            send_message<message::server::internal::cannot_listen_port>(self_actor_id, listen_port_);
-            sf::sleep(sf::seconds(5));
+            send_message(self_actor_id,
+                make_packet<message::server::internal::cannot_listen_port>(listen_port_)
+            );
 
+            sf::sleep(sf::seconds(5));
             if (terminate_thread_) return;
         }
 
         is_connected_ = true;
         
-        send_message<message::server::internal::start_listening_port>(self_actor_id, listen_port_);
+        send_message(self_actor_id,
+            make_packet<message::server::internal::start_listening_port>(listen_port_)
+        );
 
         selector_.add(listener_);
 
@@ -75,8 +79,10 @@ namespace server {
                     if (clients_.size() < max_client_) {
                         actor_id_t id;
                         if (make_id_(id)) {
-                            send_message<message::server::internal::client_connected>(self_actor_id,
-                                id, s->getRemoteAddress().toString()
+                            send_message(self_actor_id,
+                                make_packet<message::server::internal::client_connected>(
+                                    id, s->getRemoteAddress().toString()
+                                )
                             );
 
                             out_packet_t p = create_message_<message::server::connection_granted>();
@@ -165,8 +171,10 @@ namespace server {
 
             // Remove disconnected clients
             for (auto cid : remove_list) {
-                send_message<message::server::internal::client_disconnected>(self_actor_id,
-                    cid, message::server::internal::client_disconnected::reason::connection_lost
+                send_message(self_actor_id,
+                    make_packet<message::server::internal::client_disconnected>(
+                        cid, message::server::internal::client_disconnected::reason::connection_lost
+                    )
                 );
 
                 remove_client_(cid);

@@ -4,6 +4,9 @@
 #include <SFML/Network/Packet.hpp>
 #include <vector>
 #include <array>
+#include <crc32.hpp>
+
+struct color32;
 
 // Extend sf::Packet to handle 64bit types
 #ifdef HAS_UINT64_T
@@ -64,5 +67,28 @@ sf::Packet& operator << (sf::Packet& p, const std::array<T,N>& t) {
     }
     return p;
 }
+
+sf::Packet& operator << (sf::Packet& s, const color32& c);
+sf::Packet& operator >> (sf::Packet& s, color32& c);
+
+namespace packet_impl {
+    template<std::uint32_t ID>
+    struct base {
+        static const std::uint32_t packet_id__ = ID;
+    };
+
+    template<std::uint32_t ID>
+    const std::uint32_t base<ID>::packet_id__;
+
+    template<typename T>
+    struct packet_builder;
+}
+
+template<typename T, typename ... Args>
+T make_packet(Args&& ... args) {
+    return packet_impl::packet_builder<T>()(std::forward<Args>(args)...);
+}
+
+#define NETCOM_PACKET(name) struct name : packet_impl::base<#name ## _crc32>
 
 #endif

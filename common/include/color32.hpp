@@ -56,11 +56,4 @@ color32 operator * (float f, const color32& c2);
 std::ostream& operator << (std::ostream& s, const color32& c);
 std::istream& operator >> (std::istream& s, color32& c);
 
-namespace sf {
-    class Packet;
-}
-
-sf::Packet& operator << (sf::Packet& s, const color32& c);
-sf::Packet& operator >> (sf::Packet& s, color32& c);
-
 #endif

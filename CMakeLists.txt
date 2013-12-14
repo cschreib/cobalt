@@ -60,6 +60,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/bin")
 add_subdirectory(tools/refgen)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
 
+# build the common netcom library
+add_subdirectory(common-netcom)
+
 # build server & client libraries
 add_subdirectory(server)
 add_subdirectory(client)

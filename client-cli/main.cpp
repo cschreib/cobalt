@@ -10,16 +10,16 @@ int main(int argc, const char* argv[]) {
     bool stop = false;
     client::netcom::watch_pool_t pool;
 
-    pool << net.watch_message<message::unhandled_message>([&](message_packet_id_t id) {
-        warning("unhandled message: ", id);
+    pool << net.watch_message<message::unhandled_message>([&](message::unhandled_message msg) {
+        warning("unhandled message: ", msg.message_id);
     });
 
     pool << net.watch_message<message::server::connection_failed>([&](
-        message::server::connection_failed::reason r) {
+        message::server::connection_failed msg) {
         stop = true;
         error("connection failed");
         std::string rsn = "?";
-        switch (r) {
+        switch (msg.rsn) {
             case message::server::connection_failed::reason::cannot_authenticate :
                 rsn = "cannot authenticate"; break;
             case message::server::connection_failed::reason::disconnected :
@@ -29,15 +29,16 @@ int main(int argc, const char* argv[]) {
         }
         reason(rsn);
     });
-    pool << net.watch_message<message::server::connection_established>([]() {
+    pool << net.watch_message<message::server::connection_established>(
+        [](message::server::connection_established msg) {
         note("connection established");
     });
     pool << net.watch_message<message::server::connection_denied>([&]
-        (message::server::connection_denied::reason r) {
+        (message::server::connection_denied msg) {
         stop = true;
         error("connection denied");
         std::string rsn = "?";
-        switch (r) {
+        switch (msg.rsn) {
             case message::server::connection_denied::reason::too_many_clients :
                 rsn = "too many clients"; break;
             case message::server::connection_denied::reason::unexpected_packet :
@@ -45,7 +46,8 @@ int main(int argc, const char* argv[]) {
         }
         reason(rsn);
     });
-    pool << net.watch_message<message::server::connection_granted>([]() {
+    pool << net.watch_message<message::server::connection_granted>(
+        [](message::server::connection_granted msg) {
         note("connection granted!");
     });
 
@@ -58,14 +60,14 @@ int main(int argc, const char* argv[]) {
         double n = now();
         if (n - start > 2) {
             start = n;
-            net.send_checked_request<request::ping>(client::netcom::server_actor_id,
-            [n](){
+            net.send_request(client::netcom::server_actor_id, request::ping{},
+            [n](request::ping::answer){
                 double tn = now();
                 note("pong from server (", seconds_str(tn - n), ")");
-            }, [](){
+            }, [](request::ping::failure){
                 warning("failure to pong ?!");
             }, [](){
-                error("server does not know how to pong");
+                error("server does not know how to pong...");
             });
         }
     }

@@ -1,5 +1,4 @@
 #include "color32.hpp"
-#include "packet.hpp"
 #include <iostream>
 #include <sstream>
 
@@ -215,12 +214,4 @@ std::istream& operator >> (std::istream& s, color32& c) {
     }
 
     return s;
-}
-
-sf::Packet& operator << (sf::Packet& s, const color32& c) {
-    return s << c.r << c.g << c.b << c.a;
-}
-
-sf::Packet& operator >> (sf::Packet& s, color32& c) {
-    return s >> c.r >> c.g >> c.b >> c.a;
 }

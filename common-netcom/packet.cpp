@@ -1,4 +1,5 @@
 #include "packet.hpp"
+#include <color32.hpp>
 
 #ifdef HAS_UINT64_T
 sf::Packet& operator << (sf::Packet& p, std::uint64_t data) {
@@ -50,3 +51,11 @@ sf::Packet& operator >> (sf::Packet& p, impl_u64& data) {
     return p;
 }
 #endif
+
+sf::Packet& operator << (sf::Packet& s, const color32& c) {
+    return s << c.r << c.g << c.b << c.a;
+}
+
+sf::Packet& operator >> (sf::Packet& s, color32& c) {
+    return s >> c.r >> c.g >> c.b >> c.a;
+}

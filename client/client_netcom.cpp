@@ -35,7 +35,7 @@ namespace client {
         while (wait_count != 0) {
             switch (socket.connect(sf::IpAddress(address_), port_, sf::seconds(1))) {
             case sf::Socket::Done : {
-                send_message<message::server::connection_established>(self_actor_id);
+                send_message(self_actor_id, message::server::connection_established{});
 
                 out_packet_t op(server_actor_id);
                 if (socket.receive(op.impl) == sf::Socket::Done) {
@@ -43,9 +43,9 @@ namespace client {
                     netcom_impl::packet_type t;
                     op >> t;
                     if (t != netcom_impl::packet_type::message) {
-                        send_message<message::server::connection_denied>(self_actor_id,
+                        send_message(self_actor_id, make_packet<message::server::connection_denied>(
                             message::server::connection_denied::reason::unexpected_packet
-                        );
+                        ));
                         return;
                     }
 
@@ -59,15 +59,15 @@ namespace client {
                         input_.push(std::move(top.to_input()));
                         return;
                     default : 
-                        send_message<message::server::connection_denied>(self_actor_id,
+                        send_message(self_actor_id, make_packet<message::server::connection_denied>(
                             message::server::connection_denied::reason::unexpected_packet
-                        );
+                        ));
                         return;
                     }
                 } else {
-                    send_message<message::server::connection_failed>(self_actor_id,
+                    send_message(self_actor_id, make_packet<message::server::connection_failed>(
                         message::server::connection_failed::reason::cannot_authenticate
-                    );
+                    ));
                     return;
                 }
 
@@ -77,9 +77,9 @@ namespace client {
             case sf::Socket::NotReady : break;
             case sf::Socket::Error : break;
             case sf::Socket::Disconnected :
-                send_message<message::server::connection_failed>(self_actor_id,
+                send_message(self_actor_id, make_packet<message::server::connection_failed>(
                     message::server::connection_failed::reason::disconnected
-                );
+                ));
                 return;
             }
 
@@ -88,9 +88,9 @@ namespace client {
             --wait_count;
 
             if (wait_count == 0) {
-                send_message<message::server::connection_failed>(self_actor_id,
+                send_message(self_actor_id, make_packet<message::server::connection_failed>(
                     message::server::connection_failed::reason::timed_out
-                );
+                ));
                 return;
             }
         }
@@ -109,9 +109,9 @@ namespace client {
             case sf::Socket::NotReady : break;
             case sf::Socket::Disconnected :
             case sf::Socket::Error :
-                send_message<message::server::connection_failed>(self_actor_id,
+                send_message(self_actor_id, make_packet<message::server::connection_failed>(
                     message::server::connection_failed::reason::disconnected
-                );
+                ));
                 terminate_thread_ = true;
                 break;
             }
@@ -127,9 +127,9 @@ namespace client {
                 case sf::Socket::NotReady :
                 case sf::Socket::Disconnected :
                 case sf::Socket::Error :
-                    send_message<message::server::connection_failed>(self_actor_id,
+                    send_message(self_actor_id, make_packet<message::server::connection_failed>(
                         message::server::connection_failed::reason::disconnected
-                    );
+                    ));
                     terminate_thread_ = true;
                     break;
                 }

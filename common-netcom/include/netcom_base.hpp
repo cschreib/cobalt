@@ -2,13 +2,12 @@
 #define NETCOM_BASE_HPP
 
 #include <stdexcept>
+#include <variadic.hpp>
+#include <lock_free_queue.hpp>
+#include <member_comparator.hpp>
+#include <sorted_vector.hpp>
+#include <std_addon.hpp>
 #include "packet.hpp"
-#include "variadic.hpp"
-#include "lock_free_queue.hpp"
-#include "member_comparator.hpp"
-#include "sorted_vector.hpp"
-#include "std_addon.hpp"
-#include "crc32.hpp"
 
 // Unique ID attributed to any request.
 // It is external, but only used explicitely by the sender. It must thus only be unique from the
@@ -28,29 +27,28 @@ class netcom_base;
 
 // List of messages that can be sent by this class
 namespace message {
-    ID_STRUCT(unhandled_message) {
-        using types = type_list<message_packet_id_t>;
+    NETCOM_PACKET(unhandled_message) {
+        message_packet_id_t message_id;
     };
 
-    ID_STRUCT(unhandled_request) {
-        using types = type_list<request_packet_id_t>;
+    NETCOM_PACKET(unhandled_request) {
+        request_packet_id_t request_id;
     };
 
-    ID_STRUCT(unhandled_answer) {
-        using types = type_list<request_id_t>;
+    NETCOM_PACKET(unhandled_answer) {
+        request_id_t request_id;
     };
     
-    ID_STRUCT(unhandled_failure) {
-        using types = type_list<request_id_t>;
+    NETCOM_PACKET(unhandled_failure) {
+        request_id_t request_id;
     };
 }
 
 // List of requests that one can send with this class
 namespace request {
-    ID_STRUCT(ping) {
-        using types = type_list<>;
-        using answer_types = type_list<>;
-        using failure_types = type_list<>;
+    NETCOM_PACKET(ping) {
+        struct answer {};
+        struct failure {};
     };
 }
 
@@ -185,7 +183,7 @@ namespace netcom_impl {
 
         virtual void receive(in_packet_t&&) = 0;
         virtual void fail(in_packet_t&&) = 0;
-        virtual void unhandled(in_packet_t&&) = 0;
+        virtual void unhandled() = 0;
 
         const request_id_t id;
         bool cancelled;
@@ -197,31 +195,33 @@ namespace netcom_impl {
         request_only(request_id_t id_, RFunc&& f) : 
             request_t(id_), receive_func_(std::move(f)) {}
 
-        using answer_types = typename RType::answer_types;
+        // using answer_types = typename RType::answer_types;
 
     private :
         RFunc receive_func_;
 
-        template<typename T, typename ... Args, typename ... Args2>
-        void receive_(type_list<T, Args...> tl, in_packet_t&& p, Args2&& ... args) {
-            T t;
-            p >> t;
-            receive_(tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
-        }
+        // template<typename T, typename ... Args, typename ... Args2>
+        // void receive_(type_list<T, Args...> tl, in_packet_t&& p, Args2&& ... args) {
+        //     T t;
+        //     p >> t;
+        //     receive_(tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
+        // }
 
-        template<typename ... Args>
-        void receive_(type_list<> tl, in_packet_t&& p, Args&& ... args) {
-            receive_func_(std::forward<Args>(args)...);
-        }
+        // template<typename ... Args>
+        // void receive_(type_list<> tl, in_packet_t&& p, Args&& ... args) {
+        //     receive_func_(std::forward<Args>(args)...);
+        // }
 
     public :
         void receive(in_packet_t&& p) override {
-            receive_(answer_types(), std::move(p));
+            typename RType::answer a;
+            p >> a;
+            receive_func_(a);
         }
 
         void fail(in_packet_t&& p) override {}
 
-        void unhandled(in_packet_t&&) override {}
+        void unhandled() override {}
     };
 
     // Full implementation of a request, with success and failure cases.
@@ -231,30 +231,32 @@ namespace netcom_impl {
             request_only<RType, RFunc>(id_, std::move(rf)), fail_func_(std::move(ff)),
             unhandled_func_(std::move(uf)) {}
 
-        using failure_types = typename RType::failure_types;
+        // using failure_types = typename RType::failure_types;
 
     private :
         FFunc fail_func_;
         UHFunc unhandled_func_;
 
-        template<typename T, typename ... Args, typename ... Args2>
-        void fail_(type_list<T, Args...> tl, in_packet_t&& p, Args2&& ... args) {
-            T t;
-            p >> t;
-            fail_(tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
-        }
+        // template<typename T, typename ... Args, typename ... Args2>
+        // void fail_(type_list<T, Args...> tl, in_packet_t&& p, Args2&& ... args) {
+        //     T t;
+        //     p >> t;
+        //     fail_(tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
+        // }
 
-        template<typename ... Args>
-        void fail_(type_list<> tl, in_packet_t&& p, Args&& ... args) {
-            fail_func_(std::forward<Args>(args)...);
-        }
+        // template<typename ... Args>
+        // void fail_(type_list<> tl, in_packet_t&& p, Args&& ... args) {
+        //     fail_func_(std::forward<Args>(args)...);
+        // }
 
     public :
         void fail(in_packet_t&& p) override {
-            fail_(failure_types(), std::move(p));
+            typename RType::failure f;
+            p >> f;
+            fail_func_(f);
         }
 
-        void unhandled(in_packet_t&& p) override {
+        void unhandled() override {
             unhandled_func_();
         }
     };
@@ -288,11 +290,8 @@ namespace netcom_impl {
             return aid_;
         }
 
-        template<typename ... Args>
-        void answer(Args&& ... args);
-
-        template<typename ... Args>
-        void fail(Args&& ... args);
+        void answer(typename RequestType::answer&& answer);
+        void fail(typename RequestType::failure&& fail);
     };
 
     // RAII class to keep requests alive.
@@ -446,31 +445,34 @@ namespace netcom_impl {
         request_watch_impl(RFunc&& rf) :
             request_watch_t(RType::packet_id__), receive_func_(rf) {}
 
-        using receive_types = typename RType::types;
+        // using receive_types = typename RType::types;
 
     private :
         RFunc receive_func_;
 
-        template<typename T, typename ... Args, typename ... Args2>
-        void receive_(netcom_request_t<RType>& req, type_list<T, Args...> tl, in_packet_t&& p,
-            Args2&& ... args) {
+        // template<typename T, typename ... Args, typename ... Args2>
+        // void receive_(netcom_request_t<RType>& req, type_list<T, Args...> tl, in_packet_t&& p,
+        //     Args2&& ... args) {
 
-            T t;
-            p >> t;
-            receive_(req, tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
-        }
+        //     T t;
+        //     p >> t;
+        //     receive_(req, tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
+        // }
 
-        template<typename ... Args>
-        void receive_(netcom_request_t<RType>& req, type_list<> tl, in_packet_t&& p, Args&& ... args) {
-            receive_func_(req, std::forward<Args>(args)...);
-        }
+        // template<typename ... Args>
+        // void receive_(netcom_request_t<RType>& req, type_list<> tl, in_packet_t&& p, Args&& ... args) {
+        //     receive_func_(req, std::forward<Args>(args)...);
+        // }
 
     public :
         void receive_and_answer(netcom_base& net, in_packet_t&& p) override {
             request_id_t rid;
             p >> rid;
             netcom_request_t<RType> req(net, p.from, rid);
-            receive_(req, receive_types(), std::move(p));
+
+            RType mreq;
+            p >> mreq;
+            receive_func_(req, mreq);
         }
     };
 
@@ -526,26 +528,29 @@ namespace netcom_impl {
         message_watch_impl(watch_id_t id_, RFunc&& rf) :
             message_watch_t(id_), receive_func_(rf) {}
 
-        using receive_types = typename MType::types;
+        // using receive_types = typename MType::types;
 
     private :
         RFunc receive_func_;
 
-        template<typename T, typename ... Args, typename ... Args2>
-        void receive_(type_list<T, Args...> tl, in_packet_t&& p, Args2&& ... args) {
-            T t;
-            p >> t;
-            receive_(tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
-        }
+        // template<typename T, typename ... Args, typename ... Args2>
+        // void receive_(type_list<T, Args...> tl, in_packet_t&& p, Args2&& ... args) {
+        //     T t;
+        //     p >> t;
+        //     receive_(tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
+        // }
 
-        template<typename ... Args>
-        void receive_(type_list<> tl, in_packet_t&& p, Args&& ... args) {
-            receive_func_(std::forward<Args>(args)...);
-        }
+        // template<typename ... Args>
+        // void receive_(type_list<> tl, in_packet_t&& p, Args&& ... args) {
+        //     receive_func_(std::forward<Args>(args)...);
+        // }
 
     public :
         void receive(in_packet_t&& p) override {
-            receive_(receive_types(), std::move(p));
+            MType msg;
+            p >> msg;
+            receive_func_(msg);
+            // receive_(receive_types(), std::move(p));
         }
     };
 
@@ -812,20 +817,20 @@ private :
 
 private :
     // Serialize a bunch of objects into an sf::Packet
-    template<typename T, typename ... Args1, typename ... Args2>
-    void serialize_(type_list<T, Args1...> tl, out_packet_t& p, const T& t, Args2&& ... args) {
-        p << t;
-        serialize_(tl.pop_front(), p, std::forward<Args2>(args)...);
-    }
+    // template<typename T, typename ... Args1, typename ... Args2>
+    // void serialize_(type_list<T, Args1...> tl, out_packet_t& p, const T& t, Args2&& ... args) {
+    //     p << t;
+    //     serialize_(tl.pop_front(), p, std::forward<Args2>(args)...);
+    // }
 
-    template<typename T, typename U, typename ... Args1, typename ... Args2>
-    void serialize_(type_list<T, Args1...> tl, out_packet_t& p, const U& u, Args2&& ... args) {
-        T t = u;
-        p << t;
-        serialize_(tl.pop_front(), p, std::forward<Args2>(args)...);
-    }
+    // template<typename T, typename U, typename ... Args1, typename ... Args2>
+    // void serialize_(type_list<T, Args1...> tl, out_packet_t& p, const U& u, Args2&& ... args) {
+    //     T t = u;
+    //     p << t;
+    //     serialize_(tl.pop_front(), p, std::forward<Args2>(args)...);
+    // }
 
-    void serialize_(type_list<>, out_packet_t& p);
+    // void serialize_(type_list<>, out_packet_t& p);
 
     // Send a packet to the output queue
     void send_(out_packet_t&& p);
@@ -865,39 +870,44 @@ private :
 protected :
     // Packet creation functions
     template<typename MessageType, typename ... Args>
-    out_packet_t create_message_(Args&& ... args) {
-        using arg_types = typename MessageType::types;
-
-        static_assert(sizeof...(Args) == type_list_size<arg_types>::value,
-            "wrong number of arguments for this message");
-        static_assert(are_convertible<type_list<Args...>, arg_types>::value,
-            "provided arguments do not match message types");
-
+    out_packet_t create_message_(MessageType&& msg) {
         out_packet_t p;
         p << netcom_impl::packet_type::message;
         p << MessageType::packet_id__;
-        serialize_(arg_types(), p, std::forward<Args>(args)...);
+        p << msg;
+        return p;
+    }
 
+    template<typename MessageType, typename ... Args>
+    out_packet_t create_message_(Args&& ... args) {
+        out_packet_t p;
+        p << netcom_impl::packet_type::message;
+        p << MessageType::packet_id__;
+        p << make_packet<MessageType>(std::forward<Args>(args)...);
         return p;
     }
 
     template<typename RequestType, typename ... Args>
-    out_packet_t create_request_(request_id_t& rid, Args&& ... args) {
-        using arg_types = typename RequestType::types;
-
-        static_assert(sizeof...(Args) == type_list_size<arg_types>::value,
-            "wrong number of arguments for this request");
-        static_assert(are_convertible<type_list<Args...>, arg_types>::value,
-            "provided arguments do not match request types");
-
+    out_packet_t create_request_(request_id_t& rid, RequestType&& req) {
         rid = make_request_id_();
 
         out_packet_t p;
         p << netcom_impl::packet_type::request;
         p << RequestType::packet_id__;
         p << rid;
-        serialize_(arg_types(), p, std::forward<Args>(args)...);
+        p << req;
+        return p;
+    }
 
+    template<typename RequestType, typename ... Args>
+    out_packet_t create_request_(request_id_t& rid, Args&& ... args) {
+        rid = make_request_id_();
+
+        out_packet_t p;
+        p << netcom_impl::packet_type::request;
+        p << RequestType::packet_id__;
+        p << rid;
+        p << make_packet<RequestType>(std::forward<Args>(args)...);
         return p;
     }
 
@@ -913,9 +923,9 @@ public :
     using request_pool_t = netcom_impl::request_pool_t;
 
     // Send a message with the provided arguments.
-    template<typename MessageType, typename ... Args>
-    void send_message(actor_id_t aid, Args&& ... args) {
-        out_packet_t p = create_message_<MessageType>(std::forward<Args>(args)...);
+    template<typename MessageType>
+    void send_message(actor_id_t aid, MessageType&& msg = MessageType()) {
+        out_packet_t p = create_message_(std::forward<MessageType>(msg));
         p.to = aid;
         send_(std::move(p));
     }
@@ -925,18 +935,13 @@ public :
     // answer is received, if the request has been properly issued. If the request fails, no action
     // will be taken. The request can be cancelled by the returned request_keeper_t at any time if
     // not needed anymore.
-    template<typename RequestType, typename ... Args, typename FR>
-    request_keeper_t send_request(actor_id_t aid, FR&& receive_func, Args&& ... args) {
-        using RArgs = function_arguments<FR>;
-
-        static_assert(type_list_size<RArgs>::value ==
-            type_list_size<typename RequestType::answer_types>::value,
-            "wrong number of arguments of receive function");
-        static_assert(are_convertible<typename RequestType::answer_types, RArgs>::value,
-            "receive function arguments do not match request return types");
+    template<typename RequestType, typename FR>
+    request_keeper_t send_request(actor_id_t aid, RequestType&& req, FR&& receive_func) {
+        static_assert(std::is_same<function_argument<FR>, typename RequestType::answer>::value,
+            "wrong argument of 'reception' handler");
 
         request_id_t rid;
-        out_packet_t p = create_request_<RequestType>(rid, std::forward<Args>(args)...);
+        out_packet_t p = create_request_(rid, std::forward<RequestType>(req));
         p.to = aid;
 
         using request_type = netcom_impl::request_only<RequestType, FR>;
@@ -952,29 +957,18 @@ public :
     // the request could not be received on the other side). The callback functions will be called
     // by process_packets() when the corresponding answer is received. The request can be cancelled
     // by the returned request_keeper_t at any time if not needed anymore.
-    template<typename RequestType, typename FR, typename FF, typename UF, typename ... Args>
-    request_keeper_t send_checked_request(actor_id_t aid, FR&& receive_func,
-        FF&& failure_func, UF&& unhandled_func, Args&& ... args) {
-
-        using RArgs = function_arguments<FR>;
-        using FArgs = function_arguments<FF>;
-        using UArgs = function_arguments<UF>;
-
-        static_assert(type_list_size<RArgs>::value ==
-            type_list_size<typename RequestType::answer_types>::value,
-            "wrong number of arguments of receive function");
-        static_assert(are_convertible<typename RequestType::answer_types, RArgs>::value,
-            "receive function arguments do not match request return types");
-        static_assert(type_list_size<FArgs>::value ==
-            type_list_size<typename RequestType::failure_types>::value,
-            "wrong number of arguments of failure function");
-        static_assert(are_convertible<typename RequestType::failure_types, FArgs>::value,
-            "failure function arguments do not match request return types");
-        static_assert(std::is_same<type_list<>, UArgs>::value,
-            "unhandled function must not take any argument");
+    template<typename RequestType, typename FR, typename FF, typename UF = decltype(no_op)>
+    request_keeper_t send_request(actor_id_t aid, RequestType&& req, FR&& receive_func,
+        FF&& failure_func, UF&& unhandled_func = no_op) {
+        static_assert(std::is_same<function_argument<FR>, typename RequestType::answer>::value,
+            "wrong argument of 'reception' handler");
+        static_assert(std::is_same<function_argument<FF>, typename RequestType::failure>::value,
+            "wrong argument of 'failure' handler");
+        static_assert(argument_count<UF>::value == 0,
+            "'unhandled' handler cannot have arguments");
 
         request_id_t rid;
-        out_packet_t p = create_request_<RequestType>(rid, std::forward<Args>(args)...);
+        out_packet_t p = create_request_(rid, std::forward<RequestType>(req));
         p.to = aid;
 
         using request_type = netcom_impl::request_or_fail<RequestType, FR, FF, UF>;
@@ -993,13 +987,8 @@ public :
 
     template<typename MessageType, typename FR>
     watch_keeper_t watch_message(FR&& receive_func) {
-        using arg_types = typename MessageType::types;
-        using RArgs = function_arguments<FR>;
-
-        static_assert(type_list_size<RArgs>::value == type_list_size<arg_types>::value,
-            "wrong number of arguments of receive function");
-        static_assert(are_convertible<arg_types, RArgs>::value,
-            "receive function arguments do not match message types");
+        static_assert(std::is_same<function_argument<FR>, MessageType>::value,
+            "wrong argument of 'reception' handler");
 
         netcom_impl::watch_id_t wid = make_message_watch_id_();
 
@@ -1020,47 +1009,33 @@ public :
 
 private :
     // Send an answer to a request with the provided arguments.
-    template<typename RequestType, typename ... Args>
-    void send_answer_(actor_id_t aid, request_id_t id, Args&& ... args) {
-        using arg_types = typename RequestType::answer_types;
-
-        static_assert(sizeof...(Args) == type_list_size<arg_types>::value,
-            "wrong number of arguments for this request answer");
-        static_assert(are_convertible<type_list<Args...>, arg_types>::value,
-            "provided arguments do not match request answer types");
-
+    template<typename RequestType>
+    void send_answer_(actor_id_t aid, request_id_t id, typename RequestType::answer&& answer) {
         out_packet_t p(aid);
         p << netcom_impl::packet_type::answer;
         p << id;
-        serialize_(arg_types(), p, std::forward<Args>(args)...);
+        p << answer;
         send_(std::move(p));
     }
 
     // Send a failure message to a request with the provided arguments.
-    template<typename RequestType, typename ... Args>
-    void send_failure_(actor_id_t aid, request_id_t id, Args&& ... args) {
-        using arg_types = typename RequestType::failure_types;
-
-        static_assert(sizeof...(Args) == type_list_size<arg_types>::value,
-            "wrong number of arguments for this request failure");
-        static_assert(are_convertible<type_list<Args...>, arg_types>::value,
-            "provided arguments do not match request failure types");
-
+    template<typename RequestType>
+    void send_failure_(actor_id_t aid, request_id_t id, typename RequestType::failure&& fail) {
         out_packet_t p(aid);
         p << netcom_impl::packet_type::failure;
         p << id;
-        serialize_(arg_types(), p, std::forward<Args>(args)...);
+        p << fail;
         send_(std::move(p));
     }
 
     // Send an "unhandled request" packet when no answer can be given.
     void send_unhandled_(in_packet_t&& p) {
-        request_id_t rid;
-        p >> rid;
+        request_id_t id;
+        p >> id;
 
         out_packet_t op(p.from);
         op << netcom_impl::packet_type::unhandled_request;
-        op << rid;
+        op << id;
         send_(std::move(op));
     }
 
@@ -1073,14 +1048,9 @@ public :
 
     template<typename RequestType, typename FR>
     watch_keeper_t watch_request(FR&& receive_func) {
-        using base_types = typename RequestType::types;
-        using arg_types = typename base_types::template push_front_t<request_t<RequestType>&>;
-        using RArgs = function_arguments<FR>;
-
-        static_assert(type_list_size<RArgs>::value == type_list_size<arg_types>::value,
-            "wrong number of arguments of receive function");
-        static_assert(are_convertible<arg_types, RArgs>::value,
-            "receive function arguments do not match request types");
+        using FArg = typename type_list_element<1,function_arguments<FR>>::type;
+        static_assert(std::is_same<FArg, RequestType>::value,
+            "wrong argument of 'reception' handler");
 
         auto iter = request_watches_.find(RequestType::packet_id__);
         if (iter != request_watches_.end()) throw request_already_watched<RequestType>();
@@ -1096,18 +1066,16 @@ public :
 
 namespace netcom_impl {
     template<typename RequestType>
-    template<typename ... Args>
-    void netcom_request_t<RequestType>::answer(Args&& ... args) {
+    void netcom_request_t<RequestType>::answer(typename RequestType::answer&& answer) {
         if (answered_) throw request_already_answered<RequestType>();
-        net_.send_answer_<RequestType>(aid_, rid_, std::forward<Args>(args)...);
+        net_.send_answer_<RequestType>(aid_, rid_, std::move(answer));
         answered_ = true;
     }
 
     template<typename RequestType>
-    template<typename ... Args>
-    void netcom_request_t<RequestType>::fail(Args&& ... args) {
+    void netcom_request_t<RequestType>::fail(typename RequestType::failure&& fail) {
         if (answered_) throw request_already_answered<RequestType>();
-        net_.send_failure_<RequestType>(aid_, rid_, std::forward<Args>(args)...);
+        net_.send_failure_<RequestType>(aid_, rid_, std::move(fail));
         answered_ = true;
     }
 
