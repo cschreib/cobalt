@@ -4,9 +4,11 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <fnmatch.h>
+#include <ftw.h>
 #include <cstring>
 #include <cstdio>
 #include <ctime>
+#include <iostream>
 
 namespace file {
     namespace impl {
@@ -202,18 +204,14 @@ namespace file {
 
     bool mkdir(const std::string& tpath) {
         std::string path = string::replace(string::trim(tpath, " \t"), "\\", "/");
+        if (path.empty()) return true;
         std::vector<std::string> dirs = string::split(path, "/");
-        path = "";
+        path = path[0] == '/' ? "/" : "";  
 
         for (auto& d : dirs) {
             if (d.empty()) continue;
 
-            if (path.empty()) {
-                path = d;
-            } else {
-                path += "/" + d;
-            }
-
+            path += d + "/";
             bool res = (::mkdir(path.c_str(), 0775) == 0) || (errno == EEXIST);
 
             if (!res) return false;
@@ -222,10 +220,20 @@ namespace file {
         return true;
     }
 
+    int remove_callback_(const char *fpath, const struct stat *sb, int typeflag,
+        struct FTW *ftwbuf) {
+
+        return ::remove(fpath);
+    }
+
+    bool remove(const std::string& path) {
+        return ::nftw(path.c_str(), remove_callback_, 64, FTW_DEPTH | FTW_PHYS) == 0;
+    }
+
     bool is_older(const std::string& file1, const std::string& file2) {
         struct stat st1, st2;
-        if (stat(file1.c_str(), &st1) != 0) return false;
-        if (stat(file2.c_str(), &st2) != 0) return false;
+        if (::stat(file1.c_str(), &st1) != 0) return false;
+        if (::stat(file2.c_str(), &st2) != 0) return false;
         return std::difftime(st1.st_ctime, st2.st_ctime) < 0.0;
     }
 }

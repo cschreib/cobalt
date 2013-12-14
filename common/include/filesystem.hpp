@@ -11,6 +11,7 @@ namespace file {
     std::string directorize(const std::string& path);
     std::string get_directory(const std::string& file);
     bool mkdir(const std::string& path);
+    bool remove(const std::string& path);
     bool is_older(const std::string& file1, const std::string& file2);
 }
 
