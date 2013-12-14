@@ -191,6 +191,32 @@ struct function_arguments_t {
 template<typename T>
 using function_arguments = typename function_arguments_t<T>::type;
 
+template<typename T> 
+struct functor_argument_t;
+
+template<typename R, typename T, typename Arg> 
+struct functor_argument_t<R (T::*)(Arg) const> {
+    using type = Arg;
+};
+
+template<typename T>
+struct function_argument_t {
+    using type = typename functor_argument_t<decltype(&T::operator())>::type;
+};
+
+template<typename T>
+using function_argument = typename function_argument_t<T>::type;
+
+template<typename T> 
+struct argument_count {
+    static const std::size_t value = argument_count<decltype(&T::operator())>::value;
+};
+
+template<typename R, typename T, typename ... Args> 
+struct argument_count<R (T::*)(Args...) const> {
+    static const std::size_t value = sizeof...(Args);
+};
+
 auto no_op = [](){};
 
 #endif
