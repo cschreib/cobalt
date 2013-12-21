@@ -70,11 +70,3 @@ add_subdirectory(client)
 # build server & client frontends
 add_subdirectory(server-cli)
 add_subdirectory(client-cli)
-
-# build test tools
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/bin")
-add_subdirectory(tools/crc32_collide_test)
-enable_testing()
-add_test(crc32-collide-test
-    ${PROJECT_SOURCE_DIR}/tools/bin/crc32-collide-test ${PROJECT_SOURCE_DIR}
-)
