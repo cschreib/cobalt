@@ -16,11 +16,12 @@ add_custom_target(refgen-gen ALL
     ${PROJECT_SOURCE_DIR}/../../
     -std=c++11
     -I${PROJECT_SOURCE_DIR}/../../common/include
+    -I${PROJECT_SOURCE_DIR}/../../common-netcom/include
     -I${PROJECT_SOURCE_DIR}/../../server/include
     -I${PROJECT_SOURCE_DIR}/../../client/include
     -I${SFML_INCLUDE_DIR}
     -DNO_AUTOGEN
 )
 
-add_custom_target(refgen-clean COMMAND ${PROJECT_SOURCE_DIR}/../bin/refgen 
+add_custom_target(refgen-clean COMMAND ${PROJECT_SOURCE_DIR}/../bin/refgen
     ${PROJECT_SOURCE_DIR}/../../ clean)
