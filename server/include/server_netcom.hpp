@@ -28,6 +28,9 @@ namespace server {
         **/
         void terminate();
 
+        /// Return the IP address of a given actor.
+        std::string get_actor_ip(actor_id_t cid) const;
+
     private :
         struct client_t {
             std::unique_ptr<sf::TcpSocket> socket;
@@ -48,7 +51,7 @@ namespace server {
         sf::SocketSelector selector_;
 
         client_list_t             clients_;
-        sorted_vector<actor_id_t, std::greater<request_id_t>> available_ids_;
+        sorted_vector<actor_id_t, std::greater<actor_id_t>> available_ids_;
 
         std::atomic<bool> is_connected_;
         std::atomic<bool> terminate_thread_;
@@ -107,7 +110,7 @@ namespace server {
 }
 
 #ifndef NO_AUTOGEN
-#include "autogen/packets/server_netcom.hpp" 
+#include "autogen/packets/server_netcom.hpp"
 #endif
 
 #endif

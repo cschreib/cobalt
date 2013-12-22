@@ -38,7 +38,7 @@ namespace message {
     NETCOM_PACKET(unhandled_answer) {
         request_id_t request_id;
     };
-    
+
     NETCOM_PACKET(unhandled_failure) {
         request_id_t request_id;
     };
@@ -53,7 +53,7 @@ namespace request {
 }
 
 #ifndef NO_AUTOGEN
-#include "autogen/packets/netcom_base.hpp" 
+#include "autogen/packets/netcom_base.hpp"
 #endif
 
 // Exception thrown when too many requests are issued at once.
@@ -192,25 +192,11 @@ namespace netcom_impl {
     // Implementation of a request with no handling of the failure case.
     template<typename RType, typename RFunc>
     struct request_only : public request_t {
-        request_only(request_id_t id_, RFunc&& f) : 
+        request_only(request_id_t id_, RFunc&& f) :
             request_t(id_), receive_func_(std::move(f)) {}
-
-        // using answer_types = typename RType::answer_types;
 
     private :
         RFunc receive_func_;
-
-        // template<typename T, typename ... Args, typename ... Args2>
-        // void receive_(type_list<T, Args...> tl, in_packet_t&& p, Args2&& ... args) {
-        //     T t;
-        //     p >> t;
-        //     receive_(tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
-        // }
-
-        // template<typename ... Args>
-        // void receive_(type_list<> tl, in_packet_t&& p, Args&& ... args) {
-        //     receive_func_(std::forward<Args>(args)...);
-        // }
 
     public :
         void receive(in_packet_t&& p) override {
@@ -231,23 +217,9 @@ namespace netcom_impl {
             request_only<RType, RFunc>(id_, std::move(rf)), fail_func_(std::move(ff)),
             unhandled_func_(std::move(uf)) {}
 
-        // using failure_types = typename RType::failure_types;
-
     private :
         FFunc fail_func_;
         UHFunc unhandled_func_;
-
-        // template<typename T, typename ... Args, typename ... Args2>
-        // void fail_(type_list<T, Args...> tl, in_packet_t&& p, Args2&& ... args) {
-        //     T t;
-        //     p >> t;
-        //     fail_(tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
-        // }
-
-        // template<typename ... Args>
-        // void fail_(type_list<> tl, in_packet_t&& p, Args&& ... args) {
-        //     fail_func_(std::forward<Args>(args)...);
-        // }
 
     public :
         void fail(in_packet_t&& p) override {
@@ -264,12 +236,19 @@ namespace netcom_impl {
     // Public object that encapsulates request answering.
     template<typename RequestType>
     struct netcom_request_t {
+        using packet_t = RequestType;
+        using answer_t = typename RequestType::answer;
+        using failure_t = typename RequestType::failure;
+
     private :
         template <typename, typename>
         friend class request_watch_impl;
-        
-        netcom_request_t(netcom_base& net, actor_id_t aid, request_id_t rid) :
-            net_(net), aid_(aid), rid_(rid), answered_(false) {}
+
+        netcom_request_t(netcom_base& net, actor_id_t aid, in_packet_t&& p) :
+            net_(net), aid_(aid), answered_(false), args(args_) {
+            p >> rid_;
+            p >> args_;
+        }
 
         netcom_request_t(const netcom_request_t&) = delete;
         netcom_request_t(netcom_request_t&&) = delete;
@@ -284,13 +263,21 @@ namespace netcom_impl {
         actor_id_t aid_;
         request_id_t rid_;
         bool answered_;
+        packet_t args_;
 
     public :
+        const packet_t& args;
+
         actor_id_t from() const {
             return aid_;
         }
 
+        template<typename enable = typename std::enable_if<std::is_empty<answer_t>::value>::type>
+        void answer();
         void answer(typename RequestType::answer&& answer);
+
+        template<typename enable = typename std::enable_if<std::is_empty<failure_t>::value>::type>
+        void fail();
         void fail(typename RequestType::failure&& fail);
     };
 
@@ -409,7 +396,7 @@ namespace netcom_impl {
     struct request_watch_t {
         request_watch_t(request_packet_id_t id_) : id(id_), cancelled(false), held_(false) {}
         virtual ~request_watch_t() {}
-        
+
         request_watch_t(const request_watch_t&) = delete;
         request_watch_t(request_watch_t&&) = delete;
         request_watch_t& operator= (const request_watch_t&) = delete;
@@ -445,34 +432,13 @@ namespace netcom_impl {
         request_watch_impl(RFunc&& rf) :
             request_watch_t(RType::packet_id__), receive_func_(rf) {}
 
-        // using receive_types = typename RType::types;
-
     private :
         RFunc receive_func_;
 
-        // template<typename T, typename ... Args, typename ... Args2>
-        // void receive_(netcom_request_t<RType>& req, type_list<T, Args...> tl, in_packet_t&& p,
-        //     Args2&& ... args) {
-
-        //     T t;
-        //     p >> t;
-        //     receive_(req, tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
-        // }
-
-        // template<typename ... Args>
-        // void receive_(netcom_request_t<RType>& req, type_list<> tl, in_packet_t&& p, Args&& ... args) {
-        //     receive_func_(req, std::forward<Args>(args)...);
-        // }
-
     public :
         void receive_and_answer(netcom_base& net, in_packet_t&& p) override {
-            request_id_t rid;
-            p >> rid;
-            netcom_request_t<RType> req(net, p.from, rid);
-
-            RType mreq;
-            p >> mreq;
-            receive_func_(req, mreq);
+            netcom_request_t<RType> req(net, p.from, std::move(p));
+            receive_func_(req);
         }
     };
 
@@ -482,7 +448,7 @@ namespace netcom_impl {
     struct message_watch_t {
         explicit message_watch_t(watch_id_t id_) : id(id_), cancelled(false), held_(false) {}
         virtual ~message_watch_t() {}
-        
+
         message_watch_t(const message_watch_t&) = delete;
         message_watch_t(message_watch_t&&) = delete;
         message_watch_t& operator= (const message_watch_t&) = delete;
@@ -513,7 +479,6 @@ namespace netcom_impl {
             held_ = false;
         }
 
-        // watch_id_t id;
         const watch_id_t id;
         bool cancelled;
 
@@ -528,36 +493,21 @@ namespace netcom_impl {
         message_watch_impl(watch_id_t id_, RFunc&& rf) :
             message_watch_t(id_), receive_func_(rf) {}
 
-        // using receive_types = typename MType::types;
-
     private :
         RFunc receive_func_;
-
-        // template<typename T, typename ... Args, typename ... Args2>
-        // void receive_(type_list<T, Args...> tl, in_packet_t&& p, Args2&& ... args) {
-        //     T t;
-        //     p >> t;
-        //     receive_(tl.pop_front(), std::move(p), std::forward<Args2>(args)..., std::move(t));
-        // }
-
-        // template<typename ... Args>
-        // void receive_(type_list<> tl, in_packet_t&& p, Args&& ... args) {
-        //     receive_func_(std::forward<Args>(args)...);
-        // }
 
     public :
         void receive(in_packet_t&& p) override {
             MType msg;
             p >> msg;
             receive_func_(msg);
-            // receive_(receive_types(), std::move(p));
         }
     };
 
     // Simple wrapper around a vector of message watches (cheap multimap).
     struct message_watch_group_t {
         explicit message_watch_group_t(message_packet_id_t id_) : id(id_) {}
-        
+
         message_watch_group_t(const message_watch_group_t&) = delete;
         message_watch_group_t(message_watch_group_t&&) = default;
         message_watch_group_t& operator= (const message_watch_group_t&) = delete;
@@ -576,7 +526,7 @@ namespace netcom_impl {
     struct selector_base_t {
         explicit selector_base_t(netcom_base& net) : net_(net) {}
         virtual ~selector_base_t() {}
-        
+
         selector_base_t(const selector_base_t&) = delete;
         selector_base_t(selector_base_t&&) = delete;
         selector_base_t& operator= (const selector_base_t&) = delete;
@@ -644,7 +594,7 @@ namespace netcom_impl {
     };
 
     // Wrapper class to handle cancellation, holding and releasing of message/request watches.
-    // When a new packet is being watched, either via netcom::watch_message() or 
+    // When a new packet is being watched, either via netcom::watch_message() or
     // netcom::watch_request(), a watch_keeper_t is returned, and is the only accessible handle on
     // the internal watch system. One can:
     //  1) Cancel the watch, by calling 'cancel()'. Packets will not be processed by this watch
@@ -710,7 +660,7 @@ namespace netcom_impl {
     // TODO: write comments for you
     struct watch_pool_t {
         watch_pool_t() : held_(false) {}
-        
+
         watch_pool_t(const watch_pool_t&) = delete;
         watch_pool_t(watch_pool_t&&) = default;
         watch_pool_t& operator= (const watch_pool_t&) = delete;
@@ -794,7 +744,7 @@ private :
 
     // Stores the requests that have been made by this actor.
     using request_container = sorted_vector<
-        std::unique_ptr<netcom_impl::request_t>, 
+        std::unique_ptr<netcom_impl::request_t>,
         mem_var_comp(&netcom_impl::request_t::id)
     >;
     request_container requests_;
@@ -810,28 +760,12 @@ private :
 
     // Stores the request watches created by this actor.
     using request_watch_container = sorted_vector<
-        std::unique_ptr<netcom_impl::request_watch_t>, 
+        std::unique_ptr<netcom_impl::request_watch_t>,
         mem_var_comp(&netcom_impl::request_watch_t::id)
     >;
     request_watch_container request_watches_;
 
 private :
-    // Serialize a bunch of objects into an sf::Packet
-    // template<typename T, typename ... Args1, typename ... Args2>
-    // void serialize_(type_list<T, Args1...> tl, out_packet_t& p, const T& t, Args2&& ... args) {
-    //     p << t;
-    //     serialize_(tl.pop_front(), p, std::forward<Args2>(args)...);
-    // }
-
-    // template<typename T, typename U, typename ... Args1, typename ... Args2>
-    // void serialize_(type_list<T, Args1...> tl, out_packet_t& p, const U& u, Args2&& ... args) {
-    //     T t = u;
-    //     p << t;
-    //     serialize_(tl.pop_front(), p, std::forward<Args2>(args)...);
-    // }
-
-    // void serialize_(type_list<>, out_packet_t& p);
-
     // Send a packet to the output queue
     void send_(out_packet_t&& p);
 
@@ -985,10 +919,12 @@ public :
     using watch_keeper_t = netcom_impl::watch_keeper_t;
     using watch_pool_t = netcom_impl::watch_pool_t;
 
-    template<typename MessageType, typename FR>
+    template<typename FR>
     watch_keeper_t watch_message(FR&& receive_func) {
-        static_assert(std::is_same<function_argument<FR>, MessageType>::value,
-            "wrong argument of 'reception' handler");
+        static_assert(argument_count<FR>::value == 1,
+            "message reception handler can only take one argument");
+
+        using MessageType = typename std::decay<function_argument<FR>>::type;
 
         netcom_impl::watch_id_t wid = make_message_watch_id_();
 
@@ -1046,11 +982,13 @@ public :
     template<typename T>
     using request_t = netcom_impl::netcom_request_t<T>;
 
-    template<typename RequestType, typename FR>
+    template<typename FR>
     watch_keeper_t watch_request(FR&& receive_func) {
-        using FArg = typename type_list_element<1,function_arguments<FR>>::type;
-        static_assert(std::is_same<FArg, RequestType>::value,
-            "wrong argument of 'reception' handler");
+        static_assert(argument_count<FR>::value == 1,
+            "request reception handler can only take one argument");
+
+        using Arg = typename std::decay<function_argument<FR>>::type;
+        using RequestType = typename Arg::packet_t;
 
         auto iter = request_watches_.find(RequestType::packet_id__);
         if (iter != request_watches_.end()) throw request_already_watched<RequestType>();
@@ -1076,6 +1014,22 @@ namespace netcom_impl {
     void netcom_request_t<RequestType>::fail(typename RequestType::failure&& fail) {
         if (answered_) throw request_already_answered<RequestType>();
         net_.send_failure_<RequestType>(aid_, rid_, std::move(fail));
+        answered_ = true;
+    }
+
+    template<typename RequestType>
+    template<typename enable>
+    void netcom_request_t<RequestType>::answer() {
+        if (answered_) throw request_already_answered<RequestType>();
+        net_.send_answer_<RequestType>(aid_, rid_, answer_t{});
+        answered_ = true;
+    }
+
+    template<typename RequestType>
+    template<typename enable>
+    void netcom_request_t<RequestType>::fail() {
+        if (answered_) throw request_already_answered<RequestType>();
+        net_.send_failure_<RequestType>(aid_, rid_, failure_t{});
         answered_ = true;
     }
 
@@ -1106,7 +1060,7 @@ namespace netcom_impl {
         net_.release_request_watch_(RequestType::packet_id__);
         held_ = false;
     }
-    
+
     template<typename MessageType>
     void message_selector_t<MessageType>::cancel() {
         if (cancelled_) return;

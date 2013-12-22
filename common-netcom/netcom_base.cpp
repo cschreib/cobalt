@@ -15,8 +15,6 @@ netcom_base::netcom_base() {
     }
 }
 
-// void netcom_base::serialize_(type_list<>, out_packet_t& p) {}
-
 void netcom_base::send_(out_packet_t&& p) {
     if (p.to == invalid_actor_id) throw invalid_actor();
     if (p.to == self_actor_id) {
@@ -137,7 +135,7 @@ bool netcom_base::process_message_(in_packet_t&& p) {
             watch->receive(in_packet_t(p));
         }
     }
-    
+
     return received;
 }
 
@@ -163,7 +161,7 @@ bool netcom_base::process_request_(in_packet_t&& p) {
 bool netcom_base::process_answer_(in_packet_t&& p) {
     request_id_t id;
     p >> id;
-    
+
     auto iter = requests_.find(id);
     if (iter == requests_.end() || (*iter)->cancelled) return false;
 
@@ -175,7 +173,7 @@ bool netcom_base::process_answer_(in_packet_t&& p) {
 bool netcom_base::process_failure_(in_packet_t&& p) {
     request_id_t id;
     p >> id;
-    
+
     auto iter = requests_.find(id);
     if (iter == requests_.end() || (*iter)->cancelled) return false;
 
@@ -187,7 +185,7 @@ bool netcom_base::process_failure_(in_packet_t&& p) {
 bool netcom_base::process_unhandled_(in_packet_t&& p) {
     request_id_t id;
     p >> id;
-    
+
     auto iter = requests_.find(id);
     if (iter == requests_.end() || (*iter)->cancelled) return false;
 
@@ -209,7 +207,7 @@ void netcom_base::process_packets() {
             [](std::unique_ptr<netcom_impl::message_watch_t>& w) { return w->cancelled; }
         );
     }
-    std::remove_if(message_watches_.begin(), message_watches_.end(), 
+    std::remove_if(message_watches_.begin(), message_watches_.end(),
         [](netcom_impl::message_watch_group_t& g) { return g.group.empty(); }
     );
 

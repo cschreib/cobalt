@@ -1,5 +1,7 @@
 #include "client_netcom.hpp"
 #include "server_netcom.hpp"
+#include "client_player_list.hpp"
+#include "server_player_list.hpp"
 #include "time.hpp"
 #include "print.hpp"
 #include <iostream>
@@ -10,12 +12,11 @@ int main(int argc, const char* argv[]) {
     bool stop = false;
     client::netcom::watch_pool_t pool;
 
-    pool << net.watch_message<message::unhandled_message>([&](message::unhandled_message msg) {
+    pool << net.watch_message([&](message::unhandled_message msg) {
         warning("unhandled message: ", msg.message_id);
     });
 
-    pool << net.watch_message<message::server::connection_failed>([&](
-        message::server::connection_failed msg) {
+    pool << net.watch_message([&](message::server::connection_failed msg) {
         stop = true;
         error("connection failed");
         std::string rsn = "?";
@@ -29,12 +30,10 @@ int main(int argc, const char* argv[]) {
         }
         reason(rsn);
     });
-    pool << net.watch_message<message::server::connection_established>(
-        [](message::server::connection_established msg) {
+    pool << net.watch_message([](message::server::connection_established msg) {
         note("connection established");
     });
-    pool << net.watch_message<message::server::connection_denied>([&]
-        (message::server::connection_denied msg) {
+    pool << net.watch_message([&](message::server::connection_denied msg) {
         stop = true;
         error("connection denied");
         std::string rsn = "?";
@@ -46,10 +45,38 @@ int main(int argc, const char* argv[]) {
         }
         reason(rsn);
     });
-    pool << net.watch_message<message::server::connection_granted>(
-        [](message::server::connection_granted msg) {
+    pool << net.watch_message([&](message::server::connection_granted msg) {
         note("connection granted!");
+        net.send_request(client::netcom::server_actor_id,
+            make_packet<request::client::join_players>("kalith", color32::blue, false),
+            [](request::client::join_players::answer msg) {
+                print("joined as player");
+            }, [](request::client::join_players::failure msg) {
+                error("could not join as player");
+                std::string rsn;
+                switch (msg.rsn) {
+                    case request::client::join_players::failure::reason::too_many_players :
+                        rsn = "too many players"; break;
+                }
+                reason(rsn);
+            }, []() {
+                error("could not join as player");
+                reason("server does not support it");
+            }
+        );
     });
+
+    client::player_list plist(net);
+
+    pool << net.watch_message([](message::server::player_connected msg) {
+            print("new player connected: id=", msg.id, ", ip=", msg.ip, ", name=",
+                msg.name, ", color=", msg.color, ", ai=", msg.is_ai);
+        }
+    );
+    pool << net.watch_message([&](message::server::player_disconnected msg) {
+            print("player disconnected: id=", msg.id);
+        }
+    );
 
     net.run("127.0.0.1", 4444);
 

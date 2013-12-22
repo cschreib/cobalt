@@ -1,7 +1,7 @@
 #include "server_netcom.hpp"
 
 namespace server {
-    netcom::netcom() : listen_port_(0), max_client_(1), is_connected_(false), 
+    netcom::netcom() : listen_port_(0), max_client_(1), is_connected_(false),
         terminate_thread_(false), listener_thread_(std::bind(&netcom::loop_, this)) {
 
         available_ids_.reserve(max_client_);
@@ -49,6 +49,21 @@ namespace server {
         listener_thread_.wait();
     }
 
+    std::string netcom::get_actor_ip(actor_id_t cid) const {
+        if (cid == self_actor_id) {
+            return "127.0.0.1";
+        } else if (cid == all_actor_id) {
+            return "...";
+        }
+
+        auto iter = clients_.find(cid);
+        if (iter == clients_.end() || !iter->socket) {
+            return "?";
+        }
+
+        return iter->socket->getRemoteAddress().toString();
+    }
+
     void netcom::loop_() {
         // Try to open the port
         while (listener_.listen(listen_port_) != sf::Socket::Done && !terminate_thread_) {
@@ -61,7 +76,7 @@ namespace server {
         }
 
         is_connected_ = true;
-        
+
         send_message(self_actor_id,
             make_packet<message::server::internal::start_listening_port>(listen_port_)
         );
@@ -150,7 +165,7 @@ namespace server {
                     // Send to individual clients
                     auto iter = clients_.find(op.to);
                     if (iter == clients_.end()) {
-                        out_packet_t tp = 
+                        out_packet_t tp =
                             create_message_<message::server::internal::unknown_client>(op.to);
                         input_.push(std::move(tp.to_input()));
                         continue;
@@ -189,7 +204,7 @@ namespace server {
         output_.clear();
         selector_.clear();
         listener_.close();
-        
+
         is_connected_ = false;
     }
 
