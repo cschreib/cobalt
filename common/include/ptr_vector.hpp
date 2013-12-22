@@ -106,6 +106,16 @@ public :
         return std::find_if(begin(), end(), std::forward<F>(func));
     }
 
+    template<typename F>
+    iterator sort(F&& func) {
+        return std::sort(begin(), end(), std::forward<F>(func));
+    }
+
+    template<typename F>
+    const_iterator sort(F&& func) const {
+        return std::sort(begin(), end(), std::forward<F>(func));
+    }
+
     using base::size;
     using base::max_size;
     using base::capacity;
