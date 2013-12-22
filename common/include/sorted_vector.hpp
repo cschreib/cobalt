@@ -151,8 +151,13 @@ public :
     }
 
     /// Erase an element from this vector.
-    void erase(iterator iter) {
-        base::erase(iter);
+    iterator erase(iterator iter) {
+        return base::erase(iter);
+    }
+
+    /// Erase a range from this vector.
+    iterator erase(iterator first, iterator last) {
+        return base::erase(first, last);
     }
 
     /// Erase an element from this vector by its key.
@@ -163,10 +168,12 @@ public :
     *   nothing.
     */
     template<typename Key>
-    void erase(const Key& k) {
+    iterator erase(const Key& k) {
         auto iter = find(k);
         if (iter != end()) {
-            base::erase(iter);
+            return base::erase(iter);
+        } else {
+            return end();
         }
     }
 
@@ -305,8 +312,13 @@ public :
     }
 
     /// Erase an element from this vector.
-    void erase(iterator iter) {
-        base::erase(iter.stdbase());
+    iterator erase(iterator iter) {
+        return base::erase(iter.stdbase());
+    }
+
+    /// Erase a range from this vector.
+    iterator erase(iterator first, iterator last) {
+        return base::erase(first.stdbase(), last.stdbase());
     }
 
     /// Erase an element from this vector by its key.
@@ -317,10 +329,12 @@ public :
     *   nothing.
     */
     template<typename Key>
-    void erase(const Key& k) {
+    iterator erase(const Key& k) {
         auto iter = find(k);
         if (iter != end()) {
-            base::erase(iter.stdbase());
+            return base::erase(iter.stdbase());
+        } else {
+            return end();
         }
     }
 
