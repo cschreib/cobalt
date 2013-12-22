@@ -10,6 +10,7 @@
 #include <string.hpp>
 #include <print.hpp>
 #include <crc32.hpp>
+#include <packet.hpp>
 
 template<typename T>
 void get_location(T& t, CXSourceRange s) {
@@ -28,7 +29,7 @@ void get_location(T& t, CXSourceRange s) {
         t.cstart -= 1;
         // and the ending one is always one too few
         t.cend += 1;
-    } 
+    }
 }
 
 bool is_in_file(CXCursor c, const CXFileUniqueID& fid) {
@@ -74,6 +75,7 @@ struct packet {
     };
     std::string usr;
     std::string name;
+    std::uint32_t id;
     std::string simple_name;
     std::string parent_name;
     std::vector<std::string> parents;
@@ -141,6 +143,8 @@ CXChildVisitResult visitor(CXCursor cursor, CXCursor parent, CXClientData client
                     s.parents.pop_back();
                     s.parent_name = string::join(s.parents, "::");
 
+                    s.id = get_crc32(s.simple_name);
+
                     data.db.push_back(s);
                     data.cstack.push_back({cursor, data.db.back()});
                 }
@@ -160,7 +164,7 @@ CXChildVisitResult visitor(CXCursor cursor, CXCursor parent, CXClientData client
             while (!data.cstack.empty() && !is_in_parent(cursor, data.cstack.back().cur)) {
                 data.cstack.pop_back();
             }
-            
+
             if (!data.cstack.empty()) {
                 packet& p = data.cstack.back().str;
                 packet::member m;
@@ -287,15 +291,105 @@ void generate_code(std::ostream& out, const packet& p) {
     out << "\n";
 }
 
+void generate_packet_code(std::ostream& out, const std::deque<packet>& db) {
+    out << "namespace packet_impl {\n";
+    for (auto& p : db) {
+        if (p.parent != nullptr) continue;
+        out << "template<>\n";
+        out << "const char* base<" << p.id << ">::packet_name__ = \"" << p.simple_name << "\";\n";
+    }
+    out << "}\n\n";
+
+    out << "std::string get_packet_name(packet_id_t id) {\n";
+    out << "    switch (id) {\n";
+    for (auto& p : db) {
+        if (p.parent != nullptr) continue;
+        out << "        case " << p.id << ": return \"" << p.simple_name << "\";\n";
+    }
+    out << "        default: return \"\";\n";
+    out << "    }\n";
+    out << "}\n";
+}
+
+sf::Packet& operator << (sf::Packet& p, const packet::member& m) {
+    return p << m.name << m.type << m.is_enum;
+}
+
+sf::Packet& operator >> (sf::Packet& p, packet::member& m) {
+    return p >> m.name >> m.type >> m.is_enum;
+}
+
+sf::Packet& operator << (sf::Packet& sp, const packet& p) {
+    return sp << p.id << p.usr << p.name << p.simple_name << p.parent_name
+        << p.file << p.lstart << p.lend << p.cstart << p.cend
+        << p.parents << p.members;
+}
+
+sf::Packet& operator >> (sf::Packet& sp, packet& p) {
+    return sp >> p.id >> p.usr >> p.name >> p.simple_name >> p.parent_name
+            >> p.file >> p.lstart >> p.lend >> p.cstart >> p.cend
+            >> p.parents >> p.members;
+}
+
+void save_db(const std::string& file, const std::deque<packet>& db) {
+    std::ofstream out(file);
+
+    sf::Packet sp;
+    sp << (std::uint32_t)db.size();
+
+    for (auto& p : db) {
+        sp << p;
+    }
+
+    out.write((const char*)sp.getData(), sp.getDataSize());
+}
+
+void load_db(const std::string& file, std::deque<packet>& db) {
+    std::ifstream in(file);
+
+    std::size_t bpos = db.size();
+
+    in.seekg(0, std::ios_base::end);
+    std::size_t len = in.tellg();
+    in.seekg(0, std::ios_base::beg);
+
+    std::vector<char> data(len);
+    in.read(data.data(), len);
+
+    sf::Packet sp;
+    sp.append(data.data(), len);
+
+    std::uint32_t np;
+    sp >> np;
+
+    for (std::size_t i = 0; i < np; ++i) {
+        packet p;
+        sp >> p;
+        db.push_back(p);
+    }
+
+    for (auto iter1 = db.begin() + bpos; iter1 != db.end(); ++iter1) {
+        for (auto iter2 = db.begin() + bpos; iter2 != db.end(); ++iter2) {
+            if (iter1->parent_name == iter2->name) {
+                iter1->parent = &*iter2;
+                break;
+            }
+        }
+    }
+}
+
 bool parse(const std::string& dir, const std::string& filename, std::deque<packet>& db,
     int argc, char* argv[]) {
 
     std::string file = dir+"/"+filename;
     std::string autogen = dir+"/autogen/packets/"+filename;
 
-    if (file::exists(autogen) && !file::is_older(autogen, file)) return true;
+    if (file::exists(autogen) && !file::is_older(autogen, file)) {
+        load_db(dir+"/autogen/packets/cached/"+filename, db);
+        return true;
+    }
 
-    print(file);
+    print(" ", file);
 
     CXIndex cidx = clang_createIndex(0, 0);
     CXTranslationUnit ctu = clang_parseTranslationUnit(
@@ -334,7 +428,7 @@ bool parse(const std::string& dir, const std::string& filename, std::deque<packe
         error("could not parse '", file, "'");
         return false;
     }
-    
+
     clang_disposeIndex(cidx);
 
     for (auto& p1 : data.db) {
@@ -345,7 +439,7 @@ bool parse(const std::string& dir, const std::string& filename, std::deque<packe
             }
         }
     }
-    
+
     std::ofstream out(autogen);
     if (!out.is_open()) {
         error("could not open output file");
@@ -357,12 +451,16 @@ bool parse(const std::string& dir, const std::string& filename, std::deque<packe
         generate_code(out, *iter);
     }
 
+    save_db(dir+"/autogen/packets/cached/"+filename, data.db);
+
     db.insert(db.end(), data.db.begin(), data.db.end());
 
     return true;
 }
 
 bool parse_directory(const std::string& dir, std::deque<packet>& db, int argc, char* argv[]) {
+    print(dir);
+
     std::vector<std::string> files = file::list_files(dir+"/*.hpp");
     for (auto& f : files) {
         if (!parse(dir, f, db, argc, argv)) return false;
@@ -397,7 +495,7 @@ int main(int argc, char* argv[]) {
     }
 
     std::vector<std::string> dirs = {
-        dir+"/common-netcom/include", 
+        dir+"/common-netcom/include",
         dir+"/server/include",
         dir+"/client/include"
     };
@@ -406,6 +504,7 @@ int main(int argc, char* argv[]) {
         for (auto& d : dirs) {
             file::remove(d+"/autogen/packets");
         }
+        file::remove(dir+"/common-netcom/include/autogen/packet.cpp");
         return 0;
     }
 
@@ -417,21 +516,24 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
+        if (!file::mkdir(d+"/autogen/packets/cached")) {
+            error("could not create 'autogen' directory");
+            note(d+"/autogen/packets/cached");
+            return 1;
+        }
+
         if (!parse_directory(d, db, argc-1, argv+1)) return 1;
     }
 
     // Check redundancy with CRC32
-    std::vector<std::uint32_t> crcs;
-    crcs.reserve(db.size());
-    for (auto& p : db) {
-        crcs.push_back(get_crc32(p.simple_name));
-    }
-    
     bool error = false;
-    for (std::size_t i = 0;   i < db.size(); ++i) {
+    std::size_t cnt = 0;
+    for (std::size_t i = 0; i < db.size(); ++i) {
         if (db[i].parent != nullptr) continue;
+        ++cnt;
+
         for (std::size_t j = i+1; j < db.size(); ++j) {
-            if (db[j].parent == nullptr && crcs[i] == crcs[j]) {
+            if (db[j].parent == nullptr && db[i].id == db[j].id) {
                 error = true;
                 std::cout << "crc32 collision test: collision detected:" << std::endl;
                 std::cout << "  " << get_position(db[i]) << std::endl;
@@ -441,10 +543,15 @@ int main(int argc, char* argv[]) {
     }
 
     if (!error) {
-        std::cout << "crc32 collision test: no collision found" << std::endl;
+        std::cout << "crc32 collision test: no collision found (over " <<
+            cnt << " packets)" << std::endl;
     } else {
         return 1;
     }
+
+    // Generate packet names
+    std::ofstream packet_out(dir+"/common-netcom/include/autogen/packet.cpp");
+    generate_packet_code(packet_out, db);
 
     return 0;
 }
