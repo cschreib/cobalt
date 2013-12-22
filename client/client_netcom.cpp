@@ -49,7 +49,7 @@ namespace client {
                         return;
                     }
 
-                    message_packet_id_t id;
+                    packet_id_t id;
                     op >> id;
                     switch (id) {
                     case message::server::connection_granted::packet_id__ :
@@ -58,7 +58,7 @@ namespace client {
                     case message::server::connection_denied::packet_id__ :
                         input_.push(std::move(top.to_input()));
                         return;
-                    default : 
+                    default :
                         send_message(self_actor_id, make_packet<message::server::connection_denied>(
                             message::server::connection_denied::reason::unexpected_packet
                         ));

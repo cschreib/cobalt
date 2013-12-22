@@ -19,6 +19,18 @@ namespace client {
             } rsn;
         };
     };
+    NETCOM_PACKET(list_players) {
+        struct answer {
+            struct player_t {
+                actor_id_t id;
+                std::string ip, name;
+                color32 color;
+                bool is_ai;
+            };
+            std::vector<player_t> players;
+        };
+        struct failure {};
+    };
 }
 }
 
@@ -59,10 +71,11 @@ namespace server {
             message::server::player_disconnected::reason rsn);
 
         netcom& net_;
-        netcom::watch_pool_t pool_;
 
         std::uint32_t      max_player_;
         ptr_vector<player> players_;
+
+        netcom::watch_pool_t pool_;
     };
 }
 

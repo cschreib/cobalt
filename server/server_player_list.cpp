@@ -12,7 +12,7 @@ namespace server {
                 player& p = players_.back();
                 p.when_connected = now();
 
-                req.answer(request::client::join_players::answer{});
+                req.answer();
                 net_.send_message(server::netcom::all_actor_id,
                     make_packet<message::server::player_connected>(
                         id, ip, req.args.name, req.args.color, req.args.is_ai
@@ -23,6 +23,14 @@ namespace server {
                     request::client::join_players::failure::reason::too_many_players
                 });
             }
+        });
+
+        pool_ << net_.watch_request([&](netcom::request_t<request::client::list_players>& req) {
+            request::client::list_players::answer a;
+            for (auto& p : players_) {
+                a.players.push_back({p.id, p.ip, p.name, p.color, p.is_ai});
+            }
+            req.answer(std::move(a));
         });
 
         pool_ << net_.watch_message([&](message::server::internal::client_disconnected msg) {

@@ -16,11 +16,13 @@ namespace client {
 
     private :
         netcom& net_;
-        netcom::watch_pool_t pool_;
 
         ptr_vector<player> players_;
 
         player* self_;
+
+        netcom::request_pool_t rpool_;
+        netcom::watch_pool_t pool_;
     };
 }
 

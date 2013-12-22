@@ -26,6 +26,18 @@ namespace client {
         //     );
         // });
 
+        pool_.hold_all();
+        net_.send_request(netcom::server_actor_id,
+            make_packet<request::client::list_players>(),
+            [&](request::client::list_players::answer msg) {
+                for (auto& p : msg.players) {
+                    players_.emplace_back(p.id, p.ip, p.name, p.color, p.is_ai);
+                }
+
+                pool_.release_all();
+            }
+        );
+
         pool_ << net_.watch_message([&](message::server::player_connected msg) {
             players_.emplace_back(msg.id, msg.ip, msg.name, msg.color, msg.is_ai);
         });
@@ -34,6 +46,7 @@ namespace client {
             auto iter = players_.find_if([&](const player& p) { return p.id == msg.id; });
             players_.erase(iter);
         });
+
     }
 
     const player& player_list::get_player(actor_id_t id) const {

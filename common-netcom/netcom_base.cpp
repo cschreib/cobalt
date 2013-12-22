@@ -29,6 +29,12 @@ bool netcom_base::request_cancelled_(request_id_t id) const {
     return iter == requests_.end() || (*iter)->cancelled;
 }
 
+void netcom_base::request_notify_pool_(request_id_t id, request_pool_t* pool) {
+    auto iter = requests_.find(id);
+    if (iter == requests_.end()) return;
+    (*iter)->pool = pool;
+}
+
 void netcom_base::cancel_request_(request_id_t id) {
     auto iter = requests_.find(id);
     if (iter != requests_.end()) {
@@ -52,14 +58,14 @@ request_id_t netcom_base::make_request_id_() {
     return id;
 }
 
-bool netcom_base::message_watch_cancelled_(message_packet_id_t id, netcom_impl::watch_id_t wid) {
+bool netcom_base::message_watch_cancelled_(packet_id_t id, netcom_impl::watch_id_t wid) {
     auto iter1 = message_watches_.find(id);
     if (iter1 == message_watches_.end()) return true;
     auto iter2 = iter1->group.find(wid);
     return iter2 == iter1->group.end() || (*iter2)->cancelled;
 }
 
-void netcom_base::cancel_message_watch_(message_packet_id_t id, netcom_impl::watch_id_t wid) {
+void netcom_base::cancel_message_watch_(packet_id_t id, netcom_impl::watch_id_t wid) {
     auto iter1 = message_watches_.find(id);
     if (iter1 == message_watches_.end()) return;
     auto iter2 = iter1->group.find(wid);
@@ -68,7 +74,7 @@ void netcom_base::cancel_message_watch_(message_packet_id_t id, netcom_impl::wat
     (*iter2)->cancelled = true;
 }
 
-void netcom_base::hold_message_watch_(message_packet_id_t id, netcom_impl::watch_id_t wid) {
+void netcom_base::hold_message_watch_(packet_id_t id, netcom_impl::watch_id_t wid) {
     auto iter1 = message_watches_.find(id);
     if (iter1 == message_watches_.end()) return;
     auto iter2 = iter1->group.find(wid);
@@ -76,7 +82,7 @@ void netcom_base::hold_message_watch_(message_packet_id_t id, netcom_impl::watch
     (*iter2)->hold();
 }
 
-void netcom_base::release_message_watch_(message_packet_id_t id, netcom_impl::watch_id_t wid) {
+void netcom_base::release_message_watch_(packet_id_t id, netcom_impl::watch_id_t wid) {
     auto iter1 = message_watches_.find(id);
     if (iter1 == message_watches_.end()) return;
     auto iter2 = iter1->group.find(wid);
@@ -95,31 +101,31 @@ netcom_impl::watch_id_t netcom_base::make_message_watch_id_() {
     return id;
 }
 
-bool netcom_base::request_watch_cancelled_(request_packet_id_t id) {
+bool netcom_base::request_watch_cancelled_(packet_id_t id) {
     auto iter = request_watches_.find(id);
     return iter == request_watches_.end() || (*iter)->cancelled;
 }
 
-void netcom_base::cancel_request_watch_(request_packet_id_t id) {
+void netcom_base::cancel_request_watch_(packet_id_t id) {
     auto iter = request_watches_.find(id);
     if (iter == request_watches_.end()) return;
     (*iter)->cancelled = true;
 }
 
-void netcom_base::hold_request_watch_(request_packet_id_t id) {
+void netcom_base::hold_request_watch_(packet_id_t id) {
     auto iter = request_watches_.find(id);
     if (iter == request_watches_.end()) return;
     (*iter)->hold();
 }
 
-void netcom_base::release_request_watch_(request_packet_id_t id) {
+void netcom_base::release_request_watch_(packet_id_t id) {
     auto iter = request_watches_.find(id);
     if (iter == request_watches_.end()) return;
     (*iter)->release(*this);
 }
 
 bool netcom_base::process_message_(in_packet_t&& p) {
-    message_packet_id_t id;
+    packet_id_t id;
     p >> id;
     auto iter = message_watches_.find(id);
     if (iter == message_watches_.end()) return false;
@@ -140,7 +146,7 @@ bool netcom_base::process_message_(in_packet_t&& p) {
 }
 
 bool netcom_base::process_request_(in_packet_t&& p) {
-    request_packet_id_t id;
+    packet_id_t id;
     p >> id;
     auto iter = request_watches_.find(id);
     if (iter != request_watches_.end() && !(*iter)->cancelled) {
@@ -196,20 +202,20 @@ bool netcom_base::process_unhandled_(in_packet_t&& p) {
 
 void netcom_base::process_packets() {
     // Clean cancelled requests and watches
-    std::remove_if(requests_.begin(), requests_.end(),
+    requests_.erase(std::remove_if(requests_.begin(), requests_.end(),
         [](std::unique_ptr<netcom_impl::request_t>& r) { return r->cancelled; }
-    );
-    std::remove_if(request_watches_.begin(), request_watches_.end(),
+    ), requests_.end());
+    request_watches_.erase(std::remove_if(request_watches_.begin(), request_watches_.end(),
         [](std::unique_ptr<netcom_impl::request_watch_t>& w) { return w->cancelled; }
-    );
+    ), request_watches_.end());
     for (auto& g : message_watches_) {
-        std::remove_if(g.group.begin(), g.group.end(),
+        g.group.erase(std::remove_if(g.group.begin(), g.group.end(),
             [](std::unique_ptr<netcom_impl::message_watch_t>& w) { return w->cancelled; }
-        );
+        ), g.group.end());
     }
-    std::remove_if(message_watches_.begin(), message_watches_.end(),
+    message_watches_.erase(std::remove_if(message_watches_.begin(), message_watches_.end(),
         [](netcom_impl::message_watch_group_t& g) { return g.group.empty(); }
-    );
+    ), message_watches_.end());
 
     // Process newly arrived packets
     in_packet_t p;
@@ -220,7 +226,7 @@ void netcom_base::process_packets() {
         switch (t) {
         case netcom_impl::packet_type::message :
             if (!process_message_(std::move(p))) {
-                message_packet_id_t id;
+                packet_id_t id;
                 op >> id;
                 out_packet_t tp = create_message_<message::unhandled_message>(id);
                 process_message_(std::move(tp.to_input()));
@@ -228,7 +234,7 @@ void netcom_base::process_packets() {
             break;
         case netcom_impl::packet_type::request :
             if (!process_request_(std::move(p))) {
-                request_packet_id_t id;
+                packet_id_t id;
                 op >> id;
                 out_packet_t tp = create_message_<message::unhandled_request>(id);
                 process_message_(std::move(tp.to_input()));
@@ -257,7 +263,15 @@ void netcom_base::process_packets() {
     }
 }
 
+#include <print.hpp>
+
 namespace netcom_impl {
+    request_t::~request_t() {
+        if (pool) {
+            pool->remove_(id);
+        }
+    }
+
     void request_keeper_t::cancel() {
         if (!empty_) {
             net_->cancel_request_(rid_);
@@ -269,6 +283,10 @@ namespace netcom_impl {
         if (empty_) return true;
         empty_ = net_->request_cancelled_(rid_);
         return empty_;
+    }
+
+    void request_keeper_t::notify_pool_(request_pool_t* pool) {
+        net_->request_notify_pool_(rid_, pool);
     }
 
     void request_watch_t::release(netcom_base& net) {
