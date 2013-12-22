@@ -71,6 +71,11 @@ public :
         base::emplace_back(std::unique_ptr<T>(new U(std::forward<Args>(args)...)));
     }
 
+    /// Insert the provided object in the vector.
+    void push_back(T&& t) {
+        emplace_back(std::move(t));
+    }
+
     /// Erase an element from this vector.
     void erase(iterator iter) {
         base::erase(iter.stdbase());
@@ -119,6 +124,7 @@ public :
     using base::size;
     using base::max_size;
     using base::capacity;
+    using base::shrink_to_fit;
     using base::resize;
     using base::reserve;
     using base::empty;
