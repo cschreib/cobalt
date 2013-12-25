@@ -11,7 +11,7 @@
 #include "packet.hpp"
 
 // Unique ID attributed to any request.
-// It is external, but only used explicitely by the sender. It must thus only be unique from the
+// It is external, but only used explicitly by the sender. It must thus only be unique from the
 // point of view of the sender.
 using request_id_t = std::uint16_t;
 // Unique ID associated to an actor.
@@ -54,7 +54,7 @@ namespace request {
 #endif
 
 // Exception thrown when too many requests are issued at once.
-// Each request is given a unique ID, so that the netcom class can easilly route the packets to
+// Each request is given a unique ID, so that the netcom class can easily route the packets to
 // the proper callback functions. This exception is thrown when it is not possible to produce a
 // unique ID anymore. If this happens, then there is most likely a bug: either the receiver does not
 // answer to any request, and they pile up here awaiting for an answer, or you are sending more
@@ -171,7 +171,7 @@ namespace netcom_impl {
     // the associated callback function(s), whether the request has been issued (receive()) or not
     // (fail()).
     struct request_t {
-        explicit request_t(request_id_t id_) : id(id_), cancelled(false), pool(nullptr) {}
+        explicit request_t(request_id_t id_) : id(id_), canceled(false), pool(nullptr) {}
         virtual ~request_t();
 
         request_t(const request_t&) = delete;
@@ -184,7 +184,7 @@ namespace netcom_impl {
         virtual void unhandled() = 0;
 
         const request_id_t id;
-        bool cancelled;
+        bool canceled;
         request_pool_t* pool;
     };
 
@@ -284,10 +284,10 @@ namespace netcom_impl {
     // RAII class to keep requests alive.
     // This object is returned by netcom::send_request(). When it is destroyed and if auto
     // cancellation is enabled (auto_cancel(), disabled by default), the associated request is
-    // cancelled, and its callback function(s) are not called, even if the receiver eventually
-    // answers. The request can also be cancelled manually using the cancel() member function. The
+    // canceled, and its callback function(s) are not called, even if the receiver eventually
+    // answers. The request can also be canceled manually using the cancel() member function. The
     // destructor then does nothing.
-    // It is safe to manipulate this object by value, since it is non-copiable and has move
+    // It is safe to manipulate this object by value, since it is non-copyable and has move
     // semantic.
     struct request_keeper_t {
         request_keeper_t(const request_keeper_t&) = delete;
@@ -319,7 +319,7 @@ namespace netcom_impl {
 
         void cancel();
 
-        bool cancelled() const;
+        bool canceled() const;
 
         packet_id_t id() const {
             return id_;
@@ -346,10 +346,9 @@ namespace netcom_impl {
     };
 
     // The request pool is an optional helper class that owns a list of pending requests, keeping
-    // them alive as long as no answer is received (or until they are explicitely cancelled by the
-    // user). This class is automatically informed when one of its request is answered or cancelled
-    // so there is never any "dead" requests  remaining in the list.
-    // Inserting a new request is guaranteed to succeed.
+    // them alive as long as no answer is received (or until they are explicitly canceled by the
+    // user). This class is automatically informed when one of its request is answered or canceled
+    // so there is never any "dead" requests in the list.
     struct request_pool_t {
         request_pool_t() = default;
         request_pool_t(const request_pool_t&) = delete;
@@ -415,7 +414,7 @@ namespace netcom_impl {
     // This object must take care of de-serializing the received packet in order to call the
     // associated callback function(s) to answer the request.
     struct request_watch_t {
-        request_watch_t(packet_id_t id_) : id(id_), cancelled(false), held_(false) {}
+        request_watch_t(packet_id_t id_) : id(id_), canceled(false), held_(false) {}
         virtual ~request_watch_t() {}
 
         request_watch_t(const request_watch_t&) = delete;
@@ -440,7 +439,7 @@ namespace netcom_impl {
         void release(netcom_base& net);
 
         const packet_id_t id;
-        bool cancelled;
+        bool canceled;
 
     private :
         bool held_;
@@ -467,7 +466,7 @@ namespace netcom_impl {
     // This object must take care of de-serializing the received packet in order to call the
     // associated callback function(s).
     struct message_watch_t {
-        explicit message_watch_t(watch_id_t id_) : id(id_), cancelled(false), held_(false) {}
+        explicit message_watch_t(watch_id_t id_) : id(id_), canceled(false), held_(false) {}
         virtual ~message_watch_t() {}
 
         message_watch_t(const message_watch_t&) = delete;
@@ -490,7 +489,7 @@ namespace netcom_impl {
         }
 
         void release() {
-            if (!cancelled) {
+            if (!canceled) {
                 for (auto& p : held_packets_) {
                     receive(std::move(p));
                 }
@@ -501,7 +500,7 @@ namespace netcom_impl {
         }
 
         const watch_id_t id;
-        bool cancelled;
+        bool canceled;
 
     private :
         bool held_;
@@ -554,7 +553,7 @@ namespace netcom_impl {
         selector_base_t& operator= (selector_base_t&&) = delete;
 
         virtual void cancel() = 0;
-        virtual bool cancelled() const = 0;
+        virtual bool canceled() const = 0;
         virtual void hold() = 0;
         virtual bool held() const = 0;
         virtual void release() = 0;
@@ -576,7 +575,7 @@ namespace netcom_impl {
 
         void cancel() override;
 
-        bool cancelled() const override;
+        bool canceled() const override;
 
         bool held() const override {
             return held_;
@@ -603,7 +602,7 @@ namespace netcom_impl {
 
         void cancel() override;
 
-        bool cancelled() const override;
+        bool canceled() const override;
 
         bool held() const override {
             return held_;
@@ -628,7 +627,7 @@ namespace netcom_impl {
     // netcom::watch_request(), a watch_keeper_t is returned, and is the only accessible handle on
     // the internal watch system. One can:
     //  1) Cancel the watch, by calling 'cancel()'. Packets will not be processed by this watch
-    //     anymore. It will be detroyed automatically when possible by the netcom.
+    //     anymore. It will be destroyed automatically when possible by the netcom.
     //  2) Temporarily hold back the incoming packets by calling 'hold()'. They will be stored in a
     //     queue as soon as they arrive, and processed later, only when the user calls 'release()'.
     //     Holding is then disabled and the situation goes back to normal, packets being processed
@@ -637,8 +636,8 @@ namespace netcom_impl {
     // Note that, like request_keeper_t, this class can automatically cancel its watched item on
     // destruction. The major difference here is that this is the *default behavior*. To disable it,
     // one has to call 'auto_cancel(false)', but this is not recommended: unlike requests which get
-    // automatically cancelled as soon as their answer has arrived, watchers are potentially
-    // eternal, and can only be cancelled manually through the use of this watch_keeper_t. Hence,
+    // automatically canceled as soon as their answer has arrived, watchers are potentially
+    // eternal, and can only be canceled manually through the use of this watch_keeper_t. Hence,
     // if auto_cancel is disabled and this watch_keeper_t is destroyed, there is no way to cancel
     // the watched item any more, and it will remain active until the netcom class is destroyed.
     struct watch_keeper_t {
@@ -662,9 +661,9 @@ namespace netcom_impl {
             }
         }
 
-        bool cancelled() const {
+        bool canceled() const {
             if (!sel_) return true;
-            return sel_->cancelled();
+            return sel_->canceled();
         }
 
         bool held() {
@@ -698,11 +697,12 @@ namespace netcom_impl {
     // The watch pool is a tool to make it easier to manage the lifetime of watch keepers.
     // It is basically just a container that provides clearer semantics and functions that affect
     // all watchers at once (hold_all, release_all, ...).
-    // Watch keepers that are stored here are *exclusively* managed by this class. Contrary to
-    // request_pool_t, it is not necessary to worry about "dead" watchers, since they are only
-    // cancelled by this class.
+    // Watch keepers that are stored here are *exclusively* managed by this class. The only
+    // exception to this rule is when the whole netcom is stopped: watchers are all killed, and all
+    // pools are automatically notified, so the user has nothing to do.
     struct watch_pool_t {
-        watch_pool_t() : held_(false) {}
+        explicit watch_pool_t(netcom_base& net);
+        ~watch_pool_t();
 
         watch_pool_t(const watch_pool_t&) = delete;
         watch_pool_t(watch_pool_t&&) = default;
@@ -789,16 +789,17 @@ namespace netcom_impl {
         }
 
     private :
+        netcom_base& net_;
         bool held_;
         std::vector<watch_keeper_t> watchers_;
     };
 }
 
-// Base class of network communation.
+// Base class of network communication.
 // This class must be inherited from. The derived class must then take care of filling the input
 // packet queue (input_) and consuming the output packet queue (output_). These two queues are
 // thread safe, and can thus be filled/consumed in another thread. The rest of the code is not
-// garanteed to be thread safe, and doesn't use any thread.
+// guaranteed to be thread safe, and doesn't use any thread.
 // In particular, all the callback functions that are registered to requests, their answers or
 // simple messages. These are called sequentially either when one calls 'process_packets()' or when
 // one releases a watch, in a synchronous way.
@@ -826,7 +827,7 @@ public :
     using request_t = netcom_impl::netcom_request_t<T>;
 
 protected :
-    // Packet intput and output queues
+    // Packet input and output queues
     lock_free_queue<in_packet_t>  input_;
     lock_free_queue<out_packet_t> output_;
 
@@ -836,8 +837,9 @@ private :
     template<typename>
     friend struct netcom_impl::message_selector_t;
     friend struct netcom_impl::request_watch_t;
+    friend struct netcom_impl::watch_pool_t;
 
-    // Stores the requests that have been made by this actor.
+    // Requests that have been made by this actor.
     using request_container = sorted_vector<
         std::unique_ptr<netcom_impl::request_t>,
         mem_var_comp(&netcom_impl::request_t::id)
@@ -845,7 +847,7 @@ private :
     request_container requests_;
     sorted_vector<request_id_t, std::greater<request_id_t>> available_request_ids_;
 
-    // Stores the message watches created by this actor.
+    // Message watches created by this actor.
     using message_watch_container = sorted_vector<
         netcom_impl::message_watch_group_t,
         mem_var_comp(&netcom_impl::message_watch_group_t::id)
@@ -853,12 +855,15 @@ private :
     message_watch_container message_watches_;
     sorted_vector<netcom_impl::watch_id_t, std::greater<request_id_t>> available_mwatch_ids_;
 
-    // Stores the request watches created by this actor.
+    // Request watches created by this actor.
     using request_watch_container = sorted_vector<
         std::unique_ptr<netcom_impl::request_watch_t>,
         mem_var_comp(&netcom_impl::request_watch_t::id)
     >;
     request_watch_container request_watches_;
+
+    // Watch pools used by this actor.
+    sorted_vector<watch_pool_t*> watch_pools_;
 
 private :
     // Send a packet to the output queue
@@ -879,6 +884,7 @@ private :
     // Message watcher manipulation
     bool message_watch_cancelled_(packet_id_t id, netcom_impl::watch_id_t wid);
     void cancel_message_watch_(packet_id_t id, netcom_impl::watch_id_t wid);
+    void cancel_message_watch_(netcom_impl::message_watch_group_t::container_type::iterator iter);
     void hold_message_watch_(packet_id_t id, netcom_impl::watch_id_t wid);
     void release_message_watch_(packet_id_t id, netcom_impl::watch_id_t wid);
     void free_message_watch_id_(netcom_impl::watch_id_t id);
@@ -888,8 +894,14 @@ private :
     // Request watcher manipulation
     bool request_watch_cancelled_(packet_id_t id);
     void cancel_request_watch_(packet_id_t id);
+    void cancel_request_watch_(request_watch_container::iterator iter);
     void hold_request_watch_(packet_id_t id);
     void release_request_watch_(packet_id_t id);
+
+private :
+    // Watch pool registration
+    void register_watch_pool_(watch_pool_t* pool);
+    void unregister_watch_pool_(watch_pool_t* pool);
 
 private :
     // Packet processing
@@ -943,6 +955,11 @@ protected :
         return p;
     }
 
+    // Clear all incoming and outgoing packets without processing them, and clear all requests and
+    // watchers. When this function is called, the class is in the same state as when constructed.
+    // Should be called in a thread safe environment.
+    void clear_all_();
+
 public :
     // Distributes all the received packets to the registered callback functions.
     // Should be called often enough so that packets are treated as soon as they arrive, for example
@@ -960,7 +977,7 @@ public :
     // Send a request with the provided arguments, and register a callback function to handle the
     // response. The callback function will be called by process_packets() when the corresponding
     // answer is received, if the request has been properly issued. If the request fails, no action
-    // will be taken. The request can be cancelled by the returned request_keeper_t at any time if
+    // will be taken. The request can be canceled by the returned request_keeper_t at any time if
     // not needed anymore.
     template<typename RequestType, typename FR>
     request_keeper_t send_request(actor_id_t aid, RequestType&& req, FR&& receive_func) {
@@ -982,7 +999,7 @@ public :
     // Send a request with the provided arguments, and register three callback functions to handle
     // the response (one in case of success, another in case of failure, and the last one in case
     // the request could not be received on the other side). The callback functions will be called
-    // by process_packets() when the corresponding answer is received. The request can be cancelled
+    // by process_packets() when the corresponding answer is received. The request can be canceled
     // by the returned request_keeper_t at any time if not needed anymore.
     template<typename RequestType, typename FR, typename FF, typename UF = decltype(no_op)>
     request_keeper_t send_request(actor_id_t aid, RequestType&& req, FR&& receive_func,
@@ -1127,7 +1144,7 @@ namespace netcom_impl {
     }
 
     template<typename RequestType>
-    bool request_selector_t<RequestType>::cancelled() const {
+    bool request_selector_t<RequestType>::canceled() const {
         if (cancelled_) return true;
         cancelled_ = net_.request_watch_cancelled_(RequestType::packet_id__);
         return cancelled_;
@@ -1155,7 +1172,7 @@ namespace netcom_impl {
     }
 
     template<typename MessageType>
-    bool message_selector_t<MessageType>::cancelled() const {
+    bool message_selector_t<MessageType>::canceled() const {
         if (cancelled_) return true;
         cancelled_ = net_.message_watch_cancelled_(MessageType::packet_id__, id_);
         return cancelled_;

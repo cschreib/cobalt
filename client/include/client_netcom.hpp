@@ -10,6 +10,10 @@ namespace client {
         netcom();
         ~netcom();
 
+        /// Return the public actor ID of this client.
+        /// Will return 'invalid_actor_id' if there is no active connection.
+        actor_id_t self_id() const;
+
         /// Will return true as long as there is an active connection with the server.
         bool is_connected() const;
 
@@ -50,6 +54,7 @@ namespace client {
         std::string   address_;
         std::uint16_t port_;
 
+        actor_id_t        self_id_;
         std::atomic<bool> is_connected_;
         std::atomic<bool> terminate_thread_;
         sf::Thread listener_thread_;

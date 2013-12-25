@@ -7,7 +7,7 @@ int main(int argc, const char* argv[]) {
     server::netcom net;
 
     bool stop = false;
-    server::netcom::watch_pool_t pool;
+    server::netcom::watch_pool_t pool(net);
 
     pool << net.watch_message([&](message::unhandled_message msg) {
         warning("unhandled message: ", msg.message_id);

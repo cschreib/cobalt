@@ -4,7 +4,7 @@
 #include <print.hpp>
 
 namespace client {
-    player_list::player_list(netcom& net) : net_(net) {
+    player_list::player_list(netcom& net) : net_(net), pool_(net) {
         // pool << net.watch_message<message::server::connection_granted>(
         //     [&](message::server::connection_granted msg) {
         //     net.send_request(client::netcom::server_actor_id,

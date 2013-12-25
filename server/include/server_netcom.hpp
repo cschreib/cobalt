@@ -105,7 +105,9 @@ namespace server {
         } rsn;
     };
 
-    NETCOM_PACKET(connection_granted) {};
+    NETCOM_PACKET(connection_granted) {
+        actor_id_t id;
+    };
 }
 }
 

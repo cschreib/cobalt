@@ -10,7 +10,7 @@ int main(int argc, const char* argv[]) {
     client::netcom net;
 
     bool stop = false;
-    client::netcom::watch_pool_t pool;
+    client::netcom::watch_pool_t pool(net);
 
     pool << net.watch_message([&](message::unhandled_message msg) {
         warning("unhandled message: ", msg.message_id);
@@ -46,7 +46,7 @@ int main(int argc, const char* argv[]) {
         reason(rsn);
     });
     pool << net.watch_message([&](message::server::connection_granted msg) {
-        note("connection granted!");
+        note("connection granted (id=", msg.id, ")!");
         net.send_request(client::netcom::server_actor_id,
             make_packet<request::client::join_players>("kalith", color32::blue, false),
             [](request::client::join_players::answer msg) {

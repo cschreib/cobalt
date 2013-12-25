@@ -3,11 +3,15 @@
 #include <iostream>
 
 namespace client {
-    netcom::netcom() : is_connected_(false), terminate_thread_(false),
+    netcom::netcom() : self_id_(invalid_actor_id), is_connected_(false), terminate_thread_(false),
         listener_thread_(std::bind(&netcom::loop_, this)) {}
 
     netcom::~netcom() {
         terminate();
+    }
+
+    actor_id_t netcom::self_id() const {
+        return self_id_;
     }
 
     bool netcom::is_connected() const {
@@ -15,7 +19,9 @@ namespace client {
     }
 
     void netcom::run(const std::string& addr, std::uint16_t port) {
-        terminate();
+        if (is_connected_) {
+            terminate();
+        }
         terminate_thread_ = false;
         address_ = addr;
         port_ = port;
@@ -25,6 +31,9 @@ namespace client {
     void netcom::terminate() {
         terminate_thread_ = true;
         listener_thread_.wait();
+
+        clear_all_();
+        self_id_ = invalid_actor_id;
     }
 
     void netcom::loop_() {
@@ -53,6 +62,7 @@ namespace client {
                     op >> id;
                     switch (id) {
                     case message::server::connection_granted::packet_id__ :
+                        op >> self_id_;
                         input_.push(std::move(top.to_input()));
                         break;
                     case message::server::connection_denied::packet_id__ :

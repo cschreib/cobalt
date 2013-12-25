@@ -38,7 +38,9 @@ namespace server {
     }
 
     void netcom::run(std::uint16_t port) {
-        terminate();
+        if (is_connected_) {
+            terminate();
+        }
         terminate_thread_ = false;
         listen_port_ = port;
         listener_thread_.launch();
@@ -47,6 +49,7 @@ namespace server {
     void netcom::terminate() {
         terminate_thread_ = true;
         listener_thread_.wait();
+        clear_all_();
     }
 
     std::string netcom::get_actor_ip(actor_id_t cid) const {
@@ -100,7 +103,9 @@ namespace server {
                                 )
                             );
 
-                            out_packet_t p = create_message_<message::server::connection_granted>();
+                            out_packet_t p = create_message_<message::server::connection_granted>(
+                                id
+                            );
                             s->send(p.impl);
 
                             selector_.add(*s);

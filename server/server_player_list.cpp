@@ -3,7 +3,7 @@
 #include <time.hpp>
 
 namespace server {
-    player_list::player_list(netcom& net) : net_(net), max_player_(1u) {
+    player_list::player_list(netcom& net) : net_(net), max_player_(1u), pool_(net) {
         pool_ << net_.watch_request([&](netcom::request_t<request::client::join_players>& req) {
             if (players_.size() < max_player_) {
                 actor_id_t id = req.from();
