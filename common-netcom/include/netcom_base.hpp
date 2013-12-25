@@ -734,18 +734,9 @@ namespace netcom_impl {
             watchers_.shrink_to_fit();
         }
 
-        void hold_all() {
-            if (held_) return;
-            for (auto& w : watchers_) {
-                w.hold();
-            }
-        }
-
-        void release_all() {
-            if (!held_) return;
-            for (auto& w : watchers_) {
-                w.release();
-            }
+        template<typename T>
+        void cancel_all() {
+            cancel_all(T::packet_id__);
         }
 
         void cancel_all(packet_id_t id) {
@@ -757,6 +748,18 @@ namespace netcom_impl {
             );
         }
 
+        void hold_all() {
+            if (held_) return;
+            for (auto& w : watchers_) {
+                w.hold();
+            }
+        }
+
+        template<typename T>
+        void hold_all() {
+            hold_all(T::packet_id__);
+        }
+
         void hold_all(packet_id_t id) {
             if (held_) return;
             for (auto& w : watchers_) {
@@ -764,6 +767,18 @@ namespace netcom_impl {
                     w.hold();
                 }
             }
+        }
+
+        void release_all() {
+            if (!held_) return;
+            for (auto& w : watchers_) {
+                w.release();
+            }
+        }
+
+        template<typename T>
+        void release_all() {
+            release_all(T::packet_id__);
         }
 
         void release_all(packet_id_t id) {
