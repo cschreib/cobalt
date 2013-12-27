@@ -70,3 +70,7 @@ add_subdirectory(client)
 # build server & client frontends
 add_subdirectory(server-cli)
 add_subdirectory(client-cli)
+
+# enable documentation build
+add_custom_target(doxygen COMMAND doxygen doxygen.conf
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/doc)
