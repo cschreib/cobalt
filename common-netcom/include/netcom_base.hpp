@@ -809,14 +809,15 @@ namespace netcom_impl {
     };
 }
 
-// Base class of network communication.
-// This class must be inherited from. The derived class must then take care of filling the input
-// packet queue (input_) and consuming the output packet queue (output_). These two queues are
-// thread safe, and can thus be filled/consumed in another thread. The rest of the code is not
-// guaranteed to be thread safe, and doesn't use any thread.
-// In particular, all the callback functions that are registered to requests, their answers or
-// simple messages. These are called sequentially either when one calls 'process_packets()' or when
-// one releases a watch, in a synchronous way.
+/// Base class of network communication.
+/** This class must be inherited from. The derived class must then take care of filling the input
+    packet queue (input_) and consuming the output packet queue (output_). These two queues are
+    thread safe, and can thus be filled/consumed in another thread. The rest of the code is not
+    guaranteed to be thread safe, and doesn't use any thread.
+    In particular, all the callback functions that are registered to requests, their answers or
+    simple messages. These are called sequentially either when one calls 'process_packets()' or when
+    one releases a watch, in a synchronous way.
+**/
 class netcom_base {
 public :
     netcom_base();
@@ -826,10 +827,17 @@ public :
     using in_packet_t = netcom_impl::in_packet_t;
     using out_packet_t = netcom_impl::out_packet_t;
 
+    /// Invalid ID.
     static const actor_id_t invalid_actor_id = -1;
+    /// Virtual ID that represents oneself.
     static const actor_id_t self_actor_id = 0;
+    /// Virtual ID that encompasses all actors except oneself.
     static const actor_id_t all_actor_id = 1;
+    /// ID of the server.
     static const actor_id_t server_actor_id = 2;
+    /// ID that will be attributed to the first client.
+    /** Next clients will be attributed IDs greater than this one.
+    **/
     static const actor_id_t first_actor_id = 3;
 
     // Import helper classes in this scope for the user
@@ -841,8 +849,16 @@ public :
     using request_t = netcom_impl::netcom_request_t<T>;
 
 protected :
-    // Packet input and output queues
+    /// Packet input queue
+    /** Filled by derivate when recieved from the network, consumed by netcom_base
+        (process_packets()).
+    **/
     lock_free_queue<in_packet_t>  input_;
+
+    /// Packet output queue
+    /** Filled by netcom_base (send_message(), send_request()), consumed by derivate to send them
+        over the network.
+    **/
     lock_free_queue<out_packet_t> output_;
 
 private :
@@ -926,7 +942,7 @@ private :
     bool process_unhandled_(in_packet_t&& p);
 
 protected :
-    // Packet creation functions
+    /// Create a message packet without sending it
     template<typename MessageType, typename ... Args>
     out_packet_t create_message_(MessageType&& msg) {
         out_packet_t p;
@@ -936,6 +952,7 @@ protected :
         return p;
     }
 
+    /// Create a message packet without sending it
     template<typename MessageType, typename ... Args>
     out_packet_t create_message_(Args&& ... args) {
         out_packet_t p;
@@ -945,6 +962,7 @@ protected :
         return p;
     }
 
+    /// Create a request packet without sending it
     template<typename RequestType, typename ... Args>
     out_packet_t create_request_(request_id_t& rid, RequestType&& req) {
         rid = make_request_id_();
@@ -957,6 +975,7 @@ protected :
         return p;
     }
 
+    /// Create a request packet without sending it
     template<typename RequestType, typename ... Args>
     out_packet_t create_request_(request_id_t& rid, Args&& ... args) {
         rid = make_request_id_();
@@ -969,18 +988,21 @@ protected :
         return p;
     }
 
-    // Clear all incoming and outgoing packets without processing them, and clear all requests and
-    // watchers. When this function is called, the class is in the same state as when constructed.
-    // Should be called in a thread safe environment.
+    /// Clear all incoming and outgoing packets without processing them, and clear all requests and
+    /// watchers.
+    /** When this function is called, the class is in the same state as when constructed.
+        It modifies the input_ and output_ queues in a non thread safe way.
+    **/
     void clear_all_();
 
 public :
-    // Distributes all the received packets to the registered callback functions.
-    // Should be called often enough so that packets are treated as soon as they arrive, for example
-    // inside the game loop.
+    /// Distributes all the received packets to the registered callback functions.
+    /** Should be called often enough so that packets are treated as soon as they arrive, for
+        example inside the game loop.
+    **/
     void process_packets();
 
-    // Send a message with the provided arguments.
+    /// Send a message to a given actor.
     template<typename MessageType>
     void send_message(actor_id_t aid, MessageType&& msg = MessageType()) {
         out_packet_t p = create_message_(std::forward<MessageType>(msg));
@@ -988,11 +1010,13 @@ public :
         send_(std::move(p));
     }
 
-    // Send a request with the provided arguments, and register a callback function to handle the
-    // response. The callback function will be called by process_packets() when the corresponding
-    // answer is received, if the request has been properly issued. If the request fails, no action
-    // will be taken. The request can be canceled by the returned request_keeper_t at any time if
-    // not needed anymore.
+    /// Send a request with the provided arguments, and register a callback function to handle the
+    /// response.
+    /** The callback function will be called by process_packets() when the corresponding answer is
+        received, if the request has been properly issued. If the request fails, no action will be
+        taken. The request can be canceled by the returned request_keeper_t at any time if not
+        needed anymore.
+    **/
     template<typename RequestType, typename FR>
     request_keeper_t send_request(actor_id_t aid, RequestType&& req, FR&& receive_func) {
         static_assert(std::is_same<function_argument<FR>, typename RequestType::answer>::value,
@@ -1010,11 +1034,13 @@ public :
         return request_keeper_t(*this, RequestType::packet_id__, rid);
     }
 
-    // Send a request with the provided arguments, and register three callback functions to handle
-    // the response (one in case of success, another in case of failure, and the last one in case
-    // the request could not be received on the other side). The callback functions will be called
-    // by process_packets() when the corresponding answer is received. The request can be canceled
-    // by the returned request_keeper_t at any time if not needed anymore.
+    /// Send a request with the provided arguments, and register three callback functions to handle
+    /// the response (one in case of success, another in case of failure, and the last one in case
+    /// the request could not be received on the other side).
+    /** The callback functions will be called by process_packets() when the corresponding answer is
+        received. The request can be canceled by the returned request_keeper_t at any time if not
+        needed anymore.
+    **/
     template<typename RequestType, typename FR, typename FF, typename UF = decltype(no_op)>
     request_keeper_t send_request(actor_id_t aid, RequestType&& req, FR&& receive_func,
         FF&& failure_func, UF&& unhandled_func = no_op) {
@@ -1065,11 +1091,23 @@ private :
     }
 
 public :
+    /// Register a callback function to be called whenever a given message packet is received.
+    /** The callback function will be called by process_packets() when the corresponding message is
+        received, and has to take only one argument whose type is that of the corresponding packet.
+        It can be disabled by the returned watch_keeper_t at any time if not needed anymore by
+        calling watch_keeper_t::cancel(). If the returned watch_keeper_t is destroyed, then the
+        callback will remain active as long as clear_all_() is called  (contrary to watch_keeper_t
+        returned by watch_request()). This behavior can be changed by watch_keeper_t::auto_cancel().
+    **/
     template<typename FR>
     watch_keeper_t watch_message(FR&& receive_func) {
         return watch_message_(false, std::forward<FR>(receive_func));
     }
 
+    /// Register a callback function to be called the first time a given message packet is received.
+    /** See watch_message() for details. The only difference here is that the callback will be
+        called at most once: it is automatically disabled afterwards.
+    **/
     template<typename FR>
     watch_keeper_t watch_message_once(FR&& receive_func) {
         return watch_message_(true, std::forward<FR>(receive_func));
@@ -1130,11 +1168,24 @@ private :
     }
 
 public :
+    /// Register a callback function to be called whenever a given request packet is received.
+    /** The callback function will be called by process_packets() when the corresponding request is
+        received, and will have to answer it either by giving a proper answer or by signaling
+        failure. It must take only one argument: a request_t<>. It can be disabled by the returned
+        watch_keeper_t at any time if not needed anymore by calling watch_keeper_t::cancel(). If the
+        returned watch_keeper_t is destroyed, then the callback is automatically disabled (contrary
+        to watch_keeper_t returned by watch_message()). This behavior can be changed by
+        watch_keeper_t::auto_cancel().
+    **/
     template<typename FR>
     watch_keeper_t watch_request(FR&& receive_func) {
         return watch_request_(false, std::forward<FR>(receive_func));
     }
 
+    /// Register a callback function to be called the first time a given request packet is received.
+    /** See watch_request() for details. The only difference here is that the callback will be
+        called at most once: it is automatically disabled afterwards.
+    **/
     template<typename FR>
     watch_keeper_t watch_request_once(FR&& receive_func) {
         return watch_request_(true, std::forward<FR>(receive_func));
