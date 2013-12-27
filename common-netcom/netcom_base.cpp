@@ -38,12 +38,12 @@ void netcom_base::request_notify_pool_(request_id_t id, request_pool_t* pool) {
 void netcom_base::cancel_request_(request_id_t id) {
     auto iter = requests_.find(id);
     if (iter != requests_.end()) return;
-    cancel_request_(iter);
+    cancel_request_(**iter);
 }
 
-void netcom_base::cancel_request_(request_container::iterator iter) {
-    free_request_id_((*iter)->id);
-    (*iter)->canceled = true;
+void netcom_base::cancel_request_(netcom_impl::request_t& req) {
+    free_request_id_(req.id);
+    req.canceled = true;
 }
 
 void netcom_base::free_request_id_(request_id_t id) {
@@ -69,12 +69,13 @@ void netcom_base::cancel_message_watch_(packet_id_t id, netcom_impl::watch_id_t 
     if (iter1 == message_watches_.end()) return;
     auto iter2 = iter1->group.find(wid);
     if (iter2 == iter1->group.end()) return;
-    cancel_message_watch_(iter2);
+    cancel_message_watch_(**iter2);
 }
 
-void netcom_base::cancel_message_watch_(netcom_impl::message_watch_group_t::container_type::iterator iter) {
-    free_message_watch_id_((*iter)->id);
-    (*iter)->canceled = true;
+void netcom_base::cancel_message_watch_(netcom_impl::message_watch_t& watch) {
+    free_message_watch_id_(watch.id);
+    watch.canceled = true;
+    watch.accept = false;
 }
 
 void netcom_base::hold_message_watch_(packet_id_t id, netcom_impl::watch_id_t wid) {
@@ -90,7 +91,7 @@ void netcom_base::release_message_watch_(packet_id_t id, netcom_impl::watch_id_t
     if (iter1 == message_watches_.end()) return;
     auto iter2 = iter1->group.find(wid);
     if (iter2 == iter1->group.end()) return;
-    (*iter2)->release();
+    (*iter2)->release(*this);
 }
 
 void netcom_base::free_message_watch_id_(netcom_impl::watch_id_t id) {
@@ -112,11 +113,12 @@ bool netcom_base::request_watch_cancelled_(packet_id_t id) {
 void netcom_base::cancel_request_watch_(packet_id_t id) {
     auto iter = request_watches_.find(id);
     if (iter == request_watches_.end()) return;
-    cancel_request_watch_(iter);
+    cancel_request_watch_(**iter);
 }
 
-void netcom_base::cancel_request_watch_(request_watch_container::iterator iter) {
-    (*iter)->canceled = true;
+void netcom_base::cancel_request_watch_(netcom_impl::request_watch_t& watch) {
+    watch.canceled = true;
+    watch.accept = false;
 }
 
 void netcom_base::hold_request_watch_(packet_id_t id) {
@@ -143,15 +145,15 @@ void netcom_base::clear_all_() {
     input_.clear();
     output_.clear();
 
-    for (auto iter = requests_.begin(); iter != requests_.end(); ++iter) {
-        cancel_request_(iter);
+    for (auto& r : requests_) {
+        cancel_request_(*r);
     }
 
     requests_.clear();
 
-    for (auto iter1 = message_watches_.begin(); iter1 != message_watches_.end(); ++iter1)
-    for (auto iter2 = iter1->group.begin(); iter2 != iter1->group.begin(); ++iter2) {
-        cancel_message_watch_(iter2);
+    for (auto& group : message_watches_)
+    for (auto& w : group.group) {
+        cancel_message_watch_(*w);
     }
 
     for (watch_pool_t* p : watch_pools_) {
@@ -160,8 +162,8 @@ void netcom_base::clear_all_() {
 
     message_watches_.clear();
 
-    for (auto iter = request_watches_.begin(); iter != request_watches_.end(); ++iter) {
-        cancel_request_watch_(iter);
+    for (auto& w : request_watches_) {
+        cancel_request_watch_(*w);
     }
 
     request_watches_.clear();
@@ -174,14 +176,21 @@ bool netcom_base::process_message_(in_packet_t&& p) {
     if (iter == message_watches_.end()) return false;
 
     bool received = false;
-    for (auto& watch : iter->group) {
-        if (watch->canceled) continue;
-        if (watch->held()) {
+    for (auto& tw : iter->group) {
+        auto& watch = *tw;
+        if (!watch.accept) continue;
+        if (watch.held()) {
             received = true;
-            watch->hold(in_packet_t(p));
+            watch.hold(in_packet_t(p));
+            if (watch.once) {
+                watch.accept = false;
+            }
         } else {
             received = true;
-            watch->receive(in_packet_t(p));
+            watch.receive(in_packet_t(p));
+            if (watch.once) {
+                cancel_message_watch_(watch);
+            }
         }
     }
 
@@ -192,11 +201,18 @@ bool netcom_base::process_request_(in_packet_t&& p) {
     packet_id_t id;
     p >> id;
     auto iter = request_watches_.find(id);
-    if (iter != request_watches_.end() && !(*iter)->canceled) {
-        if ((*iter)->held()) {
-            (*iter)->hold(std::move(p));
+    if (iter != request_watches_.end() && (*iter)->accept) {
+        auto& watch = **iter;
+        if (watch.held()) {
+            watch.hold(std::move(p));
+            if (watch.once) {
+                watch.accept = false;
+            }
         } else {
-            (*iter)->receive_and_answer(*this, std::move(p));
+            watch.receive_and_answer(*this, std::move(p));
+            if (watch.once) {
+                cancel_request_watch_(watch);
+            }
         }
         return true;
     } else {
@@ -215,7 +231,7 @@ bool netcom_base::process_answer_(in_packet_t&& p) {
     if (iter == requests_.end() || (*iter)->canceled) return false;
 
     (*iter)->receive(std::move(p));
-    cancel_request_(iter);
+    cancel_request_(**iter);
     return true;
 }
 
@@ -227,7 +243,7 @@ bool netcom_base::process_failure_(in_packet_t&& p) {
     if (iter == requests_.end() || (*iter)->canceled) return false;
 
     (*iter)->fail(std::move(p));
-    cancel_request_(iter);
+    cancel_request_(**iter);
     return true;
 }
 
@@ -239,7 +255,7 @@ bool netcom_base::process_unhandled_(in_packet_t&& p) {
     if (iter == requests_.end() || (*iter)->canceled) return false;
 
     (*iter)->unhandled();
-    cancel_request_(iter);
+    cancel_request_(**iter);
     return true;
 }
 
@@ -334,15 +350,32 @@ namespace netcom_impl {
         net_->request_notify_pool_(rid_, pool);
     }
 
-    void request_watch_t::release(netcom_base& net) {
+    void message_watch_t::release(netcom_base& net) {
+        if (!held_) return;
+
         if (!canceled) {
             for (auto& p : held_packets_) {
-                receive_and_answer(net, std::move(p));
+                receive(std::move(p));
             }
-        } else {
-            for (auto& p : held_packets_) {
-                net.send_unhandled_(std::move(p));
-            }
+        }
+
+        if (!held_packets_.empty() && once) {
+            net.cancel_message_watch_(*this);
+        }
+
+        held_packets_.clear();
+        held_ = false;
+    }
+
+    void request_watch_t::release(netcom_base& net) {
+        if (!held_) return;
+
+        for (auto& p : held_packets_) {
+            receive_and_answer(net, std::move(p));
+        }
+
+        if (!held_packets_.empty() && once) {
+            net.cancel_request_watch_(*this);
         }
 
         held_packets_.clear();
