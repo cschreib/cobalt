@@ -169,9 +169,24 @@ color32 operator * (float f, const color32& c2) {
     color32 c = c2; c *= f; return c;
 }
 
+std::string uchar_to_hex(std::uint8_t i) {
+    std::ostringstream ss;
+    ss << std::hex << (std::size_t)i;
+    std::string res = ss.str();
+    if (res.size() != 2) {
+        res = '0' + res;
+    }
+
+    return res;
+}
+
 std::ostream& operator << (std::ostream& s, const color32& c) {
-    return s << (std::size_t)c.r << ", " << (std::size_t)c.g << ", "
-             << (std::size_t)c.b << ", " << (std::size_t)c.a;
+    s << "#" << uchar_to_hex(c.r) << uchar_to_hex(c.g) << uchar_to_hex(c.b);
+    if (c.a != 255u) {
+        s << uchar_to_hex(c.a);
+    }
+
+    return s;
 }
 
 std::size_t hex_to_uint(const std::string& s) {
