@@ -182,14 +182,16 @@ namespace config {
             config_node& node = tree_.reach(name);
             signal_connection_t& sc = node.signal.connect([func](const std::string& value) {
                 ArgType t;
-                string::stringify<ArgType>::parse(t, value);
-                func(t);
+                if (string::stringify<ArgType>::parse(t, value)) {
+                    func(t);
+                }
             });
 
             if (!node.is_empty) {
                 ArgType t;
-                string::stringify<ArgType>::parse(t, node.value);
-                func(t);
+                if (string::stringify<ArgType>::parse(t, node.value)) {
+                    func(t);
+                }
             }
 
             return sc;
@@ -212,8 +214,9 @@ namespace config {
             config_node& node = tree_.reach(name);
             signal_connection_t& sc = node.signal.connect([func](const std::string& value) {
                 ArgType t;
-                string::stringify<ArgType>::parse(t, value);
-                func(t);
+                if (string::stringify<ArgType>::parse(t, value)) {
+                    func(t);
+                }
             });
 
             if (node.is_empty) {
@@ -223,8 +226,9 @@ namespace config {
                 dirty_ = true;
             } else {
                 ArgType t;
-                string::stringify<ArgType>::parse(t, node.value);
-                func(t);
+                if (string::stringify<ArgType>::parse(t, node.value)) {
+                    func(t);
+                }
             }
 
             return sc;
