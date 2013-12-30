@@ -227,6 +227,22 @@ namespace ctl {
     };
 
     auto no_op = [](){};
+
+    template<typename T1, typename T2>
+    struct has_left_shift {
+        template <typename U> static std::true_type  dummy(typename std::decay<
+            decltype(std::declval<T1&>() << std::declval<const U&>())>::type*);
+        template <typename U> static std::false_type dummy(...);
+        static const bool value = decltype(dummy<T2>(0))::value;
+    };
+
+    template<typename T1, typename T2>
+    struct has_right_shift {
+        template <typename U> static std::true_type  dummy(typename std::decay<
+            decltype(std::declval<T1&>() << std::declval<const U&>())>::type*);
+        template <typename U> static std::false_type dummy(...);
+        static const bool value = decltype(dummy<T2>(0))::value;
+    };
 }
 
 #endif

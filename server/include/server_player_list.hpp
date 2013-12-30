@@ -7,6 +7,10 @@
 #include "server_netcom.hpp"
 #include "server_player.hpp"
 
+namespace config {
+    class state;
+}
+
 namespace request {
 namespace client {
     NETCOM_PACKET(join_players) {
@@ -56,7 +60,7 @@ namespace server {
 namespace server {
     class player_list {
     public :
-        explicit player_list(netcom& net);
+        player_list(netcom& net, config::state& conf);
 
         struct auto_kick_policy {
             bool ai_first = false;
@@ -72,6 +76,7 @@ namespace server {
             message::server::player_disconnected::reason rsn);
 
         netcom& net_;
+        config::state& conf_;
 
         std::uint32_t      max_player_;
         ctl::ptr_vector<player> players_;

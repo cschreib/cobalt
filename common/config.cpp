@@ -2,7 +2,7 @@
 #include <fstream>
 
 namespace config {
-    state::state() : out(nullptr), dirty_(false) {}
+    state::state() : dirty_(false) {}
 
     void state::parse(const std::string& file) {
         std::ifstream f(file.c_str());
@@ -22,21 +22,15 @@ namespace config {
             std::size_t end_value = line.find_last_of(")");
             if (end_value == std::string::npos) continue;
 
-            try {
-                config_node& node = tree_.reach(line.substr(start_name, end_name-start_name));
-                if (!node.is_empty) {
-                    std::string new_value = line.substr(start_value, end_value-start_value);
-                    if (node.value != new_value) {
-                        for (auto& b : node.binds) {
-                            b->read(new_value);
-                        }
-                    }
-                } else {
-                    node.value = line.substr(start_value, end_value-start_value);
-                    node.is_empty = false;
+            config_node& node = tree_.reach(line.substr(start_name, end_name-start_name));
+            if (!node.is_empty) {
+                std::string new_value = line.substr(start_value, end_value-start_value);
+                if (node.value != new_value) {
+                    node.signal.dispatch(node.value);
                 }
-            } catch (ctl::string_tree<config_node>::wrong_structure_exception& e) {
-                out << "error: " << e.what() << std::endl;
+            } else {
+                node.value = line.substr(start_value, end_value-start_value);
+                node.is_empty = false;
             }
         }
     }

@@ -1,9 +1,12 @@
 #include "server_player_list.hpp"
 #include "server_player.hpp"
 #include <time.hpp>
+#include <config.hpp>
 
 namespace server {
-    player_list::player_list(netcom& net) : net_(net), max_player_(1u) {
+    player_list::player_list(netcom& net, config::state& conf) : net_(net), conf_(conf), max_player_(1u) {
+        pool_ << conf_.bind("player_list.max_player", max_player_);
+
         pool_ << net_.watch_request([&](const netcom::request_t<request::client::join_players>& req) {
             if (players_.size() < max_player_) {
                 actor_id_t id = req.from();
@@ -42,11 +45,11 @@ namespace server {
     }
 
     void player_list::set_max_player(std::uint32_t max) {
-        max_player_ = max;
+        conf_.set_value("player_list.max_player", max);
     }
 
     void player_list::set_max_player(std::uint32_t max, auto_kick_policy p) {
-        max_player_ = max;
+        conf_.set_value("player_list.max_player", max);
 
         if (players_.size() <= max_player_) {
             return;
