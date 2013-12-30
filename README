@@ -5,10 +5,11 @@
   Prerequisites:
 
 You will need to install the following libraries before compiling:
-1. SFML 2.0: http://www.sfml-dev.org/index.php
+1. SFML >= 2.0: http://www.sfml-dev.org/index.php
+2. libclang >= 3.0: http://clang.llvm.org/docs/Tooling.html
 
   Compiling on Linux:
-  
+
 1. Open a terminal and navigate to this directory.
 2. If it does not exist, create a new directory called 'build' (or whatever you like).
 3. Navigate to this new directory.
