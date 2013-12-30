@@ -33,7 +33,7 @@ namespace client {
     private :
         netcom& net_;
 
-        ptr_vector<player> players_;
+        ctl::ptr_vector<player> players_;
         player* self_;
 
         scoped_connection_pool_t pool_;

@@ -37,7 +37,7 @@ namespace server {
             actor_id_t                     id;
         };
 
-        using client_list_t = sorted_vector<client_t, mem_var_comp(&client_t::id)>;
+        using client_list_t = ctl::sorted_vector<client_t, mem_var_comp(&client_t::id)>;
 
         void loop_();
         bool make_id_(actor_id_t& id);
@@ -51,7 +51,7 @@ namespace server {
         sf::SocketSelector selector_;
 
         client_list_t             clients_;
-        sorted_vector<actor_id_t, std::greater<actor_id_t>> available_ids_;
+        ctl::sorted_vector<actor_id_t, std::greater<actor_id_t>> available_ids_;
 
         std::atomic<bool> is_connected_;
         std::atomic<bool> terminate_thread_;

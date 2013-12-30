@@ -68,13 +68,13 @@ namespace server {
         std::uint32_t max_player() const;
 
     private :
-        void remove_player_(ptr_vector<player>::iterator iter,
+        void remove_player_(ctl::ptr_vector<player>::iterator iter,
             message::server::player_disconnected::reason rsn);
 
         netcom& net_;
 
         std::uint32_t      max_player_;
-        ptr_vector<player> players_;
+        ctl::ptr_vector<player> players_;
 
         scoped_connection_pool_t pool_;
     };

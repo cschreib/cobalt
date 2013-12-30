@@ -53,43 +53,51 @@ namespace request {
 #include "autogen/packets/netcom_base.hpp"
 #endif
 
-// Exception thrown when too many requests are issued at once.
-// Each request is given a unique ID, so that the netcom class can easily route the packets to
-// the proper callback functions. This exception is thrown when it is not possible to produce a
-// unique ID anymore. If this happens, then there is most likely a bug: either the receiver does not
-// answer to any request, and they pile up here awaiting for an answer, or you are sending more
-// requests than what the receiver can handle in a given time interval.
-// Can be thrown by: netcom::send_request().
-struct too_many_requests : public std::runtime_error {
-    too_many_requests() : std::runtime_error("error.netcom.too_many_requests") {}
-};
+namespace netcom_exception {
+    struct base : public std::runtime_error {
+        explicit base(const std::string& s);
+        explicit base(const char* s);
+        virtual ~base() noexcept;
+    };
 
-// Exception thrown when a given request type is watched by more than one watcher. Only one watcher
-// can answer to a request: if multiple watchers were allowed, one would not know how to pick the
-// one that should answer. This is a bug of the user code.
-template<typename RequestType>
-struct request_already_watched : public std::runtime_error {
-    request_already_watched() : std::runtime_error("error.netcom.request_already_watched") {}
-};
+    // Exception thrown when too many requests are issued at once.
+    // Each request is given a unique ID, so that the netcom class can easily route the packets to
+    // the proper callback functions. This exception is thrown when it is not possible to produce a
+    // unique ID anymore. If this happens, then there is most likely a bug: either the receiver does not
+    // answer to any request, and they pile up here awaiting for an answer, or you are sending more
+    // requests than what the receiver can handle in a given time interval.
+    // Can be thrown by: netcom::send_request().
+    struct too_many_requests : public base {
+        too_many_requests() : base("error.netcom.too_many_requests") {}
+    };
 
-// Exception thrown when more than one answer is sent for a given request. This is a bug in the user
-// code.
-template<typename RequestType>
-struct request_already_answered : public std::runtime_error {
-    request_already_answered() : std::runtime_error("error.netcom.request_already_answered") {}
-};
+    // Exception thrown when a given request type is watched by more than one watcher. Only one watcher
+    // can answer to a request: if multiple watchers were allowed, one would not know how to pick the
+    // one that should answer. This is a bug of the user code.
+    template<typename RequestType>
+    struct request_already_watched : public base {
+        request_already_watched() : base("error.netcom.request_already_watched") {}
+    };
 
-// Exception thrown when a request is received and sent to a registered handler, but this handler
-// does not provide any answer (even a failure). This is a bug in the user code.
-template<typename RequestType>
-struct request_not_answered : public std::runtime_error {
-    request_not_answered() : std::runtime_error("error.netcom.request_not_answered") {}
-};
+    // Exception thrown when more than one answer is sent for a given request. This is a bug in the user
+    // code.
+    template<typename RequestType>
+    struct request_already_answered : public base {
+        request_already_answered() : base("error.netcom.request_already_answered") {}
+    };
 
-// Exception thrown when working on packets with unspecified origin/recipient. This is a bug.
-struct invalid_actor : public std::runtime_error {
-    invalid_actor() : std::runtime_error("error.netcom.invalid_actor") {}
-};
+    // Exception thrown when a request is received and sent to a registered handler, but this handler
+    // does not provide any answer (even a failure). This is a bug in the user code.
+    template<typename RequestType>
+    struct request_not_answered : public base {
+        request_not_answered() : base("error.netcom.request_not_answered") {}
+    };
+
+    // Exception thrown when working on packets with unspecified origin/recipient. This is a bug.
+    struct invalid_actor : public base {
+        invalid_actor() : base("error.netcom.invalid_actor") {}
+    };
+}
 
 // Implementation details that should not filter out of the netcom class.
 namespace netcom_impl {
@@ -180,7 +188,7 @@ namespace netcom_impl {
         request_t& operator= (request_t&&) = delete;
 
         ~request_t() {
-            if (!answered_) throw request_not_answered<RequestType>();
+            if (!answered_) throw netcom_exception::request_not_answered<RequestType>();
         }
 
         netcom_base& net_;
@@ -427,13 +435,13 @@ protected :
     /** Filled by derivate when recieved from the network, consumed by netcom_base
         (process_packets()).
     **/
-    lock_free_queue<in_packet_t>  input_;
+    ctl::lock_free_queue<in_packet_t>  input_;
 
     /// Packet output queue
     /** Filled by netcom_base (send_message(), send_request()), consumed by derivate to send them
         over the network.
     **/
-    lock_free_queue<out_packet_t> output_;
+    ctl::lock_free_queue<out_packet_t> output_;
 
 private :
     using message_signal_t = netcom_impl::message_signal_t;
@@ -449,23 +457,23 @@ private :
     bool clearing_ = false;
 
     // Message signals
-    using message_signal_container = sorted_vector<
+    using message_signal_container = ctl::sorted_vector<
         std::unique_ptr<message_signal_t>, mem_var_comp(&message_signal_t::id)
     >;
     message_signal_container message_signals_;
 
     // Request signals
-    using request_signal_container = sorted_vector<
+    using request_signal_container = ctl::sorted_vector<
         std::unique_ptr<request_signal_t>, mem_var_comp(&request_signal_t::id)
     >;
     request_signal_container request_signals_;
 
     // Answer signals
-    using answer_signal_container = sorted_vector<
+    using answer_signal_container = ctl::sorted_vector<
         std::unique_ptr<answer_signal_t>, mem_var_comp(&answer_signal_t::id)
     >;
     answer_signal_container answer_signals_;
-    sorted_vector<request_id_t, std::greater<request_id_t>> available_request_ids_;
+    ctl::sorted_vector<request_id_t, std::greater<request_id_t>> available_request_ids_;
 
 private :
     // Send a packet to the output queue
@@ -571,9 +579,9 @@ public :
     **/
     template<typename RequestType, typename FR>
     signal_connection_t& send_request(actor_id_t aid, RequestType&& req, FR&& receive_func) {
-        static_assert(argument_count<FR>::value == 1,
+        static_assert(ctl::argument_count<FR>::value == 1,
             "answer reception handler can only take one argument (packet::answer)");
-        using AnswerType = typename std::decay<functor_argument<FR>>::type;
+        using AnswerType = typename std::decay<ctl::functor_argument<FR>>::type;
         static_assert(std::is_same<AnswerType, typename RequestType::answer>::value,
             "answer reception handler can only take a packet::answer as argument");
 
@@ -584,7 +592,7 @@ public :
         answer_signal_impl<RequestType>& netsig = get_answer_signal_<RequestType>(rid);
         netcom_impl::answer_connection& ac = netsig.answer_signal.template connect<
             netcom_impl::answer_connection>(
-            [=](signal_connection_t& c, functor_argument<FR> a) {
+            [=](signal_connection_t& c, ctl::functor_argument<FR> a) {
                 receive_func(a);
                 c.stop();
             }
@@ -601,20 +609,20 @@ public :
         the other side. These callback functions will be called by process_packets() when the
         corresponding answer is received.
     **/
-    template<typename RequestType, typename FR, typename FF, typename UF = decltype(no_op)>
+    template<typename RequestType, typename FR, typename FF, typename UF = decltype(ctl::no_op)>
     signal_connection_t& send_request(actor_id_t aid, RequestType&& req, FR&& receive_func,
-        FF&& failure_func, UF&& unhandled_func = no_op) {
-        static_assert(argument_count<FR>::value == 1,
+        FF&& failure_func, UF&& unhandled_func = ctl::no_op) {
+        static_assert(ctl::argument_count<FR>::value == 1,
             "answer reception handler can only take one argument (packet::answer)");
-        using AnswerType = typename std::decay<functor_argument<FR>>::type;
+        using AnswerType = typename std::decay<ctl::functor_argument<FR>>::type;
         static_assert(std::is_same<AnswerType, typename RequestType::answer>::value,
             "answer reception handler can only take a packet::answer as argument");
-        static_assert(argument_count<FF>::value == 1,
+        static_assert(ctl::argument_count<FF>::value == 1,
             "failure reception handler can only take one argument (packet::failure)");
-        using FailureType = typename std::decay<functor_argument<FF>>::type;
+        using FailureType = typename std::decay<ctl::functor_argument<FF>>::type;
         static_assert(std::is_same<FailureType, typename RequestType::failure>::value,
             "failure reception handler can only take a packet::failure as argument");
-        static_assert(argument_count<UF>::value == 0,
+        static_assert(ctl::argument_count<UF>::value == 0,
             "unhandled request reception handler cannot have arguments");
 
         request_id_t rid;
@@ -626,7 +634,7 @@ public :
         netsig.unhandled_signal.connect(std::forward<UF>(unhandled_func));
         netcom_impl::answer_connection& ac = netsig.answer_signal.template connect<
             netcom_impl::answer_connection>(
-            [=](netcom_impl::answer_connection& c, functor_argument<FR> a) {
+            [=](netcom_impl::answer_connection& c, ctl::functor_argument<FR> a) {
                 receive_func(a);
                 c.stop();
             }
@@ -644,9 +652,9 @@ public :
     **/
     template<typename WP = watch_policy::none, typename FR>
     signal_connection_t& watch_message(FR&& receive_func) {
-        static_assert(argument_count<FR>::value == 1,
+        static_assert(ctl::argument_count<FR>::value == 1,
             "message reception handler can only take one argument");
-        using MessageType = typename std::decay<functor_argument<FR>>::type;
+        using MessageType = typename std::decay<ctl::functor_argument<FR>>::type;
         static_assert(packet_impl::is_packet<MessageType>::value,
             "message reception handler argument must be a packet");
 
@@ -699,16 +707,16 @@ public :
     **/
     template<typename WP = watch_policy::none, typename FR>
     signal_connection_t& watch_request(FR&& receive_func) {
-        static_assert(argument_count<FR>::value == 1,
+        static_assert(ctl::argument_count<FR>::value == 1,
             "request reception handler can only take one argument");
-        using Arg = typename std::decay<functor_argument<FR>>::type;
+        using Arg = typename std::decay<ctl::functor_argument<FR>>::type;
         static_assert(netcom_impl::is_request<Arg>::value,
             "message reception handler argument must be a request_t");
 
         using RequestType = typename Arg::packet_t;
 
         request_signal_impl<RequestType>& netsig = get_request_signal_<RequestType>();
-        if (!netsig.empty()) throw request_already_watched<RequestType>();
+        if (!netsig.empty()) throw netcom_exception::request_already_watched<RequestType>();
 
         return netsig.signal.connect(netcom_impl::make_slot<signal_connection_t,WP>::make(
             std::forward<FR>(receive_func)
@@ -719,14 +727,14 @@ public :
 namespace netcom_impl {
     template<typename RequestType>
     void request_t<RequestType>::answer(typename RequestType::answer&& answer) const {
-        if (answered_) throw request_already_answered<RequestType>();
+        if (answered_) throw netcom_exception::request_already_answered<RequestType>();
         net_.send_answer_<RequestType>(aid_, rid_, std::move(answer));
         answered_ = true;
     }
 
     template<typename RequestType>
     void request_t<RequestType>::fail(typename RequestType::failure&& fail) const {
-        if (answered_) throw request_already_answered<RequestType>();
+        if (answered_) throw netcom_exception::request_already_answered<RequestType>();
         net_.send_failure_<RequestType>(aid_, rid_, std::move(fail));
         answered_ = true;
     }
@@ -734,7 +742,7 @@ namespace netcom_impl {
     template<typename RequestType>
     template<typename enable>
     void request_t<RequestType>::answer() const {
-        if (answered_) throw request_already_answered<RequestType>();
+        if (answered_) throw netcom_exception::request_already_answered<RequestType>();
         net_.send_answer_<RequestType>(aid_, rid_, answer_t{});
         answered_ = true;
     }
@@ -742,7 +750,7 @@ namespace netcom_impl {
     template<typename RequestType>
     template<typename enable>
     void request_t<RequestType>::fail() const {
-        if (answered_) throw request_already_answered<RequestType>();
+        if (answered_) throw netcom_exception::request_already_answered<RequestType>();
         net_.send_failure_<RequestType>(aid_, rid_, failure_t{});
         answered_ = true;
     }

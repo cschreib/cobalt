@@ -2,6 +2,13 @@
 #include "endian.hpp"
 #include <scoped.hpp>
 
+namespace netcom_exception {
+    base::base(const std::string& s) : std::runtime_error(s) {}
+    base::base(const char* s) : std::runtime_error(s) {}
+
+    base::~base() noexcept {}
+}
+
 netcom_base::netcom_base() {
     std::size_t n = std::numeric_limits<request_id_t>::max();
     available_request_ids_.reserve(n);
@@ -11,7 +18,7 @@ netcom_base::netcom_base() {
 }
 
 void netcom_base::send_(out_packet_t&& p) {
-    if (p.to == invalid_actor_id) throw invalid_actor();
+    if (p.to == invalid_actor_id) throw netcom_exception::invalid_actor();
     if (p.to == self_actor_id) {
         // TODO: check thread safety of this
         input_.push(std::move(p.to_input()));
@@ -36,7 +43,7 @@ void netcom_base::free_request_id_(request_id_t id) {
 }
 
 request_id_t netcom_base::make_request_id_() {
-    if (available_request_ids_.empty()) throw too_many_requests();
+    if (available_request_ids_.empty()) throw netcom_exception::too_many_requests();
     request_id_t id = available_request_ids_.back();
     available_request_ids_.pop_back();
     return id;
@@ -44,7 +51,7 @@ request_id_t netcom_base::make_request_id_() {
 
 void netcom_base::clear_all_() {
     clearing_ = true;
-    auto sd = make_scoped([this]() { clearing_ = false; });
+    auto sd = ctl::make_scoped([this]() { clearing_ = false; });
 
     input_.clear();
     output_.clear();

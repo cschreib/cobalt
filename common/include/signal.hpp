@@ -16,11 +16,11 @@
     informed whenever the connection is stopped for any reason.
 **/
 class signal_connection_t {
-    delegate<void(signal_connection_t&)> stop_;
+    ctl::delegate<void(signal_connection_t&)> stop_;
 
 protected :
     template<typename ... Args>
-    friend struct signal_t;
+    friend class signal_t;
 
     template<typename F>
     signal_connection_t(F&& f) : stop_(std::forward<F>(f)) {}
@@ -31,9 +31,15 @@ protected :
         }
     }
 
+    struct deleter {
+        void operator() (signal_connection_t* s) const {
+            delete s;
+        }
+    };
+
 public :
     /// Callback function called whenever the connection is stopped and soon to be destroyed.
-    delegate<void(signal_connection_t&)> on_stop;
+    ctl::delegate<void(signal_connection_t&)> on_stop;
 
     signal_connection_t(const signal_connection_t&) = delete;
     signal_connection_t(signal_connection_t&&) = delete;
@@ -56,7 +62,7 @@ public :
 
 namespace signal_impl {
     template<typename T>
-    using first_argument = type_list_element<0, function_arguments<T>>;
+    using first_argument = ctl::type_list_element<0, ctl::function_arguments<T>>;
 
     template<typename CO, typename T>
     using is_extended_callback__ = std::integral_constant<bool,
@@ -71,7 +77,7 @@ namespace signal_impl {
 
     template<typename CO, typename T>
     using is_extended_callback = typename is_extended_callback_<
-        (argument_count<T>::value > 0), CO, T
+        (ctl::argument_count<T>::value > 0), CO, T
     >::type;
 }
 
@@ -83,18 +89,20 @@ namespace signal_impl {
 **/
 template<typename ... Args>
 class signal_t {
-    using delegate_t = delegate<void(Args...)>;
-    using call_adaptor_t = delegate<void(signal_connection_t&, const delegate_t&, Args...)>;
+    using delegate_t = ctl::delegate<void(Args...)>;
+    using call_adaptor_t = ctl::delegate<void(signal_connection_t&, const delegate_t&, Args...)>;
 
     struct slot_t {
+        using connection_t = std::unique_ptr<signal_connection_t, signal_connection_t::deleter>;
+
         template<typename D>
-        slot_t(D&& d, std::unique_ptr<signal_connection_t> s) :
+        slot_t(D&& d, connection_t s) :
             callback(std::forward<D>(d)),
             connection(std::move(s)) {}
 
         delegate_t callback;
         call_adaptor_t call_adaptor;
-        std::unique_ptr<signal_connection_t> connection;
+        connection_t connection;
         bool stopped = false;
     };
 
@@ -118,7 +126,7 @@ class signal_t {
     CO& connect_(F&& f, std::false_type) {
         slots_.emplace_back(
             std::forward<F>(f),
-            std::unique_ptr<signal_connection_t>(new CO([this](signal_connection_t& c) {
+            typename slot_t::connection_t(new CO([this](signal_connection_t& c) {
                 stop_(c);
             }))
         );
@@ -128,7 +136,7 @@ class signal_t {
 
     template<typename CO, typename F>
     CO& connect_(F&& f, std::true_type) {
-        std::unique_ptr<signal_connection_t> cp(new CO([this](signal_connection_t& c) {
+        typename slot_t::connection_t cp(new CO([this](signal_connection_t& c) {
             stop_(c);
         }));
 
@@ -168,7 +176,7 @@ public :
     void dispatch(Args ... args) {
         {
             dispatching_ = true;
-            auto sd = make_scoped([this]() { dispatching_ = false; });
+            auto sd = ctl::make_scoped([this]() { dispatching_ = false; });
 
             for (auto& s : slots_) {
                 if (s.stopped) continue;
@@ -176,7 +184,7 @@ public :
             }
         }
 
-        erase_if(slots_, [](const slot_t& s) { return s.stopped; });
+        ctl::erase_if(slots_, [](const slot_t& s) { return s.stopped; });
     }
 
     /// Stop all connections and destroy all slots.

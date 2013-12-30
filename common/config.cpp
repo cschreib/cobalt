@@ -35,7 +35,7 @@ namespace config {
                     node.value = line.substr(start_value, end_value-start_value);
                     node.is_empty = false;
                 }
-            } catch (string_tree<config_node>::wrong_structure_exception& e) {
+            } catch (ctl::string_tree<config_node>::wrong_structure_exception& e) {
                 out << "error: " << e.what() << std::endl;
             }
         }
@@ -53,15 +53,15 @@ namespace config {
         tree_.clear();
     }
 
-    void state::save_node_(std::ofstream& f, const string_tree<config_node>::branch& node,
+    void state::save_node_(std::ofstream& f, const ctl::string_tree<config_node>::branch& node,
         const std::string& name) const {
 
         for (auto& n : node.childs) {
             if (n->is_branch)
-                save_node_(f, (const string_tree<config_node>::branch&)*n, name+n->name+'.');
+                save_node_(f, (const ctl::string_tree<config_node>::branch&)*n, name+n->name+'.');
             else
                 f << name << n->name;
-                f << '(' << ((string_tree<config_node>::leaf&)*n).data.value << ')' << '\n';
+                f << '(' << ((ctl::string_tree<config_node>::leaf&)*n).data.value << ')' << '\n';
         }
     }
 }

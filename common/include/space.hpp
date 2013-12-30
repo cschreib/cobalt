@@ -15,28 +15,30 @@ namespace space {
     enum class direction { LEFT = 0, UP, RIGHT, DOWN };
 
     /// Base exception class that encompasses all the 'space' exceptions.
-    struct exception : public std::runtime_error {
-        explicit exception(const std::string& s);
-        explicit exception(const char* s);
-        virtual ~exception() noexcept;
-    };
+    namespace exception {
+        struct base : public std::runtime_error {
+            explicit base(const std::string& s);
+            explicit base(const char* s);
+            virtual ~base() noexcept;
+        };
 
-    /// Exception raised when trying to put an object in a cell that
-    /// already contains one.
-    struct cell_occupied_exception : public exception {
-        cell_occupied_exception();
-    };
+        /// Exception raised when trying to put an object in a cell that
+        /// already contains one.
+        struct cell_occupied : public base {
+            cell_occupied();
+        };
 
-    /// Exception raised when trying to probe a direction that does not exist.
-    struct invalid_direction_exception : public exception {
-        invalid_direction_exception();
-    };
+        /// Exception raised when trying to probe a direction that does not exist.
+        struct invalid_direction : public base {
+            invalid_direction();
+        };
 
-    /// Exception raised when trying to access a position that does not
-    /// belong to the universe.
-    struct invalid_position_exception : public exception {
-        explicit invalid_position_exception(const vec_t& pos);
-    };
+        /// Exception raised when trying to access a position that does not
+        /// belong to the universe.
+        struct invalid_position : public base {
+            explicit invalid_position(const vec_t& pos);
+        };
+    }
 
     template<typename T>
     class cell;
@@ -134,7 +136,7 @@ namespace space {
                   befriend space::cell<T>.
         **/
         T& fill(std::unique_ptr<T>&& t) {
-            if (obj_) throw space::cell_occupied_exception();
+            if (obj_) throw space::exception::cell_occupied();
 
             obj_ = std::move(t);
             obj_notify_parent_cell_(this, has_notify_parent_cell());
@@ -155,7 +157,7 @@ namespace space {
         **/
         void move_content_to(cell& c) {
             if (!obj_) return;
-            if (c.obj_) throw space::cell_occupied_exception();
+            if (c.obj_) throw space::exception::cell_occupied();
 
             c.obj_ = std::move(obj_);
             obj_notify_parent_cell_(&c, has_notify_parent_cell());
@@ -328,7 +330,7 @@ namespace space {
                         for them beforehand. This function will not take care
                         about it.
         **/
-        virtual void clip(const axis_aligned_box2d& box, sorted_vector<const cell<T>&>& list) const = 0;
+        virtual void clip(const axis_aligned_box2d& box, ctl::sorted_vector<const cell<T>&>& list) const = 0;
 
     protected :
         universe() = default;
@@ -665,7 +667,7 @@ namespace space {
             cell<T>& reach(const space::vec_t& spos) override {
                 static const pos_t half_size = 1 << (D-2);
                 vec_t pos(spos + space::vec_t(half_size, half_size));
-                if (!check_position_(pos)) throw invalid_position_exception(spos);
+                if (!check_position_(pos)) throw space::exception::invalid_position(spos);
 
                 return reach_(root_, pos);
             }
@@ -680,7 +682,7 @@ namespace space {
             }
 
             /// @copydoc space::universe::clip
-            void clip(const axis_aligned_box2d& box, sorted_vector<const cell<T>&>& list) const override {
+            void clip(const axis_aligned_box2d& box, ctl::sorted_vector<const cell<T>&>& list) const override {
                 static const pos_t half_size = 1 << (D-2);
                 clip_(root_, box + vec2d(half_size, half_size), list);
             }
@@ -755,7 +757,7 @@ namespace space {
                 \param list The container within which to store the selected cells
             **/
             template<std::size_t N>
-            void clip_(const any_cell<T,N,D>& c, const axis_aligned_box2d& box, sorted_vector<const cell<T>&>& list) const {
+            void clip_(const any_cell<T,N,D>& c, const axis_aligned_box2d& box, ctl::sorted_vector<const cell<T>&>& list) const {
                 static const double size = 1 << (D-N);
                 static const axis_aligned_box2d cell_boxes[4] = {
                     axis_aligned_box2d(vec2d(   0.0,    0.0), vec2d(size/2, size/2)),
@@ -783,7 +785,7 @@ namespace space {
                 \param box  The box within which to select the cells
                 \param list The container within which to store the selected cells
             **/
-            void clip_(const any_cell<T,D,D>& c, const axis_aligned_box2d& box, sorted_vector<const cell<T>&>& list) const {
+            void clip_(const any_cell<T,D,D>& c, const axis_aligned_box2d& box, ctl::sorted_vector<const cell<T>&>& list) const {
                 if (!c.empty()) {
                     list.insert(c);
                 }

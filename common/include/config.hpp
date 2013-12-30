@@ -8,6 +8,8 @@
 
 namespace config {
 namespace config_impl {
+    // TODO: move some of it in variadic.hpp
+    // TODO: use ctl::delegate instead of std::function (may rewrite things a bit)
     template<typename T>
     struct same_impl {
         using type = T;
@@ -187,7 +189,7 @@ namespace config_impl {
                 config_node& node = tree_.reach(name);
                 if (!node.is_empty) {
                     std::string old_value = node.value;
-                    stringify<T>::serialize(t, node.value);
+                    string::stringify<T>::serialize(t, node.value);
                     if (node.value != old_value) {
                         for (auto& b : node.binds) {
                             b->set((void*)&t);
@@ -195,12 +197,12 @@ namespace config_impl {
                         dirty_ = true;
                     }
                 } else {
-                    stringify<T>::serialize(t, node.value);
+                    string::stringify<T>::serialize(t, node.value);
                     node.is_empty = false;
                     dirty_ = true;
                 }
                 return true;
-            } catch (string_tree<config_node>::wrong_structure_exception& e) {
+            } catch (ctl::string_tree<config_node>::wrong_structure_exception& e) {
                 out << "error: " << e.what() << std::endl;
                 return false;
             }
@@ -220,7 +222,7 @@ namespace config_impl {
                 if (node->is_empty) {
                     return false;
                 } else {
-                    return stringify<T>::parse(t, node->value);
+                    return string::stringify<T>::parse(t, node->value);
                 }
             } else {
                 return false;
@@ -244,15 +246,15 @@ namespace config_impl {
                 config_node& node = tree_.reach(name);
                 if (node.is_empty) {
                     t = def;
-                    stringify<T>::serialize(T(def), node.value);
+                    string::stringify<T>::serialize(T(def), node.value);
                     node.is_empty = false;
                     dirty_ = true;
                     return true;
                 } else {
-                    return stringify<T>::parse(t, node.value);
+                    return string::stringify<T>::parse(t, node.value);
                 }
                 return true;
-            } catch (string_tree<config_node>::wrong_structure_exception& e) {
+            } catch (ctl::string_tree<config_node>::wrong_structure_exception& e) {
                 out << "error: " << e.what() << std::endl;
                 return false;
             }
@@ -286,14 +288,14 @@ namespace config_impl {
                 any_conf& b = *node.binds.back();
                 id = b.key();
                 if (node.is_empty) {
-                    stringify<T>::serialize(t, node.value);
+                    string::stringify<T>::serialize(t, node.value);
                     node.is_empty = false;
                     dirty_ = true;
                 } else {
                     b.read(node.value);
                 }
                 return true;
-            } catch (string_tree<config_node>::wrong_structure_exception& e) {
+            } catch (ctl::string_tree<config_node>::wrong_structure_exception& e) {
                 out << "error: " << e.what() << std::endl;
                 return false;
             }
@@ -331,7 +333,7 @@ namespace config_impl {
                     b.read(node.value);
                 }
                 return true;
-            } catch (string_tree<config_node>::wrong_structure_exception& e) {
+            } catch (ctl::string_tree<config_node>::wrong_structure_exception& e) {
                 out << "error: " << e.what() << std::endl;
                 return false;
             }
@@ -361,7 +363,7 @@ namespace config_impl {
                 any_conf& b = *node.binds.back();
                 id = b.key();
                 if (node.is_empty) {
-                    stringify<param_t>::serialize(def, node.value);
+                    string::stringify<param_t>::serialize(def, node.value);
                     b.set((void*)&def);
                     node.is_empty = false;
                     dirty_ = true;
@@ -369,7 +371,7 @@ namespace config_impl {
                     b.read(node.value);
                 }
                 return true;
-            } catch (string_tree<config_node>::wrong_structure_exception& e) {
+            } catch (ctl::string_tree<config_node>::wrong_structure_exception& e) {
                 out << "error: " << e.what() << std::endl;
                 return false;
             }
@@ -394,7 +396,7 @@ namespace config_impl {
                     }
                 }
                 return false;
-            } catch (string_tree<config_node>::wrong_structure_exception& e) {
+            } catch (ctl::string_tree<config_node>::wrong_structure_exception& e) {
                 out << "error: " << e.what() << std::endl;
                 return false;
             }
@@ -415,7 +417,7 @@ namespace config_impl {
             T& t;
 
             void read(const std::string& value) override {
-                stringify<T>::parse(t, value);
+                string::stringify<T>::parse(t, value);
             }
             void set(void* data) override {
                 t = *(T*)data;
@@ -433,7 +435,7 @@ namespace config_impl {
 
             void read(const std::string& value) override {
                 T t;
-                if (stringify<T>::parse(t, value)) {
+                if (string::stringify<T>::parse(t, value)) {
                     f(t);
                 }
             }
@@ -451,10 +453,10 @@ namespace config_impl {
             std::vector<std::unique_ptr<any_conf>> binds;
         };
 
-        void save_node_(std::ofstream& f, const string_tree<config_node>::branch& node,
+        void save_node_(std::ofstream& f, const ctl::string_tree<config_node>::branch& node,
             const std::string& name) const;
 
-        string_tree<config_node> tree_;
+        ctl::string_tree<config_node> tree_;
         mutable bool dirty_;
     };
 

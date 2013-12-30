@@ -1,20 +1,22 @@
 #include "space.hpp"
-#include "stringify.hpp"
+#include "string.hpp"
 
 namespace space {
-    exception::exception(const std::string& s) : std::runtime_error(s) {}
-    exception::exception(const char* s) : std::runtime_error(s) {}
+namespace exception {
+    base::base(const std::string& s) : std::runtime_error(s) {}
+    base::base(const char* s) : std::runtime_error(s) {}
 
-    exception::~exception() noexcept {}
+    base::~base() noexcept {}
 
-    cell_occupied_exception::cell_occupied_exception() :
-        exception("this cell already contains an object") {}
+    cell_occupied::cell_occupied() :
+        base("this cell already contains an object") {}
 
-    invalid_direction_exception::invalid_direction_exception() :
-        exception("invalid direction provided") {}
+    invalid_direction::invalid_direction() :
+        base("invalid direction provided") {}
 
-    invalid_position_exception::invalid_position_exception(const vec_t& pos) :
-        exception("invalid position, goes out of the universe's boundaries: "+to_string(pos)) {}
+    invalid_position::invalid_position(const vec_t& pos) :
+        base("invalid position, goes out of the universe's boundaries: "+string::convert(pos)) {}
+}
 
 namespace impl {
     bool get_cell_id(std::size_t id, direction dir, std::size_t& next_id) {
@@ -47,7 +49,7 @@ namespace impl {
             case direction::RIGHT : next_id = sub_cell::BR; return true;
             case direction::DOWN  : next_id = sub_cell::TL; return false;
             }
-        default : throw invalid_direction_exception();
+        default : throw exception::invalid_direction();
         }
     }
 }

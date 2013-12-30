@@ -100,7 +100,7 @@ namespace server {
         return max_player_;
     }
 
-    void player_list::remove_player_(ptr_vector<player>::iterator iter,
+    void player_list::remove_player_(ctl::ptr_vector<player>::iterator iter,
         message::server::player_disconnected::reason rsn) {
 
         actor_id_t id = iter->id;
