@@ -12,51 +12,11 @@ namespace ctl {
     /** This class is a light alternative to std::set.
         Inspired from: [1] www.lafstern.org/matt/col1.pdf
 
-        The sorted list achieves the same O(log(N)) look up com-
-        plexity as std::set, but with a lower constant of propor-
-        tionality thanks to the binary search algorithm (twice
-        lower according to [1]).
+        The sorted list achieves the same O(log(N)) look up complexity as std::set, but with a lower
+        constant of proportionality thanks to the binary search algorithm (twice lower according to
+        [1]).
 
-        The elements of this container are sorted according to the
-        Cmp template argument, which defaults to std::less<T> (i.e.
-        the elements are sorted using operator<()). One can provide
-        his own comparison functor if std::less is not desirable.
-        Using a custom comparison functor can also allow to find
-        elements by keys instead of their own value. For example,
-        if T is
-                    struct test { int id; };
-
-        then one can use the following comparison functor:
-
-        struct comp {
-            bool operator() (const test& n1, const test& n2) const {
-                return n1.id < n2.id;
-            }
-            bool operator() (const test& n1, int i) const {
-                return n1.id < s;
-            }
-            bool operator() (int i, const test& n2) const {
-                return s < n2.id;
-            }
-        };
-
-        and use an integer as the key to find elements in the
-        container
-
-            using lst_t = sorted_list<test, comp>;
-            lst_t ls;
-            // ... fill ls with some data ...
-            // Then find the element that has the 'id' equal to 5
-            lst_t::iterator it = ls.find(5);
-
-        There is also a specialization of the sorted_list for
-        reference types, which is something std::list cannot do.
-        References are stored as pointers internally, but no pointer
-        is exposed in the interface. The advantage of this kind of
-        container compared to a container of pointers is that all
-        the contained objects are valid (no nullptr), unless one of
-        them is destroyed after the container has been created of
-        course.
+        See sorted_vector_t for details.
     **/
     template<typename T, typename Cmp>
     class sorted_list_t : private std::list<T> {
@@ -71,15 +31,15 @@ namespace ctl {
 
         /// Default constructor.
         /** Creates an empty vector.
-        */
+        **/
         sorted_list_t() = default;
 
         /// Copy another vector into this one.
         sorted_list_t(const sorted_list_t& s) = default;
 
         /// Move another sorted_list into this one.
-        /** The other vector is left empty in the process, and all
-            its content is transfered into this new one.
+        /** The other vector is left empty in the process, and all its content is transfered into
+            this new one.
         **/
         sorted_list_t(sorted_list_t&& s) = default;
 
@@ -87,42 +47,38 @@ namespace ctl {
         sorted_list_t& operator = (const sorted_list_t& s) = default;
 
         /// Move another vector into this one.
-        /** The other vector is left empty in the process, and all
-            its content is transfered into this new one.
+        /** The other vector is left empty in the process, and all its content is transfered into
+            this new one.
         **/
         sorted_list_t& operator = (sorted_list_t&& s) = default;
 
         /// Copy a pre-built vector into this one.
-        /** The provided vector must be sorted, and shall not
-            contain any duplicate value.
+        /** The provided vector must be sorted, and shall not contain any duplicate value.
         **/
         explicit sorted_list_t(const base& s) : base(s) {}
 
         /// Move a pre-built vector into this one.
-        /** The provided vector must be sorted, and shall not
-            contain any duplicate value. It is left empty in the
-            process, and all its content is transfered into this
-            new sorted_list.
+        /** The provided vector must be sorted, and shall not contain any duplicate value. It is
+            left empty in the process, and all its content is transfered into this new sorted_list.
         **/
         explicit sorted_list_t(base&& s) : base(s) {}
 
         /// Default constructor, with comparator.
         /** Creates an empty vector and sets the comparator function.
-        */
+        **/
         explicit sorted_list_t(const Cmp& c) : compare(c) {}
 
         /// Insert a copy of the provided object in the vector.
-        /** If an object already exists with the same key, it
-        *   is destroyed and replaced by this copy.
-        */
+        /** If an object already exists with the same key, it is destroyed and replaced by this
+            copy.
+        **/
         iterator insert(const T& t) {
             return insert(T(t));
         }
 
         /// Insert the provided object in the vector.
-        /** If an object already exists with the same key, it
-        *   is destroyed and replaced by this one.
-        */
+        /** If an object already exists with the same key, it is destroyed and replaced by this one.
+        **/
         iterator insert(T&& t) {
             if (empty()) {
                 base::push_back(std::move(t));
@@ -144,12 +100,10 @@ namespace ctl {
         }
 
         /// Erase an element from this vector by its key.
-        /** The key can be a copy of the element itself, or any
-        *   other object that is supported by the chosen comparison
-        *   function.
-        *   If no object is found with that key, this function does
-        *   nothing.
-        */
+        /** The key can be a copy of the element itself, or any other object that is supported by
+            the chosen comparison function. If no object is found with that key, this function does
+            nothing.
+        **/
         template<typename Key>
         void erase(const Key& k) {
             auto iter = find(k);
@@ -159,11 +113,9 @@ namespace ctl {
         }
 
         /// Find an object in this vector by its key.
-        /** The key can be a copy of the element itself, or any
-        *   other object that is supported by the chosen comparison
-        *   function.
-        *   If no element is found, this function returns end().
-        */
+        /** The key can be a copy of the element itself, or any other object that is supported by
+            the chosen comparison function. If no element is found, this function returns end().
+        **/
         template<typename Key>
         iterator find(const Key& k) {
             if (empty()) {
@@ -179,11 +131,9 @@ namespace ctl {
         }
 
         /// Find an object in this vector by its key.
-        /** The key can be a copy of the element itself, or any
-        *   other object that is supported by the chosen comparison
-        *   function.
-        *   If no element is found, this function returns end().
-        */
+        /** The key can be a copy of the element itself, or any other object that is supported by
+            the chosen comparison function. If no element is found, this function returns end().
+        **/
         template<typename Key>
         const_iterator find(const Key& k) const {
             if (empty()) {
@@ -213,7 +163,9 @@ namespace ctl {
         using base::rend;
     };
 
-    /// @copydoc sorted_list_t
+    /// Sorted std::list wrapper, reference specialization.
+    /** See sorted_list_t for details.
+    **/
     template<typename T, typename Cmp>
     class sorted_list_t<T&, Cmp> : private std::vector<T*> {
         using base  = std::vector<T*>;
@@ -232,15 +184,15 @@ namespace ctl {
 
         /// Default constructor.
         /** Creates an empty vector.
-        */
+        **/
         sorted_list_t() = default;
 
         /// Copy another vector into this one.
         sorted_list_t(const sorted_list_t& s) = default;
 
         /// Move another sorted_list into this one.
-        /** The other vector is left empty in the process, and all
-            its content is transfered into this new one.
+        /** The other vector is left empty in the process, and all its content is transfered into
+            this new one.
         **/
         sorted_list_t(sorted_list_t&& s) = default;
 
@@ -248,34 +200,30 @@ namespace ctl {
         sorted_list_t& operator = (const sorted_list_t& s) = default;
 
         /// Move another vector into this one.
-        /** The other vector is left empty in the process, and all
-            its content is transfered into this new one.
+        /** The other vector is left empty in the process, and all its content is transfered into
+            this new one.
         **/
         sorted_list_t& operator = (sorted_list_t&& s) = default;
 
         /// Copy a pre-built vector into this one.
-        /** The provided vector must be sorted, and shall not
-            contain any duplicate value.
+        /** The provided vector must be sorted, and shall not contain any duplicate value.
         **/
         explicit sorted_list_t(const base& s) : base(s) {}
 
         /// Move a pre-built vector into this one.
-        /** The provided vector must be sorted, and shall not
-            contain any duplicate value. It is left empty in the
-            process, and all its content is transfered into this
-            new sorted_list.
+        /** The provided vector must be sorted, and shall not contain any duplicate value. It is
+            left empty in the process, and all its content is transfered into this new sorted_list.
         **/
         explicit sorted_list_t(base&& s) : base(s) {}
 
         /// Default constructor, with comparator.
         /** Creates an empty vector and sets the comparator function.
-        */
+        **/
         explicit sorted_list_t(const Cmp& c) : compare(c) {}
 
         /// Insert the provided object in the vector.
-        /** If an object already exists with the same key, it
-        *   is destroyed and replaced by this one.
-        */
+        /** If an object already exists with the same key, it is destroyed and replaced by this one.
+        **/
         iterator insert(T& t) {
             if (empty()) {
                 base::push_back(&t);
@@ -297,12 +245,10 @@ namespace ctl {
         }
 
         /// Erase an element from this vector by its key.
-        /** The key can be a copy of the element itself, or any
-        *   other object that is supported by the chosen comparison
-        *   function.
-        *   If no object is found with that key, this function does
-        *   nothing.
-        */
+        /** The key can be a copy of the element itself, or any other object that is supported by
+            the chosen comparison function. If no object is found with that key, this function does
+            nothing.
+        **/
         template<typename Key>
         void erase(const Key& k) {
             auto iter = find(k);
@@ -312,11 +258,9 @@ namespace ctl {
         }
 
         /// Find an object in this vector by its key.
-        /** The key can be a copy of the element itself, or any
-        *   other object that is supported by the chosen comparison
-        *   function.
-        *   If no element is found, this function returns end().
-        */
+        /** The key can be a copy of the element itself, or any other object that is supported by
+            the chosen comparison function. If no element is found, this function returns end().
+        **/
         template<typename Key, typename enable = typename std::enable_if<!std::is_same<Key,T>::value>::type>
         iterator find(const Key& k) {
             if (empty()) {
@@ -332,11 +276,9 @@ namespace ctl {
         }
 
         /// Find an object in this vector by its key.
-        /** The key can be a copy of the element itself, or any
-        *   other object that is supported by the chosen comparison
-        *   function.
-        *   If no element is found, this function returns end().
-        */
+        /** The key can be a copy of the element itself, or any other object that is supported by
+            the chosen comparison function. If no element is found, this function returns end().
+        **/
         iterator find(const T& t) {
             if (empty()) {
                 return end();
@@ -351,11 +293,9 @@ namespace ctl {
         }
 
         /// Find an object in this vector by its key.
-        /** The key can be a copy of the element itself, or any
-        *   other object that is supported by the chosen comparison
-        *   function.
-        *   If no element is found, this function returns end().
-        */
+        /** The key can be a copy of the element itself, or any other object that is supported by
+            the chosen comparison function. If no element is found, this function returns end().
+        **/
         template<typename Key, typename enable = typename std::enable_if<!std::is_same<Key,T>::value>::type>
         const_iterator find(const Key& k) const {
             if (empty()) {
@@ -371,11 +311,9 @@ namespace ctl {
         }
 
         /// Find an object in this vector by its key.
-        /** The key can be a copy of the element itself, or any
-        *   other object that is supported by the chosen comparison
-        *   function.
-        *   If no element is found, this function returns end().
-        */
+        /** The key can be a copy of the element itself, or any other object that is supported by
+            the chosen comparison function. If no element is found, this function returns end().
+        **/
         const_iterator find(const T& t) const {
             if (empty()) {
                 return end();
