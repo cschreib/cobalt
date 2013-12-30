@@ -1,8 +1,16 @@
 #include "server_netcom.hpp"
+#include <config.hpp>
+#include <print.hpp>
 
 namespace server {
-    netcom::netcom() : listen_port_(0), max_client_(1), is_connected_(false),
+    netcom::netcom(config::state& conf) :
+        conf_(conf), listen_port_(4444), max_client_(1), is_connected_(false),
         terminate_thread_(false), listener_thread_(std::bind(&netcom::loop_, this)) {
+
+        pool_ << conf_.bind("netcom.listen_port", listen_port_);
+        pool_ << conf_.bind("netcom.max_client", [this](std::size_t max) {
+            set_max_client_(max);
+        }, max_client_);
 
         available_ids_.reserve(max_client_);
         for (std::size_t i = 0; i < max_client_; ++i) {
@@ -14,7 +22,7 @@ namespace server {
         terminate();
     }
 
-    void netcom::set_max_client(std::size_t max_client) {
+    void netcom::set_max_client_(std::size_t max_client) {
         if (max_client_ == max_client) return;
 
         if (max_client_ < max_client) {
@@ -37,8 +45,16 @@ namespace server {
         max_client_ = max_client;
     }
 
+    void netcom::set_max_client(std::size_t max_client) {
+        conf_.set_value("netcom.max_client", max_client);
+    }
+
     bool netcom::is_connected() const {
         return is_connected_;
+    }
+
+    void netcom::run() {
+        run(listen_port_);
     }
 
     void netcom::run(std::uint16_t port) {
@@ -46,7 +62,10 @@ namespace server {
             terminate();
         }
         terminate_thread_ = false;
-        listen_port_ = port;
+
+        if (port != listen_port_) {
+            conf_.set_value("netcom.listen_port", port);
+        }
         listener_thread_.launch();
     }
 

@@ -3,11 +3,16 @@
 
 #include <netcom_base.hpp>
 #include <SFML/Network.hpp>
+#include <connection_handler.hpp>
+
+namespace config {
+    class state;
+}
 
 namespace server {
     class netcom : public netcom_base {
     public :
-        netcom();
+        netcom(config::state& conf);
         ~netcom();
 
         /// Define the maximum number of simultaneously connected clients.
@@ -19,6 +24,9 @@ namespace server {
 
         /// Will return true as long as the server is listening to incoming connections.
         bool is_connected() const;
+
+        /// Start the server, listening to the last or default port.
+        void run();
 
         /// Start the server, listening to the given port.
         void run(std::uint16_t port);
@@ -40,10 +48,14 @@ namespace server {
         using client_list_t = ctl::sorted_vector<client_t, mem_var_comp(&client_t::id)>;
 
         void loop_();
+        void set_max_client_(std::size_t max_client);
         bool make_id_(actor_id_t& id);
         void free_id_(actor_id_t id);
         void remove_client_(actor_id_t cid);
         void remove_client_(client_list_t::iterator ic);
+
+        config::state& conf_;
+        scoped_connection_pool_t pool_;
 
         std::uint16_t      listen_port_;
         std::size_t        max_client_;

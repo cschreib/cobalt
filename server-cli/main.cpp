@@ -5,9 +5,10 @@
 #include <iostream>
 
 int main(int argc, const char* argv[]) {
-    server::netcom net;
     config::state conf;
     conf.parse("server.conf");
+
+    server::netcom net(conf);
 
     bool stop = false;
     scoped_connection_pool_t pool;
@@ -45,12 +46,9 @@ int main(int argc, const char* argv[]) {
         req.answer();
     });
 
-    net.set_max_client(5);
-
     server::player_list plist(net, conf);
-    plist.set_max_player(4);
 
-    net.run(4444);
+    net.run();
 
     while (!stop) {
         sf::sleep(sf::milliseconds(5));
