@@ -182,7 +182,7 @@ namespace config {
             config_node& node = tree_.reach(name);
             signal_connection_t& sc = node.signal.connect([func](const std::string& value) {
                 ArgType t;
-                string::stringify<ArgType>::parse(t, node.value);
+                string::stringify<ArgType>::parse(t, value);
                 func(t);
             });
 
@@ -212,7 +212,7 @@ namespace config {
             config_node& node = tree_.reach(name);
             signal_connection_t& sc = node.signal.connect([func](const std::string& value) {
                 ArgType t;
-                string::stringify<ArgType>::parse(t, node.value);
+                string::stringify<ArgType>::parse(t, value);
                 func(t);
             });
 
