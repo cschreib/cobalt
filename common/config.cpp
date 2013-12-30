@@ -51,11 +51,12 @@ namespace config {
         const std::string& name) const {
 
         for (auto& n : node.childs) {
-            if (n->is_branch)
+            if (n->is_branch) {
                 save_node_(f, (const ctl::string_tree<config_node>::branch&)*n, name+n->name+'.');
-            else
+            } else {
                 f << name << n->name;
                 f << '(' << ((ctl::string_tree<config_node>::leaf&)*n).data.value << ')' << '\n';
+            }
         }
     }
 }
