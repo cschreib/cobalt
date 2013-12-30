@@ -11,30 +11,28 @@ namespace client {
         ~netcom();
 
         /// Return the public actor ID of this client.
-        /// Will return 'invalid_actor_id' if there is no active connection.
+        /** Return 'invalid_actor_id' if there is no active connection.
+        **/
         actor_id_t self_id() const;
 
-        /// Will return true as long as there is an active connection with the server.
+        /// Return true as long as there is an active connection with the server.
         bool is_connected() const;
 
         /// Try to connect to a server.
         /** Use is_connected() in order to see if/when the connection is successful.
             It usually will not happen immediately though. During the connection process,
             this class will emit a handful of messages that the client can watch for in
-            order to know how things are going. First step:
+            order to know how things are going.
+
+            First step:
              - connection_established: the server exists and is reachable, but it has
                 not yet accepted the connection.
-             - connection_failed: the server could not be reached or would not answer. The
-                first and only object that is sent in this packet is actually a
-                connection_failed_reason::reason.
+             - connection_failed: the server could not be reached or would not answer.
+
             Second step:
              - connection_granted: the server accepts the connection, end of story.
-             - connection_denied: the server does not want to accept the connection. There
-                are several possible reasons for this. The first and only object that is
-                sent in this packet is actually a connection_denied_reason::reason.
-             - connection_failed: the server could not be reached or would not answer. The
-                first and only object that is sent in this packet is actually a
-                connection_failed_reason::reason.
+             - connection_denied: the server does not want to accept the connection.
+             - connection_failed: the server could not be reached or would not answer.
 
             Note that, after the connection is successful, there is still a chance for the
             server to go offline, for the internet to go down, and plenty of other problems.

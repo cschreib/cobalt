@@ -3,19 +3,19 @@
 #include <time.hpp>
 
 namespace server {
-    player_list::player_list(netcom& net) : net_(net), max_player_(1u), pool_(net) {
-        pool_ << net_.watch_request([&](netcom::request_t<request::client::join_players>& req) {
+    player_list::player_list(netcom& net) : net_(net), max_player_(1u) {
+        pool_ << net_.watch_request([&](const netcom::request_t<request::client::join_players>& req) {
             if (players_.size() < max_player_) {
                 actor_id_t id = req.from();
                 std::string ip = net_.get_actor_ip(id);
-                players_.emplace_back(id, ip, req.args.name, req.args.color, req.args.is_ai);
+                players_.emplace_back(id, ip, req.arg.name, req.arg.color, req.arg.is_ai);
                 player& p = players_.back();
                 p.when_connected = now();
 
                 req.answer();
                 net_.send_message(server::netcom::all_actor_id,
                     make_packet<message::server::player_connected>(
-                        id, ip, req.args.name, req.args.color, req.args.is_ai
+                        id, ip, req.arg.name, req.arg.color, req.arg.is_ai
                     )
                 );
             } else {
@@ -25,7 +25,7 @@ namespace server {
             }
         });
 
-        pool_ << net_.watch_request([&](netcom::request_t<request::client::list_players>& req) {
+        pool_ << net_.watch_request([&](const netcom::request_t<request::client::list_players>& req) {
             request::client::list_players::answer a;
             for (auto& p : players_) {
                 a.players.push_back({p.id, p.ip, p.name, p.color, p.is_ai});
@@ -33,7 +33,7 @@ namespace server {
             req.answer(std::move(a));
         });
 
-        pool_ << net_.watch_message([&](message::server::internal::client_disconnected msg) {
+        pool_ << net_.watch_message([&](const message::server::internal::client_disconnected& msg) {
             auto iter = players_.find_if([&](const player& p) { return p.id == msg.id; });
             if (iter == players_.end()) return;
 

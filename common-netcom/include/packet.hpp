@@ -79,14 +79,19 @@ using packet_id_t = std::uint32_t;
 std::string get_packet_name(packet_id_t id);
 
 namespace packet_impl {
+    struct base_ {};
+
     template<packet_id_t ID>
-    struct base {
+    struct base : base_ {
         static const packet_id_t packet_id__ = ID;
         static const char* packet_name__;
     };
 
     template<packet_id_t ID>
     const packet_id_t base<ID>::packet_id__;
+
+    template<typename T>
+    using is_packet = std::is_base_of<base_, T>;
 
     template<typename T>
     struct packet_builder;

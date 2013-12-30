@@ -103,22 +103,26 @@ namespace server {
                                 )
                             );
 
-                            out_packet_t p = create_message_<message::server::connection_granted>(
-                                id
+                            out_packet_t p = create_message_(
+                                make_packet<message::server::connection_granted>(id)
                             );
                             s->send(p.impl);
 
                             selector_.add(*s);
                             clients_.insert({std::move(s), id});
                         } else {
-                            out_packet_t p = create_message_<message::server::connection_denied>(
-                                message::server::connection_denied::reason::too_many_clients
+                            out_packet_t p = create_message_(
+                                make_packet<message::server::connection_denied>(
+                                    message::server::connection_denied::reason::too_many_clients
+                                )
                             );
                             s->send(p.impl);
                         }
                     } else {
-                        out_packet_t p = create_message_<message::server::connection_denied>(
-                            message::server::connection_denied::reason::too_many_clients
+                        out_packet_t p = create_message_(
+                            make_packet<message::server::connection_denied>(
+                                message::server::connection_denied::reason::too_many_clients
+                            )
                         );
                         s->send(p.impl);
                     }
@@ -170,8 +174,11 @@ namespace server {
                     // Send to individual clients
                     auto iter = clients_.find(op.to);
                     if (iter == clients_.end()) {
-                        out_packet_t tp =
-                            create_message_<message::server::internal::unknown_client>(op.to);
+                        out_packet_t tp = create_message_(
+                            make_packet<message::server::internal::unknown_client>(
+                                op.to
+                            )
+                        );
                         input_.push(std::move(tp.to_input()));
                         continue;
                     };

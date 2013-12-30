@@ -3,6 +3,7 @@
 
 #include <color32.hpp>
 #include <ptr_vector.hpp>
+#include <connection_handler.hpp>
 #include "server_netcom.hpp"
 #include "server_player.hpp"
 
@@ -75,7 +76,7 @@ namespace server {
         std::uint32_t      max_player_;
         ptr_vector<player> players_;
 
-        netcom::watch_pool_t pool_;
+        scoped_connection_pool_t pool_;
     };
 }
 

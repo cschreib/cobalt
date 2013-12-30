@@ -10,7 +10,7 @@ int main(int argc, const char* argv[]) {
     client::netcom net;
 
     bool stop = false;
-    client::netcom::watch_pool_t pool(net);
+    scoped_connection_pool_t pool;
 
     pool << net.watch_message([&](message::unhandled_message msg) {
         warning("unhandled message: ", msg.message_id);
@@ -47,26 +47,37 @@ int main(int argc, const char* argv[]) {
     });
     pool << net.watch_message([&](message::server::connection_granted msg) {
         note("connection granted (id=", msg.id, ")!");
-        net.send_request(client::netcom::server_actor_id,
-            make_packet<request::client::join_players>("kalith", color32::blue, false),
-            [](request::client::join_players::answer msg) {
-                print("joined as player");
-            }, [](request::client::join_players::failure msg) {
-                error("could not join as player");
-                std::string rsn;
-                switch (msg.rsn) {
-                    case request::client::join_players::failure::reason::too_many_players :
-                        rsn = "too many players"; break;
-                }
-                reason(rsn);
-            }, []() {
-                error("could not join as player");
-                reason("server does not support it");
-            }
-        );
+        // net.send_request(client::netcom::server_actor_id,
+        //     make_packet<request::client::join_players>("kalith", color32::blue, false),
+        //     [](request::client::join_players::answer msg) {
+        //         print("joined as player");
+        //     }, [](request::client::join_players::failure msg) {
+        //         error("could not join as player");
+        //         std::string rsn;
+        //         switch (msg.rsn) {
+        //             case request::client::join_players::failure::reason::too_many_players :
+        //                 rsn = "too many players"; break;
+        //         }
+        //         reason(rsn);
+        //     }, []() {
+        //         error("could not join as player");
+        //         reason("server does not support it");
+        //     }
+        // );
     });
 
     client::player_list plist(net);
+
+    // TODO think about that
+    // w = plist.on_joined([]() {
+    //     print("joined as player");
+    // });
+    // w = plist.on_joined_failed([](const std::string& reason) {
+    //     error("could not join as player");
+    //     reason(reason);
+    // });
+
+    plist.join_as("kalith", color32::blue, false);
 
     pool << net.watch_message([](message::server::player_connected msg) {
             print("new player connected: id=", msg.id, ", ip=", msg.ip, ", name=",

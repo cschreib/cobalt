@@ -7,7 +7,7 @@ int main(int argc, const char* argv[]) {
     server::netcom net;
 
     bool stop = false;
-    server::netcom::watch_pool_t pool(net);
+    scoped_connection_pool_t pool;
 
     pool << net.watch_message([&](message::unhandled_message msg) {
         warning("unhandled message: ", msg.message_id);
@@ -37,7 +37,7 @@ int main(int argc, const char* argv[]) {
         reason(rsn);
     });
 
-    pool << net.watch_request([](server::netcom::request_t<request::ping>& req){
+    pool << net.watch_request([](const server::netcom::request_t<request::ping>& req){
         note("ping client ", req.from());
         req.answer();
     });
