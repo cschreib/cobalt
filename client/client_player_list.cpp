@@ -58,7 +58,7 @@ namespace client {
         if (net_.is_connected()) {
             make_request();
         } else {
-            pool_ << net_.watch_message<slot::call_adaptor::once>(
+            pool_ << net_.watch_message<watch_policy::once>(
                 [=](message::server::connection_granted) {
                 make_request();
             });

@@ -116,24 +116,25 @@ struct type_list {
 };
 
 template<std::size_t N, typename T, typename ... Args>
-struct type_list_element_ {
-    using type = typename type_list_element_<N-1, Args...>::type;
+struct type_list_element__t {
+    using type = typename type_list_element__t<N-1, Args...>::type;
 };
 
 template<typename T, typename ... Args>
-struct type_list_element_<0, T, Args...> {
+struct type_list_element__t<0, T, Args...> {
     using type = T;
 };
 
-template<std::size_t N, typename ... Args>
-struct type_list_element {
-    using type = typename type_list_element_<N, Args...>::type;
-};
+template<std::size_t N, typename T>
+struct type_list_element_t;
 
 template<std::size_t N, typename ... Args>
-struct type_list_element<N, type_list<Args...>> {
-    using type = typename type_list_element_<N, Args...>::type;
+struct type_list_element_t<N, type_list<Args...>> {
+    using type = typename type_list_element__t<N, Args...>::type;
 };
+
+template<std::size_t N, typename T>
+using type_list_element = typename type_list_element_t<N, T>::type;
 
 template<typename T>
 struct type_list_size;
@@ -170,49 +171,55 @@ struct type_holder_get_type<type_holder<T>> {
     using type = T;
 };
 
-template<typename T> 
-struct functor_arguments_t;
-
-template<typename R, typename T, typename ... Args> 
-struct functor_arguments_t<R (T::*)(Args...)> {
-    using type = type_list<Args...>;
-};
-
-template<typename R, typename T, typename ... Args> 
-struct functor_arguments_t<R (T::*)(Args...) const> {
-    using type = type_list<Args...>;
-};
-
 template<typename T>
-struct function_arguments_t {
-    using type = typename functor_arguments_t<decltype(&T::operator())>::type;
+struct function_arguments_t;
+
+template<typename R, typename T, typename ... Args>
+struct function_arguments_t<R (T::*)(Args...)> {
+    using type = type_list<Args...>;
+};
+
+template<typename R, typename T, typename ... Args>
+struct function_arguments_t<R (T::*)(Args...) const> {
+    using type = type_list<Args...>;
 };
 
 template<typename T>
 using function_arguments = typename function_arguments_t<T>::type;
 
-template<typename T> 
-struct functor_argument_t;
+template<typename T>
+using functor_arguments = function_arguments<decltype(&T::operator())>;
 
-template<typename R, typename T, typename Arg> 
-struct functor_argument_t<R (T::*)(Arg) const> {
+template<typename T>
+struct function_argument_t;
+
+template<typename R, typename T, typename Arg>
+struct function_argument_t<R (T::*)(Arg)> {
     using type = Arg;
 };
 
-template<typename T>
-struct function_argument_t {
-    using type = typename functor_argument_t<decltype(&T::operator())>::type;
+template<typename R, typename T, typename Arg>
+struct function_argument_t<R (T::*)(Arg) const> {
+    using type = Arg;
 };
 
 template<typename T>
 using function_argument = typename function_argument_t<T>::type;
 
-template<typename T> 
+template<typename T>
+using functor_argument = function_argument<decltype(&T::operator())>;
+
+template<typename T>
 struct argument_count {
     static const std::size_t value = argument_count<decltype(&T::operator())>::value;
 };
 
-template<typename R, typename T, typename ... Args> 
+template<typename R, typename T, typename ... Args>
+struct argument_count<R (T::*)(Args...)> {
+    static const std::size_t value = sizeof...(Args);
+};
+
+template<typename R, typename T, typename ... Args>
 struct argument_count<R (T::*)(Args...) const> {
     static const std::size_t value = sizeof...(Args);
 };

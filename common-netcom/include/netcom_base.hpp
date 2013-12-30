@@ -154,7 +154,6 @@ namespace netcom_impl {
         unhandled_request // request cannot be handled
     };
 
-
     // Public object that encapsulates request answering.
     template<typename RequestType>
     struct request_t {
@@ -328,6 +327,59 @@ namespace netcom_impl {
             answer_signal.clear();
             failure_signal.clear();
             unhandled_signal.clear();
+        }
+    };
+}
+
+namespace watch_policy {
+    struct none {};
+
+    struct once {
+        template<typename CO, typename F, typename ... Args>
+        struct adaptor {
+            explicit adaptor(F&& f_) : f(f_) {}
+            F f;
+
+            void operator() (CO& c, Args... args) {
+                f(args...);
+                c.stop();
+            }
+        };
+    };
+}
+
+namespace netcom_impl {
+    template<typename CO, template<typename, typename...> class M, typename F>
+    struct make_slot_type_;
+
+    template<typename CO, template<typename, typename...> class M, typename R, typename T, typename ... Args>
+    struct make_slot_type_<CO, M, R (T::*)(Args...)> {
+        using type = M<CO, T, Args...>;
+    };
+
+    template<typename CO, template<typename, typename...> class M, typename R, typename T, typename ... Args>
+    struct make_slot_type_<CO, M, R (T::*)(Args...) const> {
+        using type = M<CO, T, Args...>;
+    };
+
+    template<typename CO, typename P, typename F>
+    using make_slot_type = typename make_slot_type_<
+        CO, P::template adaptor, decltype(&F::operator())
+    >::type;
+
+    template<typename CO, typename P>
+    struct make_slot {
+        template<typename F>
+        static make_slot_type<CO,P,F> make(F&& f) {
+            return make_slot_type<CO,P,F>(std::forward<F>(f));
+        }
+    };
+
+    template<typename CO>
+    struct make_slot<CO, watch_policy::none> {
+        template<typename F>
+        static F&& make(F&& f) {
+            return std::forward<F>(f);
         }
     };
 }
@@ -521,7 +573,7 @@ public :
     signal_connection_t& send_request(actor_id_t aid, RequestType&& req, FR&& receive_func) {
         static_assert(argument_count<FR>::value == 1,
             "answer reception handler can only take one argument (packet::answer)");
-        using AnswerType = typename std::decay<function_argument<FR>>::type;
+        using AnswerType = typename std::decay<functor_argument<FR>>::type;
         static_assert(std::is_same<AnswerType, typename RequestType::answer>::value,
             "answer reception handler can only take a packet::answer as argument");
 
@@ -531,8 +583,11 @@ public :
 
         answer_signal_impl<RequestType>& netsig = get_answer_signal_<RequestType>(rid);
         netcom_impl::answer_connection& ac = netsig.answer_signal.template connect<
-            slot::call_adaptor::once, netcom_impl::answer_connection>(
-            std::forward<FR>(receive_func)
+            netcom_impl::answer_connection>(
+            [=](signal_connection_t& c, functor_argument<FR> a) {
+                receive_func(a);
+                c.stop();
+            }
         );
 
         send_(std::move(p));
@@ -552,12 +607,12 @@ public :
         FF&& failure_func, UF&& unhandled_func = no_op) {
         static_assert(argument_count<FR>::value == 1,
             "answer reception handler can only take one argument (packet::answer)");
-        using AnswerType = typename std::decay<function_argument<FR>>::type;
+        using AnswerType = typename std::decay<functor_argument<FR>>::type;
         static_assert(std::is_same<AnswerType, typename RequestType::answer>::value,
             "answer reception handler can only take a packet::answer as argument");
         static_assert(argument_count<FF>::value == 1,
             "failure reception handler can only take one argument (packet::failure)");
-        using FailureType = typename std::decay<function_argument<FF>>::type;
+        using FailureType = typename std::decay<functor_argument<FF>>::type;
         static_assert(std::is_same<FailureType, typename RequestType::failure>::value,
             "failure reception handler can only take a packet::failure as argument");
         static_assert(argument_count<UF>::value == 0,
@@ -571,8 +626,11 @@ public :
         netsig.failure_signal.connect(std::forward<FF>(failure_func));
         netsig.unhandled_signal.connect(std::forward<UF>(unhandled_func));
         netcom_impl::answer_connection& ac = netsig.answer_signal.template connect<
-            slot::call_adaptor::once, netcom_impl::answer_connection>(
-            std::forward<FR>(receive_func)
+            netcom_impl::answer_connection>(
+            [=](netcom_impl::answer_connection& c, functor_argument<FR> a) {
+                receive_func(a);
+                c.stop();
+            }
         );
 
         send_(std::move(p));
@@ -589,16 +647,18 @@ public :
         callback will remain active as long as clear_all_() is called  (contrary to watch_keeper_t
         returned by watch_request()). This behavior can be changed by watch_keeper_t::auto_cancel().
     **/
-    template<typename CA = slot::call_adaptor::none, typename FR>
+    template<typename WP = watch_policy::none, typename FR>
     signal_connection_t& watch_message(FR&& receive_func) {
         static_assert(argument_count<FR>::value == 1,
             "message reception handler can only take one argument");
-        using MessageType = typename std::decay<function_argument<FR>>::type;
+        using MessageType = typename std::decay<functor_argument<FR>>::type;
         static_assert(packet_impl::is_packet<MessageType>::value,
             "message reception handler argument must be a packet");
 
         message_signal_impl<MessageType>& netsig = get_message_signal_<MessageType>();
-        return netsig.signal.template connect<CA>(std::forward<FR>(receive_func));
+        return netsig.signal.connect(netcom_impl::make_slot<signal_connection_t,WP>::make(
+            std::forward<FR>(receive_func)
+        ));
     }
 
 private :
@@ -646,11 +706,11 @@ public :
         to watch_keeper_t returned by watch_message()). This behavior can be changed by
         watch_keeper_t::auto_cancel().
     **/
-    template<typename CA = slot::call_adaptor::none, typename FR>
+    template<typename WP = watch_policy::none, typename FR>
     signal_connection_t& watch_request(FR&& receive_func) {
         static_assert(argument_count<FR>::value == 1,
             "request reception handler can only take one argument");
-        using Arg = typename std::decay<function_argument<FR>>::type;
+        using Arg = typename std::decay<functor_argument<FR>>::type;
         static_assert(netcom_impl::is_request<Arg>::value,
             "message reception handler argument must be a request_t");
 
@@ -659,7 +719,9 @@ public :
         request_signal_impl<RequestType>& netsig = get_request_signal_<RequestType>();
         if (!netsig.empty()) throw request_already_watched<RequestType>();
 
-        return netsig.signal.template connect<CA>(std::forward<FR>(receive_func));
+        return netsig.signal.connect(netcom_impl::make_slot<signal_connection_t,WP>::make(
+            std::forward<FR>(receive_func)
+        ));
     }
 };
 

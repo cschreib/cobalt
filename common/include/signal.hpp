@@ -8,14 +8,6 @@
 #include "std_addon.hpp"
 #include "variadic.hpp"
 
-class signal_connection_t;
-
-namespace slot {
-    namespace call_adaptor {
-        using none = std::nullptr_t;
-    }
-}
-
 class signal_connection_t {
     delegate<void(signal_connection_t&)> stop_;
 
@@ -42,27 +34,24 @@ public :
 };
 
 namespace signal_impl {
-    template<typename T, typename ... Args>
-    struct make_adaptor {
-        using delegate_t = const delegate<void(Args...)>&;
-        using return_t = delegate<void(signal_connection_t&, delegate_t, Args...)>;
-        static return_t make() {
-            return return_t(T{},
-                std::integral_constant<
-                    void (T::*)(signal_connection_t&, delegate_t, Args...),
-                    &T::operator()
-                >{}
-            );
-        }
-    };
+    template<typename T>
+    using first_argument = type_list_element<0, function_arguments<T>>;
 
-    template<typename ... Args>
-    struct make_adaptor<std::nullptr_t, Args...> {
-        using delegate_t = const delegate<void(Args...)>&;
-        static delegate<void(signal_connection_t&, delegate_t, Args...)> make() {
-            return nullptr;
-        }
-    };
+    template<typename CO, typename T>
+    using is_extended_callback__ = std::integral_constant<bool,
+        std::is_convertible<CO&, first_argument<T>>::value
+    >;
+
+    template<bool V, typename CO, typename T>
+    struct is_extended_callback_ : std::false_type {};
+
+    template<typename CO, typename T>
+    struct is_extended_callback_<true, CO, T> : is_extended_callback__<CO,T> {};
+
+    template<typename CO, typename T>
+    using is_extended_callback = typename is_extended_callback_<
+        (argument_count<T>::value > 0), CO, T
+    >::type;
 }
 
 template<typename ... Args>
@@ -71,10 +60,9 @@ class signal_t {
     using call_adaptor_t = delegate<void(signal_connection_t&, const delegate_t&, Args...)>;
 
     struct slot_t {
-        template<typename D, typename CA>
-        slot_t(D&& d, type_list<CA>, std::unique_ptr<signal_connection_t> s) :
+        template<typename D>
+        slot_t(D&& d, std::unique_ptr<signal_connection_t> s) :
             callback(std::forward<D>(d)),
-            call_adaptor(signal_impl::make_adaptor<CA, Args...>::make()),
             connection(std::move(s)) {}
 
         delegate_t callback;
@@ -99,6 +87,36 @@ class signal_t {
         }
     }
 
+    template<typename CO, typename F>
+    CO& connect_(F&& f, std::false_type) {
+        slots_.emplace_back(
+            std::forward<F>(f),
+            std::unique_ptr<signal_connection_t>(new CO([this](signal_connection_t& c) {
+                stop_(c);
+            }))
+        );
+
+        return static_cast<CO&>(*slots_.back().connection);
+    }
+
+    template<typename CO, typename F>
+    CO& connect_(F&& f, std::true_type) {
+        std::unique_ptr<signal_connection_t> cp(new CO([this](signal_connection_t& c) {
+            stop_(c);
+        }));
+
+        CO& c = static_cast<CO&>(*cp);
+
+        slots_.emplace_back(
+            [f,&c](Args... args) mutable {
+                f(c, args...);
+            },
+            std::move(cp)
+        );
+
+        return c;
+    }
+
 public :
     /// Create a new signal-slot connection.
     /** A connection object is returned to manage this connection. If not used, the connection will
@@ -107,19 +125,15 @@ public :
         carefuly handle the lifetime of the connection using the returned connection object.
         Several helpers are provided to this end (scoped_connection_t, scoped_connection_pool_t).
     **/
-    template<typename CA = slot::call_adaptor::none, typename CO = signal_connection_t, typename F>
+    template<typename CO = signal_connection_t, typename F>
     CO& connect(F&& f) {
         static_assert(std::is_base_of<signal_connection_t,CO>::value,
             "connection type must inherit from signal_connection_t");
 
-        slots_.emplace_back(
-            std::forward<F>(f), type_list<CA>{},
-            std::unique_ptr<signal_connection_t>(new CO([this](signal_connection_t& c) {
-                stop_(c);
-            }))
+        using FType = typename std::decay<F>::type;
+        return connect_<CO>(std::forward<F>(f),
+            signal_impl::is_extended_callback<CO, decltype(&FType::operator())>()
         );
-
-        return static_cast<CO&>(*slots_.back().connection);
     }
 
     void dispatch(Args ... args) {
@@ -129,11 +143,7 @@ public :
 
             for (auto& s : slots_) {
                 if (s.stopped) continue;
-                if (s.call_adaptor) {
-                    s.call_adaptor(*s.connection, s.callback, args...);
-                } else {
-                    s.callback(args...);
-                }
+                s.callback(args...);
             }
         }
 
@@ -148,17 +158,5 @@ public :
         return slots_.empty();
     }
 };
-
-namespace slot {
-    namespace call_adaptor {
-        struct once {
-            template<typename ... Args>
-            void operator() (signal_connection_t& c, const delegate<void(Args...)>& d, Args... args) {
-                d(args...);
-                c.stop();
-            }
-        };
-    }
-}
 
 #endif
