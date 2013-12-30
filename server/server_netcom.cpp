@@ -25,8 +25,12 @@ namespace server {
             }
         } else {
             // Remove ids that are no longer accessible
-            for (std::size_t i = max_client_ - 1; i >= max_client; --i) {
-                available_ids_.erase(max_client - i - 1 + first_actor_id);
+            if (max_client == 0) {
+                available_ids_.clear();
+            } else {
+                for (std::size_t i = max_client_ - 1; i >= max_client; --i) {
+                    available_ids_.erase(max_client - i - 1 + first_actor_id);
+                }
             }
         }
 
