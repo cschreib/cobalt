@@ -15,6 +15,7 @@ struct delegate;
 
     Use case:
 
+    \code{.cpp}
         std::vector<delegate<int(int)>> v;
         v.push_back([](int i) { return 1*i; });
         v.push_back([](int i) { return 2*i; });
@@ -22,6 +23,7 @@ struct delegate;
         for (auto& d : v) {
             std::cout << d(12) << std::endl;
         }
+    \endcode
 
     It shares similar features with std::function, except that it does not support free functions
     and custom allocators (not needed). On the other hand, it is tailored for use with lambda

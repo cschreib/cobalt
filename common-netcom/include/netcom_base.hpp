@@ -331,9 +331,12 @@ namespace netcom_impl {
     };
 }
 
+/// Contains all available watch policies for netcom_base.
 namespace watch_policy {
+    /// No policy (default).
     struct none {};
 
+    /// Only call the slot once.
     struct once {
         template<typename CO, typename F, typename ... Args>
         struct adaptor {
@@ -389,9 +392,9 @@ namespace netcom_impl {
     packet queue (input_) and consuming the output packet queue (output_). These two queues are
     thread safe, and can thus be filled/consumed in another thread. The rest of the code is not
     guaranteed to be thread safe, and doesn't use any thread.
-    In particular, all the callback functions that are registered to requests, their answers or
-    simple messages. These are called sequentially either when one calls 'process_packets()' or when
-    one releases a watch, in a synchronous way.
+    In particular, this is true for all the callback functions that are registered to requests,
+    their answers or simple messages. These are called sequentially in process_packets(), in a
+    synchronous way.
 **/
 class netcom_base {
 public :
@@ -540,8 +543,7 @@ protected :
         return p;
     }
 
-    /// Clear all incoming and outgoing packets without processing them, and clear all requests and
-    /// watchers.
+    /// Clear all incoming and outgoing packets without processing them, and clear all signals.
     /** When this function is called, the class is in the same state as when constructed.
         It modifies the input_ and output_ queues in a non thread safe way.
     **/
@@ -562,12 +564,10 @@ public :
         send_(std::move(p));
     }
 
-    /// Send a request with the provided arguments, and register a callback function to handle the
-    /// response.
+    /// Send a request with the provided arguments, and register a slot to handle the answer.
     /** The callback function will be called by process_packets() when the corresponding answer is
         received, if the request has been properly issued. If the request fails, no action will be
-        taken. The request can be canceled by the returned request_keeper_t at any time if not
-        needed anymore.
+        taken.
     **/
     template<typename RequestType, typename FR>
     signal_connection_t& send_request(actor_id_t aid, RequestType&& req, FR&& receive_func) {
@@ -595,12 +595,11 @@ public :
         return ac;
     }
 
-    /// Send a request with the provided arguments, and register three callback functions to handle
-    /// the response (one in case of success, another in case of failure, and the last one in case
-    /// the request could not be received on the other side).
-    /** The callback functions will be called by process_packets() when the corresponding answer is
-        received. The request can be canceled by the returned request_keeper_t at any time if not
-        needed anymore.
+    /// Send a request with the provided arguments, and register three slots to handle the answer.
+    /** The first slot is called in case the request is successfuly answered, the second is called
+        in case of failure, and the last one is called in case the request could not be received on
+        the other side. These callback functions will be called by process_packets() when the
+        corresponding answer is received.
     **/
     template<typename RequestType, typename FR, typename FF, typename UF = decltype(no_op)>
     signal_connection_t& send_request(actor_id_t aid, RequestType&& req, FR&& receive_func,
@@ -639,13 +638,9 @@ public :
     }
 
 public :
-    /// Register a callback function to be called whenever a given message packet is received.
-    /** The callback function will be called by process_packets() when the corresponding message is
-        received, and has to take only one argument whose type is that of the corresponding packet.
-        It can be disabled by the returned watch_keeper_t at any time if not needed anymore by
-        calling watch_keeper_t::cancel(). If the returned watch_keeper_t is destroyed, then the
-        callback will remain active as long as clear_all_() is called  (contrary to watch_keeper_t
-        returned by watch_request()). This behavior can be changed by watch_keeper_t::auto_cancel().
+    /// Register a slot to be called whenever a given message packet is received.
+    /** The slot will be called by process_packets() when the corresponding message is received, and
+        has to take only one argument whose type is that of the corresponding packet.
     **/
     template<typename WP = watch_policy::none, typename FR>
     signal_connection_t& watch_message(FR&& receive_func) {
@@ -697,14 +692,10 @@ private :
     friend struct netcom_impl::request_t;
 
 public :
-    /// Register a callback function to be called whenever a given request packet is received.
-    /** The callback function will be called by process_packets() when the corresponding request is
-        received, and will have to answer it either by giving a proper answer or by signaling
-        failure. It must take only one argument: a request_t<>. It can be disabled by the returned
-        watch_keeper_t at any time if not needed anymore by calling watch_keeper_t::cancel(). If the
-        returned watch_keeper_t is destroyed, then the callback is automatically disabled (contrary
-        to watch_keeper_t returned by watch_message()). This behavior can be changed by
-        watch_keeper_t::auto_cancel().
+    /// Register a slot to be called whenever a given request packet is received.
+    /** The slot will be called by process_packets() when the corresponding request is received, and
+        will have to answer it either by giving a proper answer or by signaling failure. It must
+        take only one argument: a request_t<>.
     **/
     template<typename WP = watch_policy::none, typename FR>
     signal_connection_t& watch_request(FR&& receive_func) {
