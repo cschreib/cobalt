@@ -1,7 +1,6 @@
 #include "client_player_list.hpp"
 #include <server_player_list.hpp>
 #include "client_player.hpp"
-#include <print.hpp>
 
 namespace client {
     player_list::player_list(netcom& net) : net_(net), self_(nullptr) {
