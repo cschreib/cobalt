@@ -1,12 +1,21 @@
 #include "client_netcom.hpp"
-#include "server_netcom.hpp"
+#include <server_netcom.hpp>
 #include "client_player_list.hpp"
-#include "server_player_list.hpp"
-#include "time.hpp"
-#include "print.hpp"
+#include <server_player_list.hpp>
+#include <time.hpp>
+#include <print.hpp>
+#include <config.hpp>
 #include <iostream>
 
 int main(int argc, const char* argv[]) {
+    std::string conf_file = "client.conf";
+    if (argc > 1) {
+        conf_file = argv[1];
+    }
+
+    config::state conf;
+    conf.parse(conf_file);
+
     client::netcom net;
 
     bool stop = false;
@@ -77,7 +86,11 @@ int main(int argc, const char* argv[]) {
     //     reason(reason);
     // });
 
-    plist.join_as("kalith", color32::blue, false);
+    std::string player_name = "kalith";
+    conf.get_value("player.name", player_name, player_name);
+    color32 player_color = color32::blue;
+    conf.get_value("player.color", player_color, player_color);
+    plist.join_as(player_name, player_color, false);
 
     pool << net.watch_message([](message::server::player_connected msg) {
             print("new player connected: id=", msg.id, ", ip=", msg.ip, ", name=",
@@ -89,7 +102,12 @@ int main(int argc, const char* argv[]) {
         }
     );
 
-    net.run("127.0.0.1", 4444);
+    std::string server_ip = "127.0.0.1";
+    conf.get_value("netcom.server_ip", server_ip, server_ip);
+    std::uint16_t server_port = 4444;
+    conf.get_value("netcom.serer_port", server_port, server_port);
+
+    net.run(server_ip, server_port);
 
     double start = now();
     while (!stop) {
@@ -111,6 +129,8 @@ int main(int argc, const char* argv[]) {
     }
 
     std::cout << "stopped." << std::endl;
+
+    conf.save(conf_file);
 
     return 0;
 }
