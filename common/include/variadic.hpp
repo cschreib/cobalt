@@ -226,6 +226,29 @@ namespace ctl {
         static const std::size_t value = sizeof...(Args);
     };
 
+    template<typename T>
+    struct return_type;
+
+    template<typename R, typename ... Args>
+    struct return_type<R(Args...)> {
+        using type = R;
+    };
+
+    template<typename R, typename ... Args>
+    struct return_type<R(*)(Args...)> {
+        using type = R;
+    };
+
+    template<typename R, typename T, typename ... Args>
+    struct return_type<R(T::*)(Args...)> {
+        using type = R;
+    };
+
+    template<typename R, typename T, typename ... Args>
+    struct return_type<R(T::*)(Args...) const> {
+        using type = R;
+    };
+
     auto no_op = [](){};
 
     template<typename T1, typename T2>
