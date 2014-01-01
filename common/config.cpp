@@ -52,10 +52,12 @@ namespace config {
 
         for (auto& n : node.childs) {
             if (n->is_branch) {
-                save_node_(f, (const ctl::string_tree<config_node>::branch&)*n, name+n->name+'.');
+                auto& b = static_cast<const ctl::string_tree<config_node>::branch&>(*n);
+                save_node_(f, b, name + n->name + '.');
             } else {
                 f << name << n->name;
-                f << '(' << ((ctl::string_tree<config_node>::leaf&)*n).data.value << ')' << '\n';
+                auto& l = static_cast<const ctl::string_tree<config_node>::leaf&>(*n);
+                f << '(' << l.data.value << ')' << '\n';
             }
         }
     }
