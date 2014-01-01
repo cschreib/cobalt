@@ -266,6 +266,24 @@ namespace ctl {
         template <typename U> static std::false_type dummy(...);
         static const bool value = decltype(dummy<T2>(0))::value;
     };
+
+    /// Class holding a sequence of integer values.
+    template<std::size_t ...>
+    struct seq_t {};
+
+    namespace impl {
+        template<std::size_t N, std::size_t D, std::size_t ... S>
+        struct gen_seq_ : public gen_seq_<N+1, D, S..., N> {};
+
+        template<std::size_t D, std::size_t ... S>
+        struct gen_seq_<D, D, S...> {
+          using type = seq_t<S..., D>;
+        };
+    }
+
+    /// Generate a sequence of integer from 0 to D (exclusive).
+    template<std::size_t D>
+    using gen_seq = typename impl::gen_seq_<0, D-1>::type;
 }
 
 #endif
