@@ -4,7 +4,9 @@
 #include <config.hpp>
 
 namespace server {
-    player_list::player_list(netcom& net, config::state& conf) : net_(net), conf_(conf), max_player_(1u) {
+    player_list::player_list(netcom& net, config::state& conf) :
+        net_(net), conf_(conf), max_player_(1u) {
+
         pool_ << conf_.bind("player_list.max_player", max_player_);
 
         pool_ << net_.watch_request([&](const netcom::request_t<request::client::join_players>& req) {

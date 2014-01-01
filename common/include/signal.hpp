@@ -50,8 +50,8 @@ public :
         return true;
     }
 
-    /// Stops the connection.
-    /** Calls all callbacks. This instance must be considered as destroyed as soon as the function
+    /// Stop the connection.
+    /** Call all callbacks. This instance must be considered as destroyed as soon as the function
         returns.
     **/
     virtual void stop() {
