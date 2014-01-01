@@ -19,7 +19,7 @@ class signal_connection_t {
     ctl::delegate<void(signal_connection_t&)> stop_;
 
 protected :
-    template<typename ... Args>
+    template<typename, typename>
     friend class signal_t;
 
     template<typename F>
@@ -45,6 +45,10 @@ public :
     signal_connection_t(signal_connection_t&&) = delete;
     signal_connection_t& operator= (const signal_connection_t&) = delete;
     signal_connection_t& operator= (signal_connection_t&&) = delete;
+
+    virtual bool accept() const {
+        return true;
+    }
 
     /// Stops the connection.
     /** Calls all callbacks. This instance must be considered as destroyed as soon as the function
@@ -81,14 +85,25 @@ namespace signal_impl {
     >::type;
 }
 
+/// \cond DOXYGEN_EXCLUDE
+template<typename Signature, typename DefaultConnection = signal_connection_t>
+class signal_t {
+    static_assert(std::is_same<typename ctl::return_type<Signature>::type, void>::value,
+        "return type of signal slot must be void");
+};
+/// \endcond
+
 /// Helper class to handle signal/slot connections.
 /** A signal is a container holding a list of slots, which are basically callback functions.
     Whenever the signal is "called", it dispatches its arguments to all the slots.
     This class is tailored for use with lambda functions or functors, and does not support free
     functions.
 **/
-template<typename ... Args>
-class signal_t {
+template<typename ... Args, typename DefaultConnection>
+class signal_t<void(Args...), DefaultConnection> {
+    static_assert(std::is_base_of<signal_connection_t, DefaultConnection>::value,
+        "DefaultConnection must inherit from signal_connection_t");
+
     using delegate_t = ctl::delegate<void(Args...)>;
     using call_adaptor_t = ctl::delegate<void(signal_connection_t&, const delegate_t&, Args...)>;
 
@@ -96,9 +111,7 @@ class signal_t {
         using connection_t = std::unique_ptr<signal_connection_t, signal_connection_t::deleter>;
 
         template<typename D>
-        slot_t(D&& d, connection_t s) :
-            callback(std::forward<D>(d)),
-            connection(std::move(s)) {}
+        slot_t(D&& d, connection_t s) : callback(std::forward<D>(d)), connection(std::move(s)) {}
 
         delegate_t callback;
         call_adaptor_t call_adaptor;
@@ -161,7 +174,7 @@ public :
         of the connection using the returned connection object.
         Several helpers are provided to this end (scoped_connection_t, scoped_connection_pool_t).
     **/
-    template<typename CO = signal_connection_t, typename F>
+    template<typename CO = DefaultConnection, typename F>
     CO& connect(F&& f) {
         static_assert(std::is_base_of<signal_connection_t,CO>::value,
             "connection type must inherit from signal_connection_t");
@@ -179,7 +192,7 @@ public :
             auto sd = ctl::make_scoped([this]() { dispatching_ = false; });
 
             for (auto& s : slots_) {
-                if (s.stopped) continue;
+                if (s.stopped || !s.connection->accept()) continue;
                 s.callback(args...);
             }
         }

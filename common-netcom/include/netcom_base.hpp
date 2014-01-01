@@ -230,7 +230,7 @@ namespace netcom_impl {
 
     template<typename P>
     struct message_signal_impl : message_signal_t {
-        signal_t<const P&> signal;
+        signal_t<void(const P&)> signal;
 
         message_signal_impl() : message_signal_t(P::packet_id__) {}
 
@@ -260,7 +260,7 @@ namespace netcom_impl {
 
     template<typename P>
     struct request_signal_impl : request_signal_t {
-        signal_t<const request_t<P>&> signal;
+        signal_t<void(const request_t<P>&)> signal;
 
         request_signal_impl() : request_signal_t(P::packet_id__) {}
 
@@ -305,9 +305,9 @@ namespace netcom_impl {
         using answer_t = typename P::answer;
         using failure_t = typename P::failure;
 
-        signal_t<const answer_t&> answer_signal;
-        signal_t<const failure_t&> failure_signal;
-        signal_t<> unhandled_signal;
+        signal_t<void(const answer_t&)> answer_signal;
+        signal_t<void(const failure_t&)> failure_signal;
+        signal_t<void()> unhandled_signal;
 
         explicit answer_signal_impl(request_id_t id) : answer_signal_t(id) {}
 

@@ -226,7 +226,7 @@ namespace config {
                 dirty_ = true;
             } else {
                 ArgType t;
-                if (string::stringify<ArgType>::parse(t, node.value)) {
+                if (string::stringify<ArgType>::parse(t, node.value)) {
                     func(t);
                 }
             }
@@ -238,7 +238,7 @@ namespace config {
         struct config_node {
             std::string value;
             bool        is_empty = true;
-            signal_t<const std::string&> signal;
+            signal_t<void(const std::string&)> signal;
         };
 
         void save_node_(std::ofstream& f, const ctl::string_tree<config_node>::branch& node,
