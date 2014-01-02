@@ -2,6 +2,7 @@
 #define VARIADIC_HPP
 
 #include <type_traits>
+#include <tuple>
 
 /// Cobalt template library
 namespace ctl {
@@ -267,6 +268,7 @@ namespace ctl {
         static const bool value = decltype(dummy<T2>(0))::value;
     };
 
+
     /// Class holding a sequence of integer values.
     template<std::size_t ...>
     struct seq_t {};
@@ -284,6 +286,62 @@ namespace ctl {
     /// Generate a sequence of integer from 0 to D (exclusive).
     template<std::size_t D>
     using gen_seq = typename impl::gen_seq_<0, D-1>::type;
+
+
+    /// Get the return type of a functor given the parameter types
+    template<typename F, typename ... Args>
+    struct result_of_functor {
+        using type = decltype(std::declval<F>()(std::declval<Args>()...));
+    };
+
+
+    namespace impl {
+        template<typename F, typename T>
+        struct t2a_return_;
+
+        template<typename F, typename ... Args>
+        struct t2a_return_<F, std::tuple<Args...>> {
+            using type = typename result_of_functor<F, Args...>::type;
+        };
+
+        template<typename F>
+        struct t2a_return_<F, std::tuple<>> {
+            using type = void;
+        };
+
+        template<typename F, typename T>
+        using t2a_return = typename t2a_return_<
+            typename std::decay<F>::type,
+            typename std::decay<T>::type
+        >::type;
+
+        template<typename F, typename T, std::size_t ... I>
+        t2a_return<F,T> tuple_to_args_(F&& func, T&& tup, seq_t<I...>) {
+            return func(std::get<I>(std::forward<T>(tup))...);
+        }
+
+        template<typename F, typename T, std::size_t N>
+        impl::t2a_return<F,T> tuple_to_args_(F&& func, T&& tup,
+            std::integral_constant<std::size_t,N>) {
+            return impl::tuple_to_args_(
+                std::forward<F>(func), std::forward<T>(tup), gen_seq<N>{}
+            );
+        }
+
+        template<typename F, typename T>
+        impl::t2a_return<F,T> tuple_to_args_(F&& func, T&& tup,
+                std::integral_constant<std::size_t,0>) {}
+    }
+
+    /// Unfold a tuple and use the result as function parameters
+    template<typename F, typename T>
+    impl::t2a_return<F,T> tuple_to_args(F&& func, T&& tup) {
+        using tuple_type = typename std::decay<T>::type;
+        return impl::tuple_to_args_(
+            std::forward<F>(func), std::forward<T>(tup),
+            std::integral_constant<std::size_t, std::tuple_size<tuple_type>::value>{}
+        );
+    }
 }
 
 #endif
