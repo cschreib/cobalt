@@ -144,12 +144,12 @@ namespace config {
             provided parameter name.
         **/
         template<typename T>
-        signal_connection_t& bind(const std::string& name, T& var) {
+        signal_connection_base& bind(const std::string& name, T& var) {
             static_assert(impl::is_configurable<T>::value,
                 "bound variable must be configurable");
 
             config_node& node = tree_.reach(name);
-            signal_connection_t& sc = node.signal.connect([&var](const std::string& value) {
+            signal_connection_base& sc = node.signal.connect([&var](const std::string& value) {
                 string::stringify<T>::parse(var, value);
             });
 
@@ -172,7 +172,7 @@ namespace config {
         **/
         template<typename F, typename enable =
             typename std::enable_if<!impl::is_configurable<F>::value>::type>
-        signal_connection_t& bind(const std::string& name, F&& func) {
+        signal_connection_base& bind(const std::string& name, F&& func) {
             static_assert(ctl::argument_count<F>::value == 1,
                 "configuration callback can only take one argument");
             using ArgType = typename std::decay<ctl::functor_argument<F>>::type;
@@ -180,7 +180,7 @@ namespace config {
                 "configuration callback argument must be configurable");
 
             config_node& node = tree_.reach(name);
-            signal_connection_t& sc = node.signal.connect([func](const std::string& value) {
+            signal_connection_base& sc = node.signal.connect([func](const std::string& value) {
                 ArgType t;
                 if (string::stringify<ArgType>::parse(t, value)) {
                     func(t);
@@ -204,7 +204,7 @@ namespace config {
         **/
         template<typename F, typename N, typename enable =
             typename std::enable_if<!impl::is_configurable<F>::value>::type>
-        signal_connection_t& bind(const std::string& name, F&& func, const N& def) {
+        signal_connection_base& bind(const std::string& name, F&& func, const N& def) {
             static_assert(ctl::argument_count<F>::value == 1,
                 "configuration callback can only take one argument");
             using ArgType = typename std::decay<ctl::functor_argument<F>>::type;
@@ -212,7 +212,7 @@ namespace config {
                 "configuration callback argument must be configurable");
 
             config_node& node = tree_.reach(name);
-            signal_connection_t& sc = node.signal.connect([func](const std::string& value) {
+            signal_connection_base& sc = node.signal.connect([func](const std::string& value) {
                 ArgType t;
                 if (string::stringify<ArgType>::parse(t, value)) {
                     func(t);

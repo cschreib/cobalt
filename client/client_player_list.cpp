@@ -4,7 +4,7 @@
 
 namespace client {
     player_list::player_list(netcom& net) : net_(net), self_(nullptr) {
-        // pool_.hold_all();
+        pool_.block_all();
         net_.send_request(netcom::server_actor_id,
             make_packet<request::client::list_players>(),
             [&](const request::client::list_players::answer& msg) {
@@ -12,7 +12,7 @@ namespace client {
                     players_.emplace_back(p.id, p.ip, p.name, p.color, p.is_ai);
                 }
 
-                // pool_.release_all();
+                pool_.unblock_all();
             }
         );
 

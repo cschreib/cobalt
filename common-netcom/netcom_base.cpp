@@ -177,13 +177,3 @@ void netcom_base::process_packets() {
         }
     }
 }
-
-namespace netcom_impl {
-    void answer_connection::stop() {
-        if (net) {
-            net->stop_request_(rid);
-        }
-
-        signal_connection_t::stop();
-    }
-}

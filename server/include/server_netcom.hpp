@@ -55,7 +55,7 @@ namespace server {
         void remove_client_(client_list_t::iterator ic);
 
         config::state& conf_;
-        scoped_connection_pool_t pool_;
+        scoped_connection_pool pool_;
 
         std::uint16_t      listen_port_;
         std::size_t        max_client_;

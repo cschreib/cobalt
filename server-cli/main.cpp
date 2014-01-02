@@ -11,7 +11,7 @@ int main(int argc, const char* argv[]) {
     server::netcom net(conf);
 
     bool stop = false;
-    scoped_connection_pool_t pool;
+    scoped_connection_pool pool;
 
     pool << net.watch_message([&](message::unhandled_message msg) {
         warning("unhandled message: ", msg.message_id);

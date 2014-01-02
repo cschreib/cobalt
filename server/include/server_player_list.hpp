@@ -81,7 +81,7 @@ namespace server {
         std::uint32_t      max_player_;
         ctl::ptr_vector<player> players_;
 
-        scoped_connection_pool_t pool_;
+        scoped_connection_pool pool_;
     };
 }
 

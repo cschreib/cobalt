@@ -12,46 +12,39 @@
 /** It is owned by signal_t, and shared by reference to the initiator of the connection.
     Beside destroying the signal object, calling stop() it is the only way to stop a connection and
     unregister a slot.
-    Any class holding a signal_connection_t reference should fill the on_stop callback so that it is
-    informed whenever the connection is stopped for any reason.
+    Any class holding a signal_connection_base reference should fill the on_stop callback so that it
+    is informed whenever the connection is stopped for any reason.
 **/
-class signal_connection_t {
-    ctl::delegate<void(signal_connection_t&)> stop_;
+class signal_connection_base {
+    bool blocked_ = false;
 
 protected :
-    template<typename, typename>
-    friend class signal_t;
-
-    template<typename F>
-    signal_connection_t(F&& f) : stop_(std::forward<F>(f)) {}
-
-    virtual ~signal_connection_t() {
+    virtual ~signal_connection_base() {
         if (on_stop) {
             on_stop(*this);
         }
     }
 
+    virtual void signal_stop_() = 0;
+
     struct deleter {
-        void operator() (signal_connection_t* s) const {
+        void operator() (signal_connection_base* s) const {
             delete s;
         }
     };
 
 public :
     /// Callback function called whenever the connection is stopped and soon to be destroyed.
-    ctl::delegate<void(signal_connection_t&)> on_stop;
+    ctl::delegate<void(signal_connection_base&)> on_stop;
 
-    signal_connection_t(const signal_connection_t&) = delete;
-    signal_connection_t(signal_connection_t&&) = delete;
-    signal_connection_t& operator= (const signal_connection_t&) = delete;
-    signal_connection_t& operator= (signal_connection_t&&) = delete;
-
-    virtual bool accept() const {
-        return true;
-    }
+    signal_connection_base() = default;
+    signal_connection_base(const signal_connection_base&) = delete;
+    signal_connection_base(signal_connection_base&&) = delete;
+    signal_connection_base& operator= (const signal_connection_base&) = delete;
+    signal_connection_base& operator= (signal_connection_base&&) = delete;
 
     /// Stop the connection.
-    /** Call all callbacks. This instance must be considered as destroyed as soon as the function
+    /** Calls all callbacks. This instance must be considered as destroyed as soon as the function
         returns.
     **/
     virtual void stop() {
@@ -60,33 +53,84 @@ public :
             on_stop = nullptr;
         }
 
-        stop_(*this);
+        signal_stop_();
+    }
+
+    /// Temporarily prevent the slot from being called.
+    /** Call unblock() to make it active again.
+    **/
+    virtual void block() {
+        blocked_ = true;
+    }
+
+    /// Check if the slot is blocked. See block() and unblock().
+    bool blocked() const {
+        return blocked_;
+    }
+
+    /// Re-enable the slot if disabled by block().
+    virtual void unblock() {
+        blocked_ = false;
     }
 };
 
-namespace signal_impl {
-    template<typename T>
-    using first_argument = ctl::type_list_element<0, ctl::function_arguments<T>>;
+/// Simplest implementation of a signal/slot connection.
+/** The behavior of this connection is just to prevent the slot from being called if the connection
+    is blocked.
+**/
+template<typename T>
+class basic_signal_connection : public signal_connection_base {
+    using base = signal_connection_base;
+    using delegate_type = typename T::delegate_type;
+    using tuple_type = typename T::tuple_type;
 
-    template<typename CO, typename T>
-    using is_extended_callback__ = std::integral_constant<bool,
-        std::is_convertible<CO&, first_argument<T>>::value
-    >;
+    T& signal_;
 
-    template<bool V, typename CO, typename T>
-    struct is_extended_callback_ : std::false_type {};
+protected :
+    using typename base::deleter;
+    friend T;
 
-    template<typename CO, typename T>
-    struct is_extended_callback_<true, CO, T> : is_extended_callback__<CO,T> {};
+    delegate_type callback;
 
-    template<typename CO, typename T>
-    using is_extended_callback = typename is_extended_callback_<
-        (ctl::argument_count<T>::value > 0), CO, T
-    >::type;
-}
+    template<typename F>
+    basic_signal_connection(T& signal, F&& f) :
+        base(), signal_(signal), callback(std::forward<F>(f)) {}
+
+    void signal_stop_() {
+        signal_.stop_(*this);
+    }
+
+    virtual void call_(tuple_type& arg) {
+        if (!this->blocked()) {
+            ctl::tuple_to_args(callback, arg);
+        }
+    }
+};
+
+/// Same as basic_signal_connection, but will only call the slot once, then stop.
+template<typename T>
+class unique_signal_connection : public basic_signal_connection<T> {
+    using base = basic_signal_connection<T>;
+    using delegate_type = typename T::delegate_type;
+    using tuple_type = typename T::tuple_type;
+
+protected :
+    using typename base::deleter;
+    friend T;
+
+    template<typename F>
+    unique_signal_connection(T& signal, F&& f) : base(signal, std::forward<F>(f)) {}
+
+    virtual void call_(tuple_type& arg) {
+        if (!this->blocked()) {
+            ctl::tuple_to_args(this->callback, arg);
+            this->stop();
+        }
+    }
+};
 
 /// \cond DOXYGEN_EXCLUDE
-template<typename Signature, typename DefaultConnection = signal_connection_t>
+template<typename Signature, template<typename> class ConnectionBase = basic_signal_connection>
 class signal_t {
     static_assert(std::is_same<typename ctl::return_type<Signature>::type, void>::value,
         "return type of signal slot must be void");
@@ -99,70 +143,53 @@ class signal_t {
     This class is tailored for use with lambda functions or functors, and does not support free
     functions.
 **/
-template<typename ... Args, typename DefaultConnection>
-class signal_t<void(Args...), DefaultConnection> {
-    static_assert(std::is_base_of<signal_connection_t, DefaultConnection>::value,
-        "DefaultConnection must inherit from signal_connection_t");
+template<typename ... Args, template<typename> class ConnectionBase>
+class signal_t<void(Args...), ConnectionBase> {
+public :
+    using signature = void(Args...);
+    using delegate_type = ctl::delegate<signature>;
+    using connection_type = ConnectionBase<signal_t>;
+    using tuple_type = std::tuple<Args...>;
 
-    using delegate_t = ctl::delegate<void(Args...)>;
-    using call_adaptor_t = ctl::delegate<void(signal_connection_t&, const delegate_t&, Args...)>;
+private :
+    friend connection_type;
+
+    using connection_ptr = std::unique_ptr<connection_type, typename connection_type::deleter>;
 
     struct slot_t {
-        using connection_t = std::unique_ptr<signal_connection_t, signal_connection_t::deleter>;
+        slot_t(connection_ptr s) : connection(std::move(s)) {}
+        slot_t(slot_t&&) = default;
+        slot_t& operator= (slot_t&&) = default;
 
-        template<typename D>
-        slot_t(D&& d, connection_t s) : callback(std::forward<D>(d)), connection(std::move(s)) {}
-
-        delegate_t callback;
-        call_adaptor_t call_adaptor;
-        connection_t connection;
+        connection_ptr connection;
         bool stopped = false;
     };
 
     bool dispatching_ = false;
-    std::vector<slot_t> slots_;
 
-    void stop_(signal_connection_t& c) {
+    using slot_container = std::vector<slot_t>;
+    using slot_iterator = typename slot_container::iterator;
+    slot_container slots_;
+
+    slot_iterator get_connection_(connection_type& c) {
         for (auto iter = slots_.begin(); iter != slots_.end(); ++iter) {
             if (iter->connection.get() == &c) {
-                if (dispatching_) {
-                    iter->stopped = true;
-                } else {
-                    slots_.erase(iter);
-                }
-                break;
+                return iter;
             }
         }
+
+        return slots_.end();
     }
 
-    template<typename CO, typename F>
-    CO& connect_(F&& f, std::false_type) {
-        slots_.emplace_back(
-            std::forward<F>(f),
-            typename slot_t::connection_t(new CO([this](signal_connection_t& c) {
-                stop_(c);
-            }))
-        );
+    void stop_(connection_type& c) {
+        auto iter = get_connection_(c);
+        if (iter == slots_.end()) return;
 
-        return static_cast<CO&>(*slots_.back().connection);
-    }
-
-    template<typename CO, typename F>
-    CO& connect_(F&& f, std::true_type) {
-        typename slot_t::connection_t cp(new CO([this](signal_connection_t& c) {
-            stop_(c);
-        }));
-
-        CO& c = static_cast<CO&>(*cp);
-
-        slots_.emplace_back(
-            [f,&c](Args... args) mutable {
-                f(c, args...);
-            },
-            std::move(cp)
-        );
-
-        return c;
+        if (dispatching_) {
+            iter->stopped = true;
+        } else {
+            slots_.erase(iter);
+        }
     }
 
 public :
@@ -174,26 +201,33 @@ public :
         of the connection using the returned connection object.
         Several helpers are provided to this end (scoped_connection_t, scoped_connection_pool_t).
     **/
-    template<typename CO = DefaultConnection, typename F>
-    CO& connect(F&& f) {
-        static_assert(std::is_base_of<signal_connection_t,CO>::value,
-            "connection type must inherit from signal_connection_t");
+    template<template<typename> class CO = ConnectionBase, typename S, typename ... TArgs>
+    CO<signal_t>& connect(S&& slot, TArgs&& ... args) {
+        using slot_connection = CO<signal_t>;
+        static_assert(std::is_base_of<connection_type,slot_connection>::value,
+            "slot connection type must inherit from signal connection type");
 
-        using FType = typename std::decay<F>::type;
-        return connect_<CO>(std::forward<F>(f),
-            signal_impl::is_extended_callback<CO, decltype(&FType::operator())>()
-        );
+        connection_ptr cptr(new slot_connection(
+            *this, std::forward<S>(slot), std::forward<TArgs>(args)...
+        ));
+        slot_connection& connection = static_cast<slot_connection&>(*cptr);
+
+        slots_.emplace_back(std::move(cptr));
+
+        return connection;
     }
 
     /// Trigger the signal, and dispatch it to all slots.
-    void dispatch(Args ... args) {
+    template<typename ... TArgs>
+    void dispatch(TArgs&& ... args) {
         {
             dispatching_ = true;
             auto sd = ctl::make_scoped([this]() { dispatching_ = false; });
 
+            tuple_type arg(std::forward<TArgs>(args)...);
             for (auto& s : slots_) {
-                if (s.stopped || !s.connection->accept()) continue;
-                s.callback(args...);
+                if (s.stopped) continue;
+                s.connection->call_(arg);
             }
         }
 

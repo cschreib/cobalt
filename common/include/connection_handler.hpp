@@ -3,100 +3,27 @@
 
 #include "signal.hpp"
 
-/// Helper class to manage lifetime of signal/slot connections.
-/** Semantic equivalent of a std::unique_ptr.
-    If given the responsability of a connection, this class will automatically close it when it goes
-    out of scope. It is useful to bind a connection to the lifetime of the object that created it.
-    In case one needs to create multiple connections from the same object, all bound to its
-    lifetime, then it is more convenient to use a scoped_connection_pool_t.
-**/
-struct scoped_connection_t {
-    /// Construct an empty object.
-    /** No connection is managed.
-    **/
-    scoped_connection_t() = default;
-
-    /// Manage a connection.
-    scoped_connection_t(signal_connection_t& c) : connection_(&c) {
-        set_on_stop_();
-    }
-
-    scoped_connection_t(const scoped_connection_t&) = delete;
-    scoped_connection_t& operator= (const scoped_connection_t&) = delete;
-
-    scoped_connection_t(scoped_connection_t&& sc) : connection_(sc.connection_) {
-        set_on_stop_();
-        sc.connection_ = nullptr;
-    }
-
-    scoped_connection_t& operator= (scoped_connection_t&& sc) {
-        if (connection_) {
-            connection_->on_stop = nullptr;
-            connection_->stop();
-        }
-
-        connection_ = sc.connection_;
-        set_on_stop_();
-        sc.connection_ = nullptr;
-
-        return *this;
-    }
-
-    /// Calls stop().
-    ~scoped_connection_t() {
-        stop();
-    }
-
-    /// Stop the connection, if any.
-    /** Regardless of its previous state, the object is now empty.
-    **/
-    void stop() {
-        if (connection_) {
-            connection_->stop();
-            connection_ = nullptr;
-        }
-    }
-
-    /// Check if this object is empty.
-    bool empty() const {
-        return connection_ == nullptr;
-    }
-
-    /// Release the handled connection for it to be used elsewhere.
-    /** The object is left empty in the process, and the connection is not stopped.
-    **/
-    signal_connection_t& release() {
-        connection_->on_stop = nullptr;
-        signal_connection_t* c = connection_;
-        connection_ = nullptr;
-        return *c;
-    }
+/// Helper class to manage a pool of signal/slot connections.
+struct scoped_connection_pool {
+    using connection_type = signal_connection_base;
 
 private :
-    void set_on_stop_() {
-        connection_->on_stop = [this](signal_connection_t&) {
-            connection_ = nullptr;
-        };
-    }
+    using base = std::vector<connection_type*>;
 
-    signal_connection_t* connection_ = nullptr;
-};
+public :
+    scoped_connection_pool() = default;
 
-/// Helper class to manage a pool of signal/slot connections.
-struct scoped_connection_pool_t {
-    scoped_connection_pool_t() = default;
+    scoped_connection_pool(const scoped_connection_pool&) = delete;
+    scoped_connection_pool& operator= (const scoped_connection_pool&) = delete;
 
-    scoped_connection_pool_t(const scoped_connection_pool_t&) = delete;
-    scoped_connection_pool_t& operator= (const scoped_connection_pool_t&) = delete;
-
-    scoped_connection_pool_t(scoped_connection_pool_t&& scp) : pool_(std::move(scp.pool_)) {
+    scoped_connection_pool(scoped_connection_pool&& scp) : pool_(std::move(scp.pool_)) {
         for (auto* c : pool_) {
             set_on_stop_(*c);
         }
     }
 
-    scoped_connection_pool_t& operator= (scoped_connection_pool_t&& scp) {
-        stop();
+    scoped_connection_pool& operator= (scoped_connection_pool&& scp) {
+        stop_all();
 
         pool_ = std::move(scp.pool_);
         for (auto* c : pool_) {
@@ -106,25 +33,50 @@ struct scoped_connection_pool_t {
         return *this;
     }
 
-    /// Calls stop().
-    ~scoped_connection_pool_t() {
-        stop();
+    /// Destructor. Calls stop_all().
+    ~scoped_connection_pool() {
+        stop_all();
     }
 
     /// Shortcut for add().
-    scoped_connection_pool_t& operator << (signal_connection_t& c) {
+    scoped_connection_pool& operator << (connection_type& c) {
         add(c);
         return *this;
     }
 
     /// Store a new connection in this pool.
-    void add(signal_connection_t& c) {
+    void add(connection_type& c) {
         set_on_stop_(c);
+        if (blocked_) {
+            c.block();
+        } else {
+            c.unblock();
+        }
+
         pool_.push_back(&c);
     }
 
-    /// Stop all connections.
-    void stop() {
+    /// Merge another pool into this one.
+    /** The other pool is left empty in the process.
+    **/
+    void merge(scoped_connection_pool&& p) {
+        for (auto* c : p.pool_) {
+            set_on_stop_(*c);
+            if (blocked_ != p.blocked_) {
+                if (blocked_) {
+                    c->block();
+                } else {
+                    c->unblock();
+                }
+            }
+        }
+
+        pool_.insert(pool_.begin(), p.pool_.begin(), p.pool_.end());
+        p.pool_.clear();
+    }
+
+    /// Stop all connections in this pool.
+    void stop_all() {
         for (auto* c : pool_) {
             c->on_stop = nullptr;
             c->stop();
@@ -133,20 +85,31 @@ struct scoped_connection_pool_t {
         pool_.clear();
     }
 
-    /// Merge another pool into this one.
-    /** The other pool is left empty in the process.
-    **/
-    void merge(scoped_connection_pool_t&& p) {
-        for (auto* c : p.pool_) {
-            set_on_stop_(*c);
+    /// Block all current and future connections.
+    void block_all() {
+        if (blocked_) return;
+        blocked_ = true;
+        for (auto* c : pool_) {
+            c->block();
         }
+    }
 
-        pool_.insert(pool_.begin(), p.pool_.begin(), p.pool_.end());
-        p.pool_.clear();
+    /// Check if this pool is currently blocked.
+    bool blocked() const {
+        return blocked_;
+    }
+
+    /// Unblock all the connections in the pool.
+    void unblock_all() {
+        if (!blocked_) return;
+        blocked_ = false;
+        for (auto* c : pool_) {
+            c->unblock();
+        }
     }
 
 private :
-    void stop_(signal_connection_t& c) {
+    void stop_(connection_type& c) {
         for (auto iter = pool_.begin(); iter != pool_.end(); ++iter) {
             if (*iter == &c) {
                 pool_.erase(iter);
@@ -155,13 +118,14 @@ private :
         }
     }
 
-    void set_on_stop_(signal_connection_t& c) {
-        c.on_stop = [this](signal_connection_t& tc) {
+    void set_on_stop_(connection_type& c) {
+        c.on_stop = [this](signal_connection_base& tc) {
             stop_(tc);
         };
     }
 
-    std::vector<signal_connection_t*> pool_;
+    base pool_;
+    bool blocked_ = false;
 };
 
 #endif
