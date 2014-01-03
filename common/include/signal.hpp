@@ -83,6 +83,7 @@ class basic_signal_connection : public signal_connection_base {
     using base = signal_connection_base;
     using delegate_type = typename T::delegate_type;
     using tuple_type = typename T::tuple_type;
+    using arg_type = typename T::arg_type;
 
     T& signal_;
 
@@ -100,9 +101,26 @@ protected :
         signal_.stop_(*this);
     }
 
-    virtual void call_(tuple_type& arg) {
+    template<typename F, typename ... Args>
+    typename ctl::result_of_functor<typename std::decay<F>::type, Args...>::type
+    do_call_(F&& func, std::tuple<Args...>& arg) {
+        return ctl::tuple_to_args(std::forward<F>(func), arg);
+    }
+
+    template<typename F, typename ... Args>
+    typename ctl::result_of_functor<typename std::decay<F>::type, Args&&...>::type
+    do_call_(F&& func, std::tuple<Args...>&& arg) {
+        return ctl::tuple_to_moved_args(std::forward<F>(func), std::move(arg));
+    }
+
+    template<typename A>
+    void do_call_(A&& arg) {
+        do_call_(callback, std::forward<A>(arg));
+    }
+
+    virtual void call_(arg_type arg) {
         if (!this->blocked()) {
-            ctl::tuple_to_args(callback, arg);
+            do_call_(std::forward<arg_type>(arg));
         }
     }
 };
@@ -111,8 +129,7 @@ protected :
 template<typename T>
 class unique_signal_connection : public basic_signal_connection<T> {
     using base = basic_signal_connection<T>;
-    using delegate_type = typename T::delegate_type;
-    using tuple_type = typename T::tuple_type;
+    using arg_type = typename T::arg_type;
 
 protected :
     using typename base::deleter;
@@ -121,21 +138,35 @@ protected :
     template<typename F>
     unique_signal_connection(T& signal, F&& f) : base(signal, std::forward<F>(f)) {}
 
-    virtual void call_(tuple_type& arg) {
+    void call_(arg_type arg) override {
         if (!this->blocked()) {
-            ctl::tuple_to_args(this->callback, arg);
+            this->do_call_(std::forward<arg_type>(arg));
             this->stop();
         }
     }
 };
 
-/// \cond DOXYGEN_EXCLUDE
+namespace signal_impl {
+    template<typename T>
+    using is_raw_copy_constructible = typename std::is_copy_constructible<
+        typename std::decay<T>::type
+    >::type;
+
+    template<typename T>
+    using is_raw_move_constructible = typename std::is_move_constructible<
+        typename std::decay<T>::type
+    >::type;
+}
+
+/// Helper class to handle signal/slot connections.
+/** This is a generic and empty class.
+    @sa template<typename ... Args, template<typename> class ConnectionBase> signal_t<void(Args...), ConnectionBase>
+**/
 template<typename Signature, template<typename> class ConnectionBase = basic_signal_connection>
 class signal_t {
     static_assert(std::is_same<typename ctl::return_type<Signature>::type, void>::value,
         "return type of signal slot must be void");
 };
-/// \endcond
 
 /// Helper class to handle signal/slot connections.
 /** A signal is a container holding a list of slots, which are basically callback functions.
@@ -150,6 +181,12 @@ public :
     using delegate_type = ctl::delegate<signature>;
     using connection_type = ConnectionBase<signal_t>;
     using tuple_type = std::tuple<Args...>;
+    using arg_type = tuple_type&;
+    using allow_arg_move = std::false_type;
+    using can_copy_construct = ctl::are_true<ctl::apply_to_type_list<
+        signal_impl::is_raw_copy_constructible, ctl::function_arguments<signature>>>;
+    using can_move_construct = ctl::are_true<ctl::apply_to_type_list<
+        signal_impl::is_raw_move_constructible, ctl::function_arguments<signature>>>;
 
 private :
     friend connection_type;
@@ -242,6 +279,87 @@ public :
     /// Check if there is no slot registered to this signal.
     bool empty() const {
         return slots_.empty();
+    }
+};
+
+/// Helper class to handle a unique signal/slot connection.
+/** This is a generic and empty class.
+    @sa template<typename ... Args, template<typename> class ConnectionBase> unique_signal_t<void(Args...), ConnectionBase>
+**/
+template<typename Signature, template<typename> class ConnectionBase = basic_signal_connection>
+class unique_signal_t {
+    static_assert(std::is_same<typename ctl::return_type<Signature>::type, void>::value,
+        "return type of signal slot must be void");
+};
+
+/// Helper class to handle a unique signal/slot connection.
+/** Contrary to signal_t, this signal type can only handle a single slot at once.
+    It allows some optimizations and different behaviors. In particular, signal arguments can be
+    move constructed instead of copy constructed.
+**/
+template<typename ... Args, template<typename> class ConnectionBase>
+class unique_signal_t<void(Args...), ConnectionBase> {
+public :
+    using signature = void(Args...);
+    using delegate_type = ctl::delegate<signature>;
+    using connection_type = ConnectionBase<unique_signal_t>;
+    using tuple_type = std::tuple<Args&&...>;
+    using arg_type = tuple_type&&;
+    using allow_arg_move = std::true_type;
+    using can_copy_construct = ctl::are_true<ctl::apply_to_type_list<
+        signal_impl::is_raw_copy_constructible, ctl::function_arguments<signature>>>;
+    using can_move_construct = ctl::are_true<ctl::apply_to_type_list<
+        signal_impl::is_raw_move_constructible, ctl::function_arguments<signature>>>;
+
+private :
+    friend connection_type;
+
+    using connection_ptr = std::unique_ptr<connection_type, typename connection_type::deleter>;
+    connection_ptr slot_;
+
+    void stop_(connection_type& c) {
+        if (slot_.get() != &c) return;
+        slot_ = nullptr;
+    }
+
+public :
+    /// Create a new signal-slot connection.
+    /** A connection object is returned to manage this connection. If not used, the connection will
+        last "forever", i.e. as long as the signal object is alive. It means that, if the slot
+        becomes dangling at some point, there is no way to stop it from being called, and thus to
+        potentially crash the program. To prevent this issue, one must carefuly handle the lifetime
+        of the connection using the returned connection object.
+        Several helpers are provided to this end (scoped_connection_t, scoped_connection_pool_t).
+    **/
+    template<template<typename> class CO = ConnectionBase, typename S, typename ... TArgs>
+    CO<unique_signal_t>& connect(S&& slot, TArgs&& ... args) {
+        using slot_connection = CO<unique_signal_t>;
+        static_assert(std::is_base_of<connection_type,slot_connection>::value,
+            "slot connection type must inherit from signal connection type");
+
+        slot_ = connection_ptr(new slot_connection(
+            *this, std::forward<S>(slot), std::forward<TArgs>(args)...
+        ));
+
+        return static_cast<slot_connection&>(*slot_);
+    }
+
+    /// Trigger the signal and dispatch it to the slot, if any.
+    template<typename ... TArgs>
+    void dispatch(TArgs&& ... args) {
+        if (!slot_) return;
+        tuple_type t(std::forward<TArgs>(args)...);
+        slot_->call_(std::move(t));
+    }
+
+    /// Stop the connection and destroy the slot, if any.
+    void clear() {
+        slot_ = nullptr;
+    }
+
+    /// Check if there is no slot registered to this signal.
+    bool empty() const {
+        return slot_ == nullptr;
     }
 };
 

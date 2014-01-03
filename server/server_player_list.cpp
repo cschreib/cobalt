@@ -9,7 +9,7 @@ namespace server {
 
         pool_ << conf_.bind("player_list.max_player", max_player_);
 
-        pool_ << net_.watch_request([&](const netcom::request_t<request::client::join_players>& req) {
+        pool_ << net_.watch_request([&](netcom::request_t<request::client::join_players>&& req) {
             if (players_.size() < max_player_) {
                 actor_id_t id = req.from();
                 std::string ip = net_.get_actor_ip(id);
@@ -30,7 +30,7 @@ namespace server {
             }
         });
 
-        pool_ << net_.watch_request([&](const netcom::request_t<request::client::list_players>& req) {
+        pool_ << net_.watch_request([&](netcom::request_t<request::client::list_players>&& req) {
             request::client::list_players::answer a;
             for (auto& p : players_) {
                 a.players.push_back({p.id, p.ip, p.name, p.color, p.is_ai});

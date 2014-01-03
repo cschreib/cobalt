@@ -41,7 +41,7 @@ int main(int argc, const char* argv[]) {
         reason(rsn);
     });
 
-    pool << net.watch_request([](const server::netcom::request_t<request::ping>& req){
+    pool << net.watch_request([](server::netcom::request_t<request::ping>&& req){
         note("ping client ", req.from());
         req.answer();
     });

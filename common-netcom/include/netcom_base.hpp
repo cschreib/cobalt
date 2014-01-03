@@ -183,22 +183,26 @@ namespace netcom_impl {
             p >> arg_;
         }
 
+        netcom_base& net_;
+        actor_id_t aid_;
+        request_id_t rid_;
+        bool answered_;
+        packet_t arg_;
+
+    public :
         request_t(const request_t&) = delete;
-        request_t(request_t&&) = delete;
         request_t& operator= (const request_t&) = delete;
         request_t& operator= (request_t&&) = delete;
+        request_t(request_t&& r) noexcept :
+            net_(r.net_), aid_(r.aid_), rid_(r.rid_), answered_(r.answered_),
+            arg_(r.arg_), arg(arg_) {
+            r.answered_ = true;
+        }
 
         ~request_t() {
             if (!answered_) throw netcom_exception::request_not_answered<RequestType>();
         }
 
-        netcom_base& net_;
-        actor_id_t aid_;
-        request_id_t rid_;
-        mutable bool answered_;
-        packet_t arg_;
-
-    public :
         const packet_t& arg;
 
         actor_id_t from() const {
@@ -206,12 +210,12 @@ namespace netcom_impl {
         }
 
         template<typename enable = typename std::enable_if<std::is_empty<answer_t>::value>::type>
-        void answer() const;
-        void answer(typename RequestType::answer&& answer) const;
+        void answer();
+        void answer(typename RequestType::answer&& answer);
 
         template<typename enable = typename std::enable_if<std::is_empty<failure_t>::value>::type>
-        void fail() const;
-        void fail(typename RequestType::failure&& fail) const;
+        void fail();
+        void fail(typename RequestType::failure&& fail);
     };
 
     template<typename T>
@@ -224,7 +228,7 @@ namespace netcom_impl {
         template<typename P>
         using message = signal_t<void(const P&)>;
         template<typename P>
-        using request = signal_t<void(const request_t<P>&)>;
+        using request = unique_signal_t<void(request_t<P>&&)>;
         template<typename P>
         using request_answer = signal_t<void(const typename P::answer&)>;
         template<typename P>
@@ -691,14 +695,14 @@ public :
 
 namespace netcom_impl {
     template<typename RequestType>
-    void request_t<RequestType>::answer(typename RequestType::answer&& answer) const {
+    void request_t<RequestType>::answer(typename RequestType::answer&& answer) {
         if (answered_) throw netcom_exception::request_already_answered<RequestType>();
         net_.send_answer_<RequestType>(aid_, rid_, std::move(answer));
         answered_ = true;
     }
 
     template<typename RequestType>
-    void request_t<RequestType>::fail(typename RequestType::failure&& fail) const {
+    void request_t<RequestType>::fail(typename RequestType::failure&& fail) {
         if (answered_) throw netcom_exception::request_already_answered<RequestType>();
         net_.send_failure_<RequestType>(aid_, rid_, std::move(fail));
         answered_ = true;
@@ -706,7 +710,7 @@ namespace netcom_impl {
 
     template<typename RequestType>
     template<typename enable>
-    void request_t<RequestType>::answer() const {
+    void request_t<RequestType>::answer() {
         if (answered_) throw netcom_exception::request_already_answered<RequestType>();
         net_.send_answer_<RequestType>(aid_, rid_, answer_t{});
         answered_ = true;
@@ -714,7 +718,7 @@ namespace netcom_impl {
 
     template<typename RequestType>
     template<typename enable>
-    void request_t<RequestType>::fail() const {
+    void request_t<RequestType>::fail() {
         if (answered_) throw netcom_exception::request_already_answered<RequestType>();
         net_.send_failure_<RequestType>(aid_, rid_, failure_t{});
         answered_ = true;
