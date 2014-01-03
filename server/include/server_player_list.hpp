@@ -24,6 +24,10 @@ namespace client {
             } rsn;
         };
     };
+    NETCOM_PACKET(leave_players) {
+        struct answer {};
+        struct failure {};
+    };
     NETCOM_PACKET(list_players) {
         struct answer {
             struct player_t {
@@ -51,6 +55,7 @@ namespace server {
         actor_id_t id;
         enum class reason {
             connection_lost,
+            left,
             auto_kicked
         } rsn;
     };
