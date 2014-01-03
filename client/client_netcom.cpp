@@ -28,11 +28,11 @@ namespace client {
         listener_thread_.launch();
     }
 
-    void netcom::terminate() {
+    void netcom::terminate_() {
         terminate_thread_ = true;
         listener_thread_.wait();
 
-        clear_all_();
+        netcom_base::terminate_();
         self_id_ = invalid_actor_id;
     }
 

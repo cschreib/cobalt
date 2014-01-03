@@ -8,6 +8,8 @@ namespace client {
     class netcom : public netcom_base {
     public :
         netcom();
+
+        /// Call terminate().
         ~netcom();
 
         /// Return the public actor ID of this client.
@@ -41,12 +43,8 @@ namespace client {
         **/
         void run(const std::string& addr, std::uint16_t port);
 
-        /// Stop the connection with the server (cleanly).
-        /** Note that this function is automatically called in the destructor.
-        **/
-        void terminate();
-
     private :
+        void terminate_() override;
         void loop_();
 
         std::string   address_;

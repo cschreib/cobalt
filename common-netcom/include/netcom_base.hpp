@@ -435,6 +435,8 @@ private :
     using answer_signal_impl = netcom_impl::answer_signal_impl<T>;
 
     bool clearing_ = false;
+    bool processing_ = false;
+    bool call_terminate_ = false;
 
     // Message signals
     using message_signal_container = ctl::sorted_vector<
@@ -533,10 +535,13 @@ protected :
     }
 
     /// Clear all incoming and outgoing packets without processing them, and clear all signals.
-    /** When this function is called, the class is in the same state as when constructed.
-        It modifies the input_ and output_ queues in a non thread safe way.
+    /** When this function is called, the class is expected to be in the same state as when
+        constructed. It modifies the input_ and output_ queues in a non thread safe way.
+        This base function should be called by derivatives.
+        Note that this function will have to be called explicitely in the derived class' destructor,
+        since netcom_base cannot do it.
     **/
-    void clear_all_();
+    virtual void terminate_();
 
 public :
     /// Distributes all the received packets to the registered callback functions.
@@ -544,6 +549,12 @@ public :
         example inside the game loop.
     **/
     void process_packets();
+
+    /// Stop this netcom.
+    /** Will delay the call to the end of process_packet() if called in one of the registered
+        callbacks. Calls the virtual function terminate_().
+    **/
+    void terminate();
 
     /// Send a message to a given actor.
     template<typename MessageType>
