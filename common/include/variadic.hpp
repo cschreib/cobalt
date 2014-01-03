@@ -6,6 +6,19 @@
 
 /// Cobalt template library
 namespace ctl {
+    /// value == all the provided types have T::value == true
+    template<typename ... Args>
+    struct are_true;
+
+    template<typename T, typename ... Args>
+    struct are_true<T, Args...> {
+        static const bool value = T::value && are_true<Args...>::value;
+    };
+
+    template<>
+    struct are_true<> : std::true_type {};
+
+
     template<typename T, typename ... Args>
     struct is_any_of;
     template<typename T, typename U, typename ... Args>
@@ -147,6 +160,31 @@ namespace ctl {
         static const std::size_t value = sizeof...(Args);
     };
 
+    template<typename ... Args, typename ... TArgs>
+    struct are_true<type_list<Args...>, TArgs...> {
+        static const bool value = are_true<Args...>::value && are_true<TArgs...>::value;
+    };
+
+    namespace impl {
+        template<template<typename> class A, typename T>
+        struct apply_to_type_list_;
+
+        template<template<typename> class A, typename T, typename ... Args>
+        struct apply_to_type_list_<A, type_list<T, Args...>> {
+            using single = typename A<T>::type;
+            using base = typename apply_to_type_list_<A, type_list<Args...>>::type;
+            using type = typename base::template push_front_t<single>;
+        };
+
+        template<template<typename> class A>
+        struct apply_to_type_list_<A, type_list<>> {
+            using type = type_list<>;
+        };
+    }
+
+    template<template<typename> class A, typename T>
+    using apply_to_type_list = typename impl::apply_to_type_list_<A,T>::type;
+
     template<typename Pack1, typename Pack2>
     struct are_convertible;
 
@@ -184,6 +222,16 @@ namespace ctl {
 
     template<typename R, typename T, typename ... Args>
     struct function_arguments_t<R (T::*)(Args...) const> {
+        using type = type_list<Args...>;
+    };
+
+    template<typename R, typename ... Args>
+    struct function_arguments_t<R (*)(Args...)> {
+        using type = type_list<Args...>;
+    };
+
+    template<typename R, typename ... Args>
+    struct function_arguments_t<R (Args...)> {
         using type = type_list<Args...>;
     };
 
@@ -304,11 +352,6 @@ namespace ctl {
             using type = typename result_of_functor<F, Args...>::type;
         };
 
-        template<typename F>
-        struct t2a_return_<F, std::tuple<>> {
-            using type = void;
-        };
-
         template<typename F, typename T>
         using t2a_return = typename t2a_return_<
             typename std::decay<F>::type,
@@ -321,7 +364,7 @@ namespace ctl {
         }
 
         template<typename F, typename T, std::size_t N>
-        impl::t2a_return<F,T> tuple_to_args_(F&& func, T&& tup,
+        t2a_return<F,T> tuple_to_args_(F&& func, T&& tup,
             std::integral_constant<std::size_t,N>) {
             return impl::tuple_to_args_(
                 std::forward<F>(func), std::forward<T>(tup), gen_seq<N>{}
@@ -329,16 +372,48 @@ namespace ctl {
         }
 
         template<typename F, typename T>
-        impl::t2a_return<F,T> tuple_to_args_(F&& func, T&& tup,
-                std::integral_constant<std::size_t,0>) {}
+        t2a_return<F,T> tuple_to_args_(F&& func, T&& tup,
+            std::integral_constant<std::size_t,0>) {
+            return func();
+        }
+
+        template<typename F, typename T, std::size_t ... I>
+        t2a_return<F,T> tuple_to_moved_args_(F&& func, T&& tup, seq_t<I...>) {
+            return func(std::move(std::get<I>(tup))...);
+        }
+
+        template<typename F, typename T, std::size_t N>
+        t2a_return<F,T> tuple_to_moved_args_(F&& func, T&& tup,
+            std::integral_constant<std::size_t,N>) {
+            return impl::tuple_to_moved_args_(
+                std::forward<F>(func), std::move(tup), gen_seq<N>{}
+            );
+        }
+
+        template<typename F, typename T>
+        t2a_return<F,T> tuple_to_moved_args_(F&& func, T&& tup,
+            std::integral_constant<std::size_t,0>) {
+            return func();
+        }
     }
 
-    /// Unfold a tuple and use the result as function parameters
+    /// Unfold a tuple and use the individual elements as function parameters
     template<typename F, typename T>
     impl::t2a_return<F,T> tuple_to_args(F&& func, T&& tup) {
         using tuple_type = typename std::decay<T>::type;
         return impl::tuple_to_args_(
             std::forward<F>(func), std::forward<T>(tup),
+            std::integral_constant<std::size_t, std::tuple_size<tuple_type>::value>{}
+        );
+    }
+
+    /// Unfold a tuple and move the individual elements as function parameters
+    template<typename F, typename ... Args>
+    impl::t2a_return<F,std::tuple<Args&&...>> tuple_to_moved_args(F&& func,
+        std::tuple<Args...>&& tup) {
+        using tuple_type = std::tuple<Args...>;
+        return impl::tuple_to_moved_args_(
+            std::forward<F>(func), std::move(tup),
             std::integral_constant<std::size_t, std::tuple_size<tuple_type>::value>{}
         );
     }
