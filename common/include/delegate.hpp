@@ -198,12 +198,12 @@ namespace ctl {
         static R wrapper_(void* obj, void* fun, Args... args) {
             M cfun = nullptr;
             *reinterpret_cast<void**>(&cfun) = fun;
-            return (static_cast<T*>(obj)->*cfun)(args...);
+            return (static_cast<T*>(obj)->*cfun)(std::forward<Args>(args)...);
         }
 
         template<typename T, typename M, M m>
         static R template_wrapper_(void* obj, void*, Args... args) {
-            return (static_cast<T*>(obj)->*m)(args...);
+            return (static_cast<T*>(obj)->*m)(std::forward<Args>(args)...);
         }
 
         template<typename T>
