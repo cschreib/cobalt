@@ -2,6 +2,7 @@
 #define STD_ADDON_HPP
 
 #include <memory>
+#include <algorithm>
 
 namespace std {
     // For C++14 future support
