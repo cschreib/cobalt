@@ -11,7 +11,7 @@ namespace server {
 
         pool_ << net_.watch_request([&](netcom::request_t<request::client::join_players>&& req) {
             if (players_.size() < max_player_) {
-                actor_id_t id = req.from();
+                actor_id_t id = req.from;
                 std::string ip = net_.get_actor_ip(id);
                 players_.emplace_back(id, ip, req.arg.name, req.arg.color, req.arg.is_ai);
                 player& p = players_.back();

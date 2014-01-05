@@ -177,14 +177,13 @@ namespace netcom_impl {
         template<typename P>
         friend struct request_signal_impl;
 
-        request_t(netcom_base& net, actor_id_t aid, in_packet_t&& p) :
-            net_(net), aid_(aid), answered_(false), arg(arg_) {
+        request_t(netcom_base& net, in_packet_t&& p) :
+            net_(net), answered_(false), from(p.from), arg(arg_) {
             p >> rid_;
             p >> arg_;
         }
 
         netcom_base& net_;
-        actor_id_t aid_;
         request_id_t rid_;
         bool answered_;
         packet_t arg_;
@@ -193,9 +192,10 @@ namespace netcom_impl {
         request_t(const request_t&) = delete;
         request_t& operator= (const request_t&) = delete;
         request_t& operator= (request_t&&) = delete;
+
         request_t(request_t&& r) noexcept :
-            net_(r.net_), aid_(r.aid_), rid_(r.rid_), answered_(r.answered_),
-            arg_(r.arg_), arg(arg_) {
+            net_(r.net_), rid_(r.rid_), answered_(r.answered_),
+            arg_(r.arg_), from(r.from), arg(arg_) {
             r.answered_ = true;
         }
 
@@ -203,30 +203,58 @@ namespace netcom_impl {
             if (!answered_) throw netcom_exception::request_not_answered<RequestType>();
         }
 
+        const actor_id_t from;
         const packet_t& arg;
 
-        actor_id_t from() const {
-            return aid_;
-        }
-
-        template<typename enable = typename std::enable_if<std::is_empty<answer_t>::value>::type>
         void answer();
         void answer(typename RequestType::answer&& answer);
 
-        template<typename enable = typename std::enable_if<std::is_empty<failure_t>::value>::type>
         void fail();
         void fail(typename RequestType::failure&& fail);
+    };
+
+    // Public object that encapsulates request answering.
+    template<typename MessageType>
+    struct message_t {
+        static_assert(packet_impl::is_packet<MessageType>::value,
+            "template argument of message_t must be a packet");
+
+        using packet_t = MessageType;
+
+    private :
+        template<typename P>
+        friend struct message_signal_impl;
+
+        explicit message_t(in_packet_t&& p) : from(p.from), arg(arg_) {
+            p >> arg_;
+        }
+
+        packet_t arg_;
+
+    public :
+        message_t(const message_t& m) : arg_(m.arg_), from(m.from), arg(arg_) {}
+
+        message_t(message_t&& m) noexcept : arg_(std::move(m.arg_)), from(m.from), arg(arg_) {}
+
+        const actor_id_t from;
+        const packet_t& arg;
     };
 
     template<typename T>
     struct is_request : std::false_type {};
 
     template<typename T>
-    struct is_request<request_t<T>> : std::true_type {};
+    struct is_request<request_t<T>> : packet_impl::is_packet<T> {};
+
+    template<typename T>
+    struct is_message : std::false_type {};
+
+    template<typename T>
+    struct is_message<message_t<T>> : packet_impl::is_packet<T> {};
 
     namespace signals {
         template<typename P>
-        using message = signal_t<void(const P&)>;
+        using message = signal_t<void(const message_t<P>&)>;
         template<typename P>
         using request = unique_signal_t<void(request_t<P>&&)>;
         template<typename P>
@@ -253,9 +281,7 @@ namespace netcom_impl {
         message_signal_impl() : message_signal_t(P::packet_id__) {}
 
         void dispatch(in_packet_t&& p) override {
-            P tp;
-            p.impl >> tp;
-            signal.dispatch(std::move(tp));
+            signal.dispatch(message_t<P>(std::move(p)));
         }
 
         bool empty() const override {
@@ -283,8 +309,7 @@ namespace netcom_impl {
         request_signal_impl() : request_signal_t(P::packet_id__) {}
 
         void dispatch(netcom_base& net, in_packet_t&& p) override {
-            request_t<P> r(net, p.from, std::move(p));
-            signal.dispatch(std::move(r));
+            signal.dispatch(request_t<P>(net, std::move(p)));
         }
 
         bool empty() const override {
@@ -409,6 +434,8 @@ public :
     // Import helper classes in this scope for the user
     template<typename T>
     using request_t = netcom_impl::request_t<T>;
+    template<typename T>
+    using message_t = netcom_impl::message_t<T>;
 
 protected :
     /// Packet input queue
@@ -618,6 +645,24 @@ public :
         return ac;
     }
 
+    template<template<typename> class WP, typename FR>
+    signal_connection_base& watch_message_(FR&& receive_func, std::false_type) {
+        using MessageType = typename std::decay<ctl::functor_argument<FR>>::type;
+        using ArgType = netcom_impl::message_t<MessageType>;
+        message_signal_impl<MessageType>& netsig = get_message_signal_<MessageType>();
+        return netsig.signal.template connect<WP>([receive_func](const ArgType& msg) {
+            receive_func(msg.arg);
+        });
+    }
+
+    template<template<typename> class WP, typename FR>
+    signal_connection_base& watch_message_(FR&& receive_func, std::true_type) {
+        using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
+        using MessageType = typename ArgType::packet_t;
+        message_signal_impl<MessageType>& netsig = get_message_signal_<MessageType>();
+        return netsig.signal.template connect<WP>(std::forward<FR>(receive_func));
+    }
+
 public :
     /// Register a slot to be called whenever a given message packet is received.
     /** The slot will be called by process_packets() when the corresponding message is received, and
@@ -627,12 +672,14 @@ public :
     signal_connection_base& watch_message(FR&& receive_func) {
         static_assert(ctl::argument_count<FR>::value == 1,
             "message reception handler can only take one argument");
-        using MessageType = typename std::decay<ctl::functor_argument<FR>>::type;
-        static_assert(packet_impl::is_packet<MessageType>::value,
-            "message reception handler argument must be a packet");
+        using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
+        static_assert(netcom_impl::is_message<ArgType>::value ||
+                      packet_impl::is_packet<ArgType>::value,
+            "message reception handler argument must either be a packet or a message_t");
 
-        message_signal_impl<MessageType>& netsig = get_message_signal_<MessageType>();
-        return netsig.signal.template connect<WP>(std::forward<FR>(receive_func));
+        return watch_message_<WP>(
+            std::forward<FR>(receive_func), netcom_impl::is_message<ArgType>{}
+        );
     }
 
 private :
@@ -697,30 +744,32 @@ namespace netcom_impl {
     template<typename RequestType>
     void request_t<RequestType>::answer(typename RequestType::answer&& answer) {
         if (answered_) throw netcom_exception::request_already_answered<RequestType>();
-        net_.send_answer_<RequestType>(aid_, rid_, std::move(answer));
+        net_.send_answer_<RequestType>(from, rid_, std::move(answer));
         answered_ = true;
     }
 
     template<typename RequestType>
     void request_t<RequestType>::fail(typename RequestType::failure&& fail) {
         if (answered_) throw netcom_exception::request_already_answered<RequestType>();
-        net_.send_failure_<RequestType>(aid_, rid_, std::move(fail));
+        net_.send_failure_<RequestType>(from, rid_, std::move(fail));
         answered_ = true;
     }
 
     template<typename RequestType>
-    template<typename enable>
     void request_t<RequestType>::answer() {
+        static_assert(std::is_empty<typename RequestType::answer>::value,
+            "request answer packet must be empty to call answer() with no argument");
         if (answered_) throw netcom_exception::request_already_answered<RequestType>();
-        net_.send_answer_<RequestType>(aid_, rid_, answer_t{});
+        net_.send_answer_<RequestType>(from, rid_, answer_t{});
         answered_ = true;
     }
 
     template<typename RequestType>
-    template<typename enable>
     void request_t<RequestType>::fail() {
+        static_assert(std::is_empty<typename RequestType::failure>::value,
+            "request failure packet must be empty to call fail() with no argument");
         if (answered_) throw netcom_exception::request_already_answered<RequestType>();
-        net_.send_failure_<RequestType>(aid_, rid_, failure_t{});
+        net_.send_failure_<RequestType>(from, rid_, failure_t{});
         answered_ = true;
     }
 

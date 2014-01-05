@@ -42,7 +42,7 @@ int main(int argc, const char* argv[]) {
     });
 
     pool << net.watch_request([](server::netcom::request_t<request::ping>&& req){
-        note("ping client ", req.from());
+        note("ping client ", req.from);
         req.answer();
     });
 
