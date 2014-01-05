@@ -16,9 +16,15 @@ target_link_libraries(refgen ${CLANG_LIBS})
 target_link_libraries(refgen ${SFML_NETWORK_LIBRARY})
 target_link_libraries(refgen ${SFML_SYSTEM_LIBRARY})
 
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    set(REFGEN_BUILD_TYPE "debug")
+else()
+    set(REFGEN_BUILD_TYPE "release")
+endif()
+
 add_custom_target(refgen-gen ALL
     COMMAND ${PROJECT_SOURCE_DIR}/../bin/refgen
-    ${PROJECT_SOURCE_DIR}/../../
+     ${REFGEN_BUILD_TYPE} ${PROJECT_SOURCE_DIR}/../../
     -std=c++11
     -I${PROJECT_SOURCE_DIR}/../../common/include
     -I${PROJECT_SOURCE_DIR}/../../common-netcom/include
@@ -29,4 +35,4 @@ add_custom_target(refgen-gen ALL
 )
 
 add_custom_target(refgen-clean COMMAND ${PROJECT_SOURCE_DIR}/../bin/refgen
-    ${PROJECT_SOURCE_DIR}/../../ clean)
+    clean ${PROJECT_SOURCE_DIR}/../../)

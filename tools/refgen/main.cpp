@@ -256,9 +256,7 @@ void generate_code(std::ostream& out, const packet& p) {
         out << " return p; ";
     }
     out << "}\n";
-    for (auto& n : nsp) {
-        out << "}";
-    }
+    out << std::string(nsp.size(),'}');
     out << "\n";
 
     if (p.parent == nullptr) {
@@ -483,11 +481,15 @@ std::string get_position(const packet& p) {
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
+        std::cout << "refgen: missing command (release, debug, clean)" << std::endl;
+        return 1;
+    } else if (argc < 3) {
         std::cout << "refgen: missing work folder" << std::endl;
         return 1;
     }
 
-    std::string dir = argv[1];
+    std::string cmd = string::to_lower(argv[1]);
+    std::string dir = argv[2];
     dir = string::replace(dir, "\\", "/");
     auto p = dir.find_last_not_of('/');
     if (p != dir.npos) {
@@ -500,12 +502,26 @@ int main(int argc, char* argv[]) {
         dir+"/client/include"
     };
 
-    if (argc > 2 && std::string(argv[2]) == "clean") {
+    if (cmd == "clean") {
         for (auto& d : dirs) {
             file::remove(d+"/autogen/packets");
         }
+
         file::remove(dir+"/common-netcom/include/autogen/packet.cpp");
+
         return 0;
+    } else if (cmd != "release" && cmd != "debug") {
+        std::cout << "refgen: unknown command '" << cmd << "'" << std::endl;
+        return 1;
+    }
+
+    if (cmd == "debug") {
+        std::cout << "refgen: debug mode" << std::endl;
+        for (int i = 0; i < argc; ++i) {
+            if (i != 0) std::cout << " ";
+            std::cout << argv[i];
+        }
+        std::cout << std::endl;
     }
 
     std::deque<packet> db;
