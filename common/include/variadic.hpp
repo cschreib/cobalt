@@ -11,9 +11,8 @@ namespace ctl {
     struct are_true;
 
     template<typename T, typename ... Args>
-    struct are_true<T, Args...> {
-        static const bool value = T::value && are_true<Args...>::value;
-    };
+    struct are_true<T, Args...> :
+        std::integral_constant<bool, T::value && are_true<Args...>::value> {};
 
     template<>
     struct are_true<> : std::true_type {};
@@ -211,6 +210,32 @@ namespace ctl {
     struct type_holder_get_type<type_holder<T>> {
         using type = T;
     };
+
+    template<typename T>
+    struct get_signature_t;
+
+    template<typename R, typename ... Args>
+    struct get_signature_t<R(Args...)> {
+        using type = R(Args...);
+    };
+
+    template<typename R, typename ... Args>
+    struct get_signature_t<R(*)(Args...)> {
+        using type = R(Args...);
+    };
+
+    template<typename R, typename T, typename ... Args>
+    struct get_signature_t<R(T::*)(Args...)> {
+        using type = R(Args...);
+    };
+
+    template<typename R, typename T, typename ... Args>
+    struct get_signature_t<R(T::*)(Args...) const> {
+        using type = R(Args...);
+    };
+
+    template<typename T>
+    using get_signature = typename get_signature_t<T>::type;
 
     template<typename T>
     struct function_arguments_t;
