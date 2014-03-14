@@ -264,4 +264,7 @@ namespace ctl {
     };
 }
 
+#define make_delegate(obj,func) ctl::delegate<ctl::get_signature<decltype(func)>>( \
+    obj, std::integral_constant<decltype(func),func>{})
+
 #endif
