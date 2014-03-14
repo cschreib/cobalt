@@ -537,8 +537,10 @@ private :
 
 protected :
     /// Create a message packet without sending it
-    template<typename MessageType, typename ... Args>
-    out_packet_t create_message_(MessageType&& msg) {
+    template<typename T>
+    out_packet_t create_message_(T&& msg) {
+        using MessageType = typename std::decay<T>::type;
+
         out_packet_t p;
         p << netcom_impl::packet_type::message;
         p << MessageType::packet_id__;
@@ -547,8 +549,10 @@ protected :
     }
 
     /// Create a request packet without sending it
-    template<typename RequestType, typename ... Args>
-    out_packet_t create_request_(request_id_t& rid, RequestType&& req) {
+    template<typename T>
+    out_packet_t create_request_(request_id_t& rid, T&& req) {
+        using RequestType = typename std::decay<T>::type;
+
         rid = make_request_id_();
 
         out_packet_t p;
