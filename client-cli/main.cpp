@@ -56,51 +56,39 @@ int main(int argc, const char* argv[]) {
     });
     pool << net.watch_message([&](message::server::connection_granted msg) {
         note("connection granted (id=", msg.id, ")!");
-        // net.send_request(client::netcom::server_actor_id,
-        //     make_packet<request::client::join_players>("kalith", color32::blue, false),
-        //     [](request::client::join_players::answer msg) {
-        //         print("joined as player");
-        //     }, [](request::client::join_players::failure msg) {
-        //         error("could not join as player");
-        //         std::string rsn;
-        //         switch (msg.rsn) {
-        //             case request::client::join_players::failure::reason::too_many_players :
-        //                 rsn = "too many players"; break;
-        //         }
-        //         reason(rsn);
-        //     }, []() {
-        //         error("could not join as player");
-        //         reason("server does not support it");
-        //     }
-        // );
     });
 
     client::player_list plist(net);
 
-    // TODO think about that
-    // w = plist.on_joined([]() {
-    //     print("joined as player");
-    // });
-    // w = plist.on_joined_failed([](const std::string& reason) {
-    //     error("could not join as player");
-    //     reason(reason);
-    // });
+    pool << plist.on_join.connect([](client::player& p) {
+        print("joined as player \"", p.name, "\"");
+    });
+    pool << plist.on_leave.connect([]() {
+        print("left player list");
+    });
+    pool << plist.on_join_fail.connect([]() {
+        error("could not join as player");
+    });
 
-    std::string player_name = "kalith";
-    conf.get_value("player.name", player_name, player_name);
-    color32 player_color = color32::blue;
-    conf.get_value("player.color", player_color, player_color);
-    plist.join_as(player_name, player_color, false);
+    std::string behavior = "watcher";
+    conf.get_value("player.behavior", behavior, behavior);
+    print("client behavior: \"", behavior, "\"");
 
-    pool << net.watch_message([](message::server::player_connected msg) {
-            print("new player connected: id=", msg.id, ", ip=", msg.ip, ", name=",
-                msg.name, ", color=", msg.color, ", ai=", msg.is_ai);
-        }
-    );
-    pool << net.watch_message([&](message::server::player_disconnected msg) {
-            print("player disconnected: id=", msg.id);
-        }
-    );
+    if (behavior == "player") {
+        std::string player_name = "kalith";
+        conf.get_value("player.name", player_name, player_name);
+        color32 player_color = color32::blue;
+        conf.get_value("player.color", player_color, player_color);
+        plist.join_as(player_name, player_color, false);
+    }
+
+    pool << plist.on_player_connected.connect([](client::player& p) {
+        print("new player connected: id=", p.id, ", ip=", p.ip, ", name=",
+            p.name, ", color=", p.color, ", ai=", p.is_ai);
+    });
+    pool << plist.on_player_disconnected.connect([](const client::player& p) {
+        print("player disconnected: id=", p.id, ", name=", p.name);
+    });
 
     std::string server_ip = "127.0.0.1";
     conf.get_value("netcom.server_ip", server_ip, server_ip);
@@ -108,14 +96,22 @@ int main(int argc, const char* argv[]) {
     conf.get_value("netcom.serer_port", server_port, server_port);
 
     net.run(server_ip, server_port);
+    while (!stop && !net.is_connected()) {
+        sf::sleep(sf::milliseconds(5));
+        net.process_packets();
+    }
 
     double start = now();
+    double last = start;
+    bool end = false;
     while (!stop) {
         sf::sleep(sf::milliseconds(5));
         net.process_packets();
+        if (!net.is_connected()) break;
+
         double n = now();
-        if (n - start > 2) {
-            start = n;
+        if (behavior == "ponger" && n - last > 2) {
+            last = n;
             net.send_request(client::netcom::server_actor_id, request::ping{},
             [n](request::ping::answer){
                 double tn = now();
@@ -124,6 +120,14 @@ int main(int argc, const char* argv[]) {
                 warning("failure to pong ?!");
             }, [](){
                 error("server does not know how to pong...");
+            });
+        }
+
+        if (n - start > 3 && !end && behavior == "player") {
+            end = true;
+            plist.leave();
+            pool << plist.on_leave.connect([&]() {
+                net.terminate();
             });
         }
     }

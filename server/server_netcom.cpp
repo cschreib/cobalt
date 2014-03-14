@@ -69,10 +69,10 @@ namespace server {
         listener_thread_.launch();
     }
 
-    void netcom::terminate() {
+    void netcom::terminate_() {
         terminate_thread_ = true;
         listener_thread_.wait();
-        clear_all_();
+        netcom_base::terminate_();
     }
 
     std::string netcom::get_actor_ip(actor_id_t cid) const {

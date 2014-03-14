@@ -49,7 +49,15 @@ request_id_t netcom_base::make_request_id_() {
     return id;
 }
 
-void netcom_base::clear_all_() {
+void netcom_base::terminate() {
+    if (processing_) {
+        call_terminate_ = true;
+    } else {
+        terminate_();
+    }
+}
+
+void netcom_base::terminate_() {
     clearing_ = true;
     auto sd = ctl::make_scoped([this]() { clearing_ = false; });
 
@@ -132,6 +140,9 @@ bool netcom_base::process_unhandled_(in_packet_t&& p) {
 }
 
 void netcom_base::process_packets() {
+    processing_ = true;
+    auto sc = ctl::make_scoped([this]() { processing_ = false; });
+
     // Process newly arrived packets
     in_packet_t p;
     while (input_.pop(p)) {
@@ -175,5 +186,9 @@ void netcom_base::process_packets() {
             process_unhandled_(std::move(p));
             break;
         }
+    }
+
+    if (call_terminate_) {
+        terminate_();
     }
 }

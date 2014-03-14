@@ -30,6 +30,17 @@ namespace server {
             }
         });
 
+        pool_ << net_.watch_request([&](netcom::request_t<request::client::leave_players>&& req) {
+            for (auto iter = players_.begin(); iter != players_.end(); ++iter) {
+                if (iter->id == req.from()) {
+                    remove_player_(iter, message::server::player_disconnected::reason::left);
+                    req.answer();
+                    return;
+                }
+            }
+            req.fail();
+        });
+
         pool_ << net_.watch_request([&](netcom::request_t<request::client::list_players>&& req) {
             request::client::list_players::answer a;
             for (auto& p : players_) {

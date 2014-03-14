@@ -12,7 +12,9 @@ namespace config {
 namespace server {
     class netcom : public netcom_base {
     public :
-        netcom(config::state& conf);
+        explicit netcom(config::state& conf);
+
+        /// Call terminate().
         ~netcom();
 
         /// Define the maximum number of simultaneously connected clients.
@@ -31,11 +33,6 @@ namespace server {
         /// Start the server, listening to the given port.
         void run(std::uint16_t port);
 
-        /// Shut down the server cleanly (called by the destructor).
-        /** Calling this function on a server that is not running has no effect.
-        **/
-        void terminate();
-
         /// Return the IP address of a given actor.
         std::string get_actor_ip(actor_id_t cid) const;
 
@@ -47,6 +44,7 @@ namespace server {
 
         using client_list_t = ctl::sorted_vector<client_t, mem_var_comp(&client_t::id)>;
 
+        void terminate_() override;
         void loop_();
         void set_max_client_(std::size_t max_client);
         bool make_id_(actor_id_t& id);

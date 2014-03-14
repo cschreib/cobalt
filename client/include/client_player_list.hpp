@@ -14,21 +14,18 @@ namespace client {
 
         bool is_player(actor_id_t id) const;
         const player& get_player(actor_id_t id) const;
+        signal_t<void(player&)> on_player_connected;
+        signal_t<void(const player&)> on_player_disconnected;
 
         void join_as(const std::string& name, const color32& col, bool as_ai);
+        signal_t<void(player&)> on_join;
+        signal_t<void()>        on_join_fail;
 
-        // TODO: implement this (client and server side)
         void leave();
+        signal_t<void()> on_leave;
 
         bool is_joined() const;
         const player& get_self() const;
-
-    // private :
-    //     handler_group
-    // public :
-    //     template<typename T>
-    //     void on_joined()
-
 
     private :
         netcom& net_;
