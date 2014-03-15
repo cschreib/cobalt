@@ -7,8 +7,9 @@ namespace client {
         pool_.block_all();
         net_.send_request(netcom::server_actor_id,
             make_packet<request::client::list_players>(),
-            [this](const request::client::list_players::answer& msg) {
-                for (auto& p : msg.players) {
+            [this](const netcom::request_answer_t<request::client::list_players>& msg) {
+                if (msg.failed) return;
+                for (auto& p : msg.answer.players) {
                     players_.emplace_back(p.id, p.ip, p.name, p.color, p.is_ai);
                 }
 
@@ -46,11 +47,10 @@ namespace client {
         auto make_request = [this,name,col,as_ai]() {
             pool_ << net_.send_request(client::netcom::server_actor_id,
                 make_packet<request::client::join_players>(name, col, as_ai),
-                [](const request::client::join_players::answer& msg) {},
-                [this](const request::client::join_players::failure& msg) {
-                    on_join_fail.dispatch();
-                }, [this]() {
-                    on_join_fail.dispatch();
+                [this](const netcom::request_answer_t<request::client::join_players>& msg) {
+                    if (msg.failed) {
+                        on_join_fail.dispatch();
+                    }
                 }
             );
         };

@@ -113,13 +113,17 @@ int main(int argc, const char* argv[]) {
         if (behavior == "ponger" && n - last > 2) {
             last = n;
             net.send_request(client::netcom::server_actor_id, request::ping{},
-            [n](request::ping::answer){
-                double tn = now();
-                note("pong from server (", seconds_str(tn - n), ")");
-            }, [](request::ping::failure){
-                warning("failure to pong ?!");
-            }, [](){
-                error("server does not know how to pong...");
+            [n](const client::netcom::request_answer_t<request::ping>& msg) {
+                if (msg.failed) {
+                    if (msg.unhandled) {
+                        error("server does not know how to pong...");
+                    } else {
+                        warning("failure to pong ?!");
+                    }
+                } else {
+                    double tn = now();
+                    note("pong from server (", seconds_str(tn - n), ")");
+                }
             });
         }
 

@@ -106,36 +106,14 @@ bool netcom_base::process_request_(in_packet_t&& p) {
     return true;
 }
 
-bool netcom_base::process_answer_(in_packet_t&& p) {
+bool netcom_base::process_answer_(netcom_impl::packet_type t, in_packet_t&& p) {
     request_id_t id;
     p >> id;
 
     auto iter = answer_signals_.find(id);
     if (iter == answer_signals_.end()) return false;
 
-    (*iter)->dispatch_answer(std::move(p));
-    return true;
-}
-
-bool netcom_base::process_failure_(in_packet_t&& p) {
-    request_id_t id;
-    p >> id;
-
-    auto iter = answer_signals_.find(id);
-    if (iter == answer_signals_.end()) return false;
-
-    (*iter)->dispatch_fail(std::move(p));
-    return true;
-}
-
-bool netcom_base::process_unhandled_(in_packet_t&& p) {
-    request_id_t id;
-    p >> id;
-
-    auto iter = answer_signals_.find(id);
-    if (iter == answer_signals_.end()) return false;
-
-    (*iter)->dispatch_unhandled();
+    (*iter)->dispatch(t, std::move(p));
     return true;
 }
 
@@ -167,23 +145,16 @@ void netcom_base::process_packets() {
             }
             break;
         case netcom_impl::packet_type::answer :
-            if (!process_answer_(std::move(p))) {
-                request_id_t id;
-                p >> id;
-                out_packet_t tp = create_message_(make_packet<message::unhandled_answer>(id));
-                process_message_(std::move(tp.to_input()));
-            }
-            break;
         case netcom_impl::packet_type::failure :
-            if (!process_failure_(std::move(p))) {
+        case netcom_impl::packet_type::unhandled :
+            if (!process_answer_(t, std::move(p))) {
                 request_id_t id;
                 p >> id;
-                out_packet_t tp = create_message_(make_packet<message::unhandled_failure>(id));
+                out_packet_t tp = create_message_(
+                    make_packet<message::unhandled_request_answer>(id)
+                );
                 process_message_(std::move(tp.to_input()));
             }
-            break;
-        case netcom_impl::packet_type::unhandled_request :
-            process_unhandled_(std::move(p));
             break;
         }
     }
