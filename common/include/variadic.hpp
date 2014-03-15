@@ -306,27 +306,30 @@ namespace ctl {
     };
 
     template<typename T>
-    struct return_type;
+    struct return_type_t;
 
     template<typename R, typename ... Args>
-    struct return_type<R(Args...)> {
+    struct return_type_t<R(Args...)> {
         using type = R;
     };
 
     template<typename R, typename ... Args>
-    struct return_type<R(*)(Args...)> {
+    struct return_type_t<R(*)(Args...)> {
         using type = R;
     };
 
     template<typename R, typename T, typename ... Args>
-    struct return_type<R(T::*)(Args...)> {
+    struct return_type_t<R(T::*)(Args...)> {
         using type = R;
     };
 
     template<typename R, typename T, typename ... Args>
-    struct return_type<R(T::*)(Args...) const> {
+    struct return_type_t<R(T::*)(Args...) const> {
         using type = R;
     };
+
+    template<typename T>
+    using return_type = typename return_type_t<typename std::decay<T>::type>::type;
 
     auto no_op = [](){};
 

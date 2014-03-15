@@ -164,7 +164,7 @@ namespace signal_impl {
 **/
 template<typename Signature, template<typename> class ConnectionBase = basic_signal_connection>
 class signal_t {
-    static_assert(std::is_same<typename ctl::return_type<Signature>::type, void>::value,
+    static_assert(std::is_same<ctl::return_type<Signature>, void>::value,
         "return type of signal slot must be void");
 };
 
@@ -288,7 +288,7 @@ public :
 **/
 template<typename Signature, template<typename> class ConnectionBase = basic_signal_connection>
 class unique_signal_t {
-    static_assert(std::is_same<typename ctl::return_type<Signature>::type, void>::value,
+    static_assert(std::is_same<ctl::return_type<Signature>, void>::value,
         "return type of signal slot must be void");
 };
 
