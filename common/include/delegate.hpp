@@ -157,9 +157,8 @@ namespace ctl {
         }
 
         /// Call the delegate.
-        template<typename ... TArgs>
-        R operator() (TArgs&& ... args) const {
-            return (*wfun_)(obj_, fun_, std::forward<TArgs>(args)...);
+        R operator() (Args ... args) const {
+            return (*wfun_)(obj_, fun_, std::forward<Args>(args)...);
         }
 
     private :
