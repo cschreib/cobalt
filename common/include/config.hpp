@@ -11,7 +11,7 @@ namespace config {
         template<typename T>
         using is_configurable = std::integral_constant<bool,
             ctl::has_left_shift<std::ostream, T>::value &&
-            ctl::has_right_shift<std::ostream, T>::value
+            ctl::has_right_shift<std::istream, T>::value
         >;
     }
 
