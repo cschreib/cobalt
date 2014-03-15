@@ -4,6 +4,7 @@
 #include <color32.hpp>
 #include <ptr_vector.hpp>
 #include <connection_handler.hpp>
+#include "server_shared_collection.hpp"
 #include "server_netcom.hpp"
 #include "server_player.hpp"
 
@@ -60,7 +61,17 @@ namespace server {
         } rsn;
     };
 }
+namespace client {
+    NETCOM_PACKET(stop_list_players) {};
 }
+}
+
+struct player_collection_traits {
+    using full_packet = request::client::list_players;
+    using add_packet = message::server::player_connected;
+    using remove_packet = message::server::player_disconnected;
+    using quit_packet = message::client::stop_list_players;
+};
 
 namespace server {
     class player_list {
@@ -87,6 +98,7 @@ namespace server {
         ctl::ptr_vector<player> players_;
 
         scoped_connection_pool pool_;
+        shared_collection<player_collection_traits> collection_;
     };
 }
 

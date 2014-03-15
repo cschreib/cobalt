@@ -7,9 +7,20 @@ namespace server {
     player_list::player_list(netcom& net, config::state& conf) :
         net_(net), conf_(conf), max_player_(1u) {
 
+        collection_.make_collection_packet = [this](
+            netcom::request_t<request::client::list_players>&& req) {
+            request::client::list_players::answer a;
+            for (auto& p : players_) {
+                a.players.push_back({p.id, p.ip, p.name, p.color, p.is_ai});
+            }
+            req.answer(std::move(a));
+        };
+
+        collection_.connect(net);
+
         pool_ << conf_.bind("player_list.max_player", max_player_);
 
-        pool_ << net_.watch_request([&](netcom::request_t<request::client::join_players>&& req) {
+        pool_ << net_.watch_request([this](netcom::request_t<request::client::join_players>&& req) {
             if (players_.size() < max_player_) {
                 actor_id_t id = req.from;
                 std::string ip = net_.get_actor_ip(id);
@@ -18,11 +29,8 @@ namespace server {
                 p.when_connected = now();
 
                 req.answer();
-                net_.send_message(server::netcom::all_actor_id,
-                    make_packet<message::server::player_connected>(
-                        id, ip, req.arg.name, req.arg.color, req.arg.is_ai
-                    )
-                );
+
+                collection_.add_item(id, ip, req.arg.name, req.arg.color, req.arg.is_ai);
             } else {
                 req.fail(request::client::join_players::failure{
                     request::client::join_players::failure::reason::too_many_players
@@ -41,15 +49,7 @@ namespace server {
             req.fail();
         });
 
-        pool_ << net_.watch_request([&](netcom::request_t<request::client::list_players>&& req) {
-            request::client::list_players::answer a;
-            for (auto& p : players_) {
-                a.players.push_back({p.id, p.ip, p.name, p.color, p.is_ai});
-            }
-            req.answer(std::move(a));
-        });
-
-        pool_ << net_.watch_message([&](const message::server::internal::client_disconnected& msg) {
+        pool_ << net_.watch_message([this](const message::server::internal::client_disconnected& msg) {
             auto iter = players_.find_if([&](const player& p) { return p.id == msg.id; });
             if (iter == players_.end()) return;
 

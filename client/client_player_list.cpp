@@ -4,33 +4,31 @@
 
 namespace client {
     player_list::player_list(netcom& net) : net_(net), self_(nullptr) {
-        pool_.block_all();
-        net_.send_request(netcom::server_actor_id,
-            make_packet<request::client::list_players>(),
-            [this](const netcom::request_answer_t<request::client::list_players>& msg) {
-                if (msg.failed) return;
-                for (auto& p : msg.answer.players) {
-                    players_.emplace_back(p.id, p.ip, p.name, p.color, p.is_ai);
-                }
-
-                pool_.unblock_all();
+        collection_.on_received =
+        [&](const netcom::request_answer_t<request::client::list_players>& msg) {
+            if (msg.failed) return;
+            for (auto& p : msg.answer.players) {
+                players_.emplace_back(p.id, p.ip, p.name, p.color, p.is_ai);
             }
-        );
+        };
 
-        pool_ << net_.watch_message([this](const message::server::player_connected& msg) {
+        collection_.on_add_item = [this](const message::server::player_connected& msg) {
             players_.emplace_back(msg.id, msg.ip, msg.name, msg.color, msg.is_ai);
             if (msg.id == net_.self_id()) {
                 self_ = &players_.back();
                 on_join.dispatch(*self_);
             }
-            on_player_connected.dispatch(players_.back());
-        });
 
-        pool_ << net_.watch_message([this](const message::server::player_disconnected& msg) {
+            on_player_connected.dispatch(players_.back());
+        };
+
+        collection_.on_remove_item = [this](const message::server::player_disconnected& msg) {
             auto iter = players_.find_if([&](const player& p) { return p.id == msg.id; });
             on_player_disconnected.dispatch(*iter);
             players_.erase(iter);
-        });
+        };
+
+        collection_.connect(net);
     }
 
     bool player_list::is_player(actor_id_t id) const {
@@ -68,9 +66,11 @@ namespace client {
     void player_list::leave() {
         pool_ << net_.send_request(client::netcom::server_actor_id,
             make_packet<request::client::leave_players>(),
-            [this](const request::client::leave_players::answer& msg) {
-                self_ = nullptr;
-                on_leave.dispatch();
+            [this](const netcom::request_answer_t<request::client::leave_players>& msg) {
+                if (!msg.failed) {
+                    self_ = nullptr;
+                    on_leave.dispatch();
+                }
             }
         );
     }

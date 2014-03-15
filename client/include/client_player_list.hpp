@@ -5,6 +5,8 @@
 #include <ptr_vector.hpp>
 #include <connection_handler.hpp>
 #include "client_netcom.hpp"
+#include "client_shared_collection.hpp"
+#include "server_player_list.hpp"
 #include "client_player.hpp"
 
 namespace client {
@@ -14,7 +16,7 @@ namespace client {
 
         bool is_player(actor_id_t id) const;
         const player& get_player(actor_id_t id) const;
-        signal_t<void(player&)> on_player_connected;
+        signal_t<void(player&)>       on_player_connected;
         signal_t<void(const player&)> on_player_disconnected;
 
         void join_as(const std::string& name, const color32& col, bool as_ai);
@@ -34,6 +36,7 @@ namespace client {
         player* self_;
 
         scoped_connection_pool pool_;
+        shared_collection<player_collection_traits> collection_;
     };
 }
 
