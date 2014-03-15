@@ -235,7 +235,7 @@ namespace ctl {
     };
 
     template<typename T>
-    using get_signature = typename get_signature_t<T>::type;
+    using get_signature = typename get_signature_t<typename std::decay<T>::type>::type;
 
     template<typename T>
     struct function_arguments_t;
@@ -261,10 +261,12 @@ namespace ctl {
     };
 
     template<typename T>
-    using function_arguments = typename function_arguments_t<T>::type;
+    using function_arguments = typename function_arguments_t<typename std::decay<T>::type>::type;
 
     template<typename T>
-    using functor_arguments = function_arguments<decltype(&T::operator())>;
+    using functor_arguments_ = function_arguments<decltype(&T::operator())>;
+    template<typename T>
+    using functor_arguments = functor_arguments_<typename std::decay<T>::type>;
 
     template<typename T>
     struct function_argument_t;
@@ -280,14 +282,17 @@ namespace ctl {
     };
 
     template<typename T>
-    using function_argument = typename function_argument_t<T>::type;
+    using function_argument = typename function_argument_t<typename std::decay<T>::type>::type;
 
     template<typename T>
-    using functor_argument = function_argument<decltype(&T::operator())>;
+    using functor_argument_ = function_argument<decltype(&T::operator())>;
+    template<typename T>
+    using functor_argument = functor_argument_<typename std::decay<T>::type>;
 
     template<typename T>
     struct argument_count {
-        static const std::size_t value = argument_count<decltype(&T::operator())>::value;
+        using DT = typename std::decay<T>::type;
+        static const std::size_t value = argument_count<decltype(&DT::operator())>::value;
     };
 
     template<typename R, typename T, typename ... Args>
