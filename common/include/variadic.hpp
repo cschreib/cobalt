@@ -290,20 +290,21 @@ namespace ctl {
     using functor_argument = functor_argument_<typename std::decay<T>::type>;
 
     template<typename T>
-    struct argument_count {
-        using DT = typename std::decay<T>::type;
-        static const std::size_t value = argument_count<decltype(&DT::operator())>::value;
-    };
+    struct argument_count;
 
     template<typename R, typename T, typename ... Args>
-    struct argument_count<R (T::*)(Args...)> {
-        static const std::size_t value = sizeof...(Args);
-    };
+    struct argument_count<R (T::*)(Args...)> :
+        std::integral_constant<std::size_t, sizeof...(Args)> {};
 
     template<typename R, typename T, typename ... Args>
-    struct argument_count<R (T::*)(Args...) const> {
-        static const std::size_t value = sizeof...(Args);
-    };
+    struct argument_count<R (T::*)(Args...) const> :
+        std::integral_constant<std::size_t, sizeof...(Args)> {};
+
+    template<typename T>
+    struct argument_count : argument_count<decltype(&T::operator())> {};
+
+    template<typename T>
+    using argument_count = argument_count_<typename std::decay<T>::type>;
 
     template<typename T>
     struct return_type_t;
