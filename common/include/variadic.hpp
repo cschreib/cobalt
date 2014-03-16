@@ -335,20 +335,26 @@ namespace ctl {
     auto no_op = [](){};
 
     template<typename T1, typename T2>
-    struct has_left_shift {
+    struct has_left_shift_t {
         template <typename U> static std::true_type  dummy(typename std::decay<
             decltype(std::declval<T1&>() << std::declval<const U&>())>::type*);
         template <typename U> static std::false_type dummy(...);
-        static const bool value = decltype(dummy<T2>(0))::value;
+        using type = decltype(dummy<T2>(0));
     };
 
     template<typename T1, typename T2>
-    struct has_right_shift {
+    using has_left_shift = typename has_left_shift_t<T1,T2>::type;
+
+    template<typename T1, typename T2>
+    struct has_right_shift_t {
         template <typename U> static std::true_type  dummy(typename std::decay<
             decltype(std::declval<T1&>() >> std::declval<U&>())>::type*);
         template <typename U> static std::false_type dummy(...);
-        static const bool value = decltype(dummy<T2>(0))::value;
+        using type = decltype(dummy<T2>(0));
     };
+
+    template<typename T1, typename T2>
+    using has_right_shift = typename has_right_shift_t<T1,T2>::type;
 
 
     /// Class holding a sequence of integer values.
