@@ -4,6 +4,7 @@
 #include <netcom_base.hpp>
 #include <SFML/Network.hpp>
 #include <connection_handler.hpp>
+#include <unique_id_provider.hpp>
 
 namespace config {
     class state;
@@ -47,8 +48,6 @@ namespace server {
         void terminate_() override;
         void loop_();
         void set_max_client_(std::size_t max_client);
-        bool make_id_(actor_id_t& id);
-        void free_id_(actor_id_t id);
         void remove_client_(actor_id_t cid);
         void remove_client_(client_list_t::iterator ic);
 
@@ -60,8 +59,8 @@ namespace server {
         sf::TcpListener    listener_;
         sf::SocketSelector selector_;
 
-        client_list_t             clients_;
-        ctl::sorted_vector<actor_id_t, std::greater<actor_id_t>> available_ids_;
+        client_list_t                       clients_;
+        ctl::unique_id_provider<actor_id_t> client_id_provider_;
 
         std::atomic<bool> is_connected_;
         std::atomic<bool> terminate_thread_;

@@ -489,7 +489,7 @@ private :
         std::unique_ptr<answer_signal_t>, mem_var_comp(&answer_signal_t::id)
     >;
     answer_signal_container answer_signals_;
-    ctl::sorted_vector<request_id_t, std::greater<request_id_t>> available_request_ids_;
+    ctl::unique_id_provider<request_id_t> request_id_provider_;
 
 private :
     // Send a packet to the output queue
@@ -500,8 +500,6 @@ private :
     template<typename P>
     friend class netcom_impl::answer_connection;
     void stop_request_(request_id_t id);
-    void free_request_id_(request_id_t id);
-    request_id_t make_request_id_();
 
     // Signal manipulation
     template<typename T>
@@ -560,7 +558,9 @@ protected :
     out_packet_t create_request_(request_id_t& rid, T&& req) {
         using RequestType = typename std::decay<T>::type;
 
-        rid = make_request_id_();
+        if (!request_id_provider_.make_id(rid)) {
+            throw netcom_exception::too_many_requests();
+        }
 
         out_packet_t p;
         p << netcom_impl::packet_type::request;

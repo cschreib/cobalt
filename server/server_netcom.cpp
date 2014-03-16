@@ -4,18 +4,15 @@
 
 namespace server {
     netcom::netcom(config::state& conf) :
-        conf_(conf), listen_port_(4444), max_client_(1), is_connected_(false),
-        terminate_thread_(false), listener_thread_(std::bind(&netcom::loop_, this)) {
+        conf_(conf), listen_port_(4444), max_client_(1),
+        client_id_provider_(max_client_, first_actor_id),
+        is_connected_(false), terminate_thread_(false),
+        listener_thread_(std::bind(&netcom::loop_, this)) {
 
         pool_ << conf_.bind("netcom.listen_port", listen_port_);
         pool_ << conf_.bind("netcom.max_client", [this](std::size_t max) {
             set_max_client_(max);
         }, max_client_);
-
-        available_ids_.reserve(max_client_);
-        for (std::size_t i = 0; i < max_client_; ++i) {
-            available_ids_.insert(max_client_ - i - 1 + first_actor_id);
-        }
     }
 
     netcom::~netcom() {
@@ -25,22 +22,7 @@ namespace server {
     void netcom::set_max_client_(std::size_t max_client) {
         if (max_client_ == max_client) return;
 
-        if (max_client_ < max_client) {
-            // Allocate new ids
-            available_ids_.reserve(max_client);
-            for (std::size_t i = max_client_; i < max_client; ++i) {
-                available_ids_.insert(max_client - i - 1 + first_actor_id);
-            }
-        } else {
-            // Remove ids that are no longer accessible
-            if (max_client == 0) {
-                available_ids_.clear();
-            } else {
-                for (std::size_t i = max_client_ - 1; i >= max_client; --i) {
-                    available_ids_.erase(max_client - i - 1 + first_actor_id);
-                }
-            }
-        }
+        client_id_provider_.set_max_id(max_client);
 
         max_client_ = max_client;
     }
@@ -72,6 +54,7 @@ namespace server {
     void netcom::terminate_() {
         terminate_thread_ = true;
         listener_thread_.wait();
+        client_id_provider_.clear();
         netcom_base::terminate_();
     }
 
@@ -119,14 +102,14 @@ namespace server {
                 if (listener_.accept(*s) == sf::Socket::Done) {
                     if (clients_.size() < max_client_) {
                         actor_id_t id;
-                        if (make_id_(id)) {
+                        if (client_id_provider_.make_id(id)) {
                             send_message(self_actor_id,
                                 make_packet<message::server::internal::client_connected>(
                                     id, s->getRemoteAddress().toString()
                                 )
                             );
 
-                            out_packet_t p = create_message_(
+                            out_packet_t p = create_message(
                                 make_packet<message::server::connection_granted>(id)
                             );
                             s->send(p.impl);
@@ -243,19 +226,6 @@ namespace server {
         is_connected_ = false;
     }
 
-    bool netcom::make_id_(actor_id_t& id) {
-        if (available_ids_.empty()) return false;
-        id = available_ids_.back();
-        available_ids_.pop_back();
-        return true;
-    }
-
-    void netcom::free_id_(actor_id_t id) {
-        if (id < max_client_) {
-            available_ids_.insert(id);
-        }
-    }
-
     void netcom::remove_client_(actor_id_t cid) {
         auto iter = clients_.find(cid);
         if (iter == clients_.end()) return;
@@ -263,7 +233,7 @@ namespace server {
     }
 
     void netcom::remove_client_(client_list_t::iterator ic) {
-        free_id_(ic->id);
+        client_id_provider_.free_id(ic->id);
         selector_.remove(*ic->socket);
         ic->socket->disconnect();
         clients_.erase(ic);

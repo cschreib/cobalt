@@ -9,13 +9,7 @@ namespace netcom_exception {
     base::~base() noexcept {}
 }
 
-netcom_base::netcom_base() {
-    std::size_t n = std::numeric_limits<request_id_t>::max();
-    available_request_ids_.reserve(n);
-    for (std::size_t i = 1; i <= n; ++i) {
-        available_request_ids_.insert(n-i);
-    }
-}
+netcom_base::netcom_base() {}
 
 void netcom_base::send_(out_packet_t&& p) {
     if (p.to == invalid_actor_id) throw netcom_exception::invalid_actor();
@@ -35,18 +29,7 @@ void netcom_base::stop_request_(request_id_t id) {
         answer_signals_.erase(iter);
     }
 
-    free_request_id_(id);
-}
-
-void netcom_base::free_request_id_(request_id_t id) {
-    available_request_ids_.insert(id);
-}
-
-request_id_t netcom_base::make_request_id_() {
-    if (available_request_ids_.empty()) throw netcom_exception::too_many_requests();
-    request_id_t id = available_request_ids_.back();
-    available_request_ids_.pop_back();
-    return id;
+    request_id_provider_.free_id(id);
 }
 
 void netcom_base::terminate() {
@@ -63,12 +46,7 @@ void netcom_base::terminate_() {
 
     input_.clear();
     output_.clear();
-
-    std::size_t n = std::numeric_limits<request_id_t>::max();
-    available_request_ids_.clear();
-    for (std::size_t i = 1; i <= n; ++i) {
-        available_request_ids_.insert(n-i);
-    }
+    request_id_provider_.clear();
 
     answer_signals_.clear();
 
