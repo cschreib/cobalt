@@ -10,7 +10,7 @@
 
 /// Class representing the connection between a signal and a slot.
 /** It is owned by signal_t, and shared by reference to the initiator of the connection.
-    Beside destroying the signal object, calling stop() it is the only way to stop a connection and
+    Beside destroying the signal object, calling stop() is the only way to stop a connection and
     unregister a slot.
     Any class holding a signal_connection_base reference should fill the on_stop callback so that it
     is informed whenever the connection is stopped for any reason.
@@ -237,6 +237,7 @@ public :
         potentially crash the program. To prevent this issue, one must carefuly handle the lifetime
         of the connection using the returned connection object.
         Several helpers are provided to this end (scoped_connection_t, scoped_connection_pool_t).
+        The slot is copied/moved into this signal.
     **/
     template<template<typename> class CO = ConnectionBase, typename S, typename ... TArgs>
     CO<signal_t>& connect(S&& slot, TArgs&& ... args) {
@@ -330,6 +331,7 @@ public :
         potentially crash the program. To prevent this issue, one must carefuly handle the lifetime
         of the connection using the returned connection object.
         Several helpers are provided to this end (scoped_connection_t, scoped_connection_pool_t).
+        The slot is copied/moved into this signal.
     **/
     template<template<typename> class CO = ConnectionBase, typename S, typename ... TArgs>
     CO<unique_signal_t>& connect(S&& slot, TArgs&& ... args) {
