@@ -81,6 +81,7 @@ struct packet {
     std::vector<std::string> parents;
     packet* parent = nullptr;
     std::string file;
+    std::string category;
     unsigned int lstart, lend;
     unsigned int cstart, cend;
     std::vector<member> members;
@@ -130,7 +131,8 @@ CXChildVisitResult visitor(CXCursor cursor, CXCursor parent, CXClientData client
                 std::string name = clang_getCString(ts);
 
                 if (string::start_with(name, "message::") ||
-                    string::start_with(name, "request::")) {
+                    string::start_with(name, "request::") ||
+                    string::start_with(name, "packet::")) {
                     packet s;
 
                     s.name = name;
@@ -140,6 +142,7 @@ CXChildVisitResult visitor(CXCursor cursor, CXCursor parent, CXClientData client
 
                     s.parents = string::split(s.name, "::");
                     s.simple_name = s.parents.back();
+                    s.category = s.parents.front();
                     s.parents.pop_back();
                     s.parent_name = string::join(s.parents, "::");
 
@@ -545,11 +548,12 @@ int main(int argc, char* argv[]) {
     bool error = false;
     std::size_t cnt = 0;
     for (std::size_t i = 0; i < db.size(); ++i) {
-        if (db[i].parent != nullptr) continue;
+        if (db[i].parent != nullptr || db[i].category == "packet") continue;
         ++cnt;
 
         for (std::size_t j = i+1; j < db.size(); ++j) {
-            if (db[j].parent == nullptr && db[i].id == db[j].id) {
+            if (db[j].parent == nullptr && db[i].id == db[j].id &&
+                db[i].category == db[j].category) {
                 error = true;
                 std::cout << "crc32 collision test: collision detected:" << std::endl;
                 std::cout << "  " << get_position(db[i]) << std::endl;
