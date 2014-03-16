@@ -6,10 +6,12 @@
 #include <lock_free_queue.hpp>
 #include <member_comparator.hpp>
 #include <sorted_vector.hpp>
+#include <unique_id_provider.hpp>
 #include <std_addon.hpp>
 #include <signal.hpp>
 #include <holdable_signal_connection.hpp>
 #include "packet.hpp"
+#include "serialized_packet.hpp"
 
 // Unique ID attributed to any request.
 // It is external, but only used explicitly by the sender. It must thus only be unique from the
@@ -119,7 +121,7 @@ namespace netcom_impl {
         }
 
         actor_id_t from;
-        sf::Packet impl;
+        serialized_packet impl;
     };
 
     struct out_packet_t {
@@ -147,7 +149,7 @@ namespace netcom_impl {
         }
 
         actor_id_t to;
-        sf::Packet impl;
+        serialized_packet impl;
     };
 
     // General type of a packet.
