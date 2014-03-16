@@ -73,10 +73,42 @@ namespace sf {
     sf::Packet& operator >> (sf::Packet& s, color32& c);
 }
 
-// Physical type of a packet identifier.
+/// Physical type of a packet identifier.
 using packet_id_t = std::uint32_t;
 
+/// Return a user readable name for a given packet.
 std::string get_packet_name(packet_id_t id);
+
+namespace packet_impl {
+    template<typename T>
+    struct packet_builder;
+}
+
+/// Create a packet and set its elements.
+template<typename T, typename ... Args>
+T make_packet(Args&& ... args) {
+    return packet_impl::packet_builder<T>()(std::forward<Args>(args)...);
+}
+
+/// Write a list of objects into a packet.
+template<typename P>
+void packet_write(P& p) {}
+
+template<typename P, typename T, typename ... Args>
+void packet_write(P& p, T&& t, Args&& ... args) {
+    p << std::forward<T>(t);
+    packet_write(p, std::forward<Args>(args)...);
+}
+
+/// Read a list of objects from a packet.
+template<typename P>
+void packet_read(P& p) {}
+
+template<typename P, typename T, typename ... Args>
+void packet_read(P& p, T& t, Args& ... args) {
+    p >> t;
+    packet_read(p, args...);
+}
 
 namespace packet_impl {
     struct base_ {};
@@ -92,14 +124,6 @@ namespace packet_impl {
 
     template<typename T>
     using is_packet = std::is_base_of<base_, T>;
-
-    template<typename T>
-    struct packet_builder;
-}
-
-template<typename T, typename ... Args>
-T make_packet(Args&& ... args) {
-    return packet_impl::packet_builder<T>()(std::forward<Args>(args)...);
 }
 
 #define NETCOM_PACKET(name) \
