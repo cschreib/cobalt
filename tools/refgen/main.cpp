@@ -10,7 +10,8 @@
 #include <string.hpp>
 #include <print.hpp>
 #include <crc32.hpp>
-#include <packet.hpp>
+#include <SFML/Network/Packet.hpp>
+#include "format.hpp"
 
 template<typename T>
 void get_location(T& t, CXSourceRange s) {
@@ -312,6 +313,27 @@ void generate_packet_code(std::ostream& out, const std::deque<packet>& db) {
     out << "}\n";
 }
 
+template<typename T>
+sf::Packet& operator >> (sf::Packet& p, std::vector<T>& t) {
+    std::uint32_t s;
+    p >> s;
+    std::uint32_t i0 = t.size();
+    t.resize(i0 + s);
+    for (std::uint32_t i = 0; i < s; ++i) {
+        p >> t[i0+i];
+    }
+    return p;
+}
+
+template<typename T>
+sf::Packet& operator << (sf::Packet& p, const std::vector<T>& t) {
+    p << (std::uint32_t)t.size();
+    for (auto& i : t) {
+        p << i;
+    }
+    return p;
+}
+
 sf::Packet& operator << (sf::Packet& p, const packet::member& m) {
     return p << m.name << m.type << m.is_enum;
 }
@@ -405,13 +427,8 @@ bool parse(const std::string& dir, const std::string& filename, std::deque<packe
         std::size_t ndiag = clang_getNumDiagnostics(ctu);
         for (std::size_t i = 0; i < ndiag; ++i) {
             CXDiagnostic d = clang_getDiagnostic(ctu, i);
-            CXDiagnosticSeverity sev = clang_getDiagnosticSeverity(d);
-            if (sev == CXDiagnostic_Error || sev == CXDiagnostic_Fatal) {
-                CXString str = clang_formatDiagnostic(d, clang_defaultDiagnosticDisplayOptions());
-                print(clang_getCString(str));
-                clang_disposeString(str);
-                fail = true;
-            }
+            format_diagnostic(d);
+            clang_disposeDiagnostic(d);
         }
 
         if (!fail) {
@@ -541,7 +558,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        if (!parse_directory(d, db, argc-1, argv+1)) return 1;
+        if (!parse_directory(d, db, argc-3, argv+3)) return 1;
     }
 
     // Check redundancy with CRC32
