@@ -2,10 +2,16 @@ cmake_minimum_required(VERSION 2.6)
 project(refgen)
 
 include_directories(${PROJECT_SOURCE_DIR}/../../common/include)
-include_directories(${PROJECT_SOURCE_DIR}/../../common-netcom/include)
 include_directories(${CLANG_INCLUDE})
 include_directories(${SFML_INCLUDE_DIR})
 add_definitions(-DNO_AUTOGEN)
+
+if (UNIX)
+    add_definitions(-DPOSIX)
+endif()
+if (WINDOWS)
+    add_definitions(-DWIN32)
+endif()
 
 add_executable(refgen
     main.cpp
