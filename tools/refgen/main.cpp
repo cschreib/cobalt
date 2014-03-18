@@ -282,7 +282,7 @@ void generate_code(std::ostream& out, const packet& p) {
         out << "        " << p.name << " p;\n";
         if (!p.members.empty()) {
             for (std::size_t i = 0; i < p.members.size(); ++i) {
-                out << "        p." << p.members[i].name << " = t" << i << ";\n";
+                out << "        p." << p.members[i].name << " = std::forward<T" << i << ">(t" << i << ");\n";
             }
         }
         out << "        return p;\n";
