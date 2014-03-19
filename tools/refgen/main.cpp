@@ -229,7 +229,8 @@ void generate_code(std::ostream& out, const packet& p) {
         out << "namespace " << n << " { ";
     }
     out << "\n";
-    out << "template<typename T> T& operator << (T& p, const " << p.name << "& t) {";
+    out << "static inline packet_t::base& operator << (packet_t::base& p, const "
+        << p.name << "& t) {";
     if (!p.members.empty()) {
         out << "\n";
         for (auto& m : p.members) {
@@ -244,7 +245,9 @@ void generate_code(std::ostream& out, const packet& p) {
     } else {
         out << " return p; ";
     }
-    out << "}\ntemplate<typename T> T& operator >> (T& p, " << p.name << "& t) {";
+    out << "}\n";
+    out << "static inline packet_t::base& operator >> (packet_t::base& p, "
+        << p.name << "& t) {";
     if (!p.members.empty()) {
         out << "\n";
         for (auto& m : p.members) {
@@ -263,7 +266,7 @@ void generate_code(std::ostream& out, const packet& p) {
     out << std::string(nsp.size(),'}');
     out << "\n";
 
-    if (p.parent == nullptr) {
+    if (p.parent == nullptr || p.simple_name == "answer" || p.simple_name == "failure") {
         out << "namespace packet_impl { template<> struct packet_builder<" << p.name << "> {\n";
         if (!p.members.empty()) {
             out << "    template<";
@@ -581,7 +584,7 @@ int main(int argc, char* argv[]) {
 
     if (!error) {
         std::cout << "crc32 collision test: no collision found (over " <<
-            cnt << " packets)" << std::endl;
+            db.size() << " packets)" << std::endl;
     } else {
         return 1;
     }

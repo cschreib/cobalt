@@ -5,35 +5,40 @@
 #include <vector>
 #include <array>
 #include <crc32.hpp>
+#include <variadic.hpp>
+#include "serialized_packet.hpp"
 
 struct color32;
 
 namespace sf {
     // Extend sf::Packet to handle 64bit types
     #ifdef HAS_UINT64_T
-    sf::Packet& operator << (sf::Packet& p, std::uint64_t data);
-    sf::Packet& operator >> (sf::Packet& p, std::uint64_t& data);
+    packet_t::base& operator << (packet_t::base& p, std::uint64_t data);
+    packet_t::base& operator >> (packet_t::base& p, std::uint64_t& data);
     #else
     struct impl_u64 {
         std::uint32_t lo, hi;
         bool operator < (const impl_u64& i) const;
     };
-    sf::Packet& operator << (sf::Packet& p, impl_u64 data);
-    sf::Packet& operator >> (sf::Packet& p, impl_u64& data);
+    packet_t::base& operator << (packet_t::base& p, impl_u64 data);
+    packet_t::base& operator >> (packet_t::base& p, impl_u64& data);
     #endif
 
     template<typename T, typename enable = typename std::enable_if<std::is_enum<T>::value>::type>
-    sf::Packet& operator >> (sf::Packet& p, T& t) {
+    packet_t::base& operator >> (packet_t::base& p, T& t) {
         return p >> reinterpret_cast<typename std::underlying_type<T>::type&>(t);
     }
 
     template<typename T, typename enable = typename std::enable_if<std::is_enum<T>::value>::type>
-    sf::Packet& operator << (sf::Packet& p, T t) {
+    packet_t::base& operator << (packet_t::base& p, T t) {
         return p << static_cast<typename std::underlying_type<T>::type>(t);
     }
 
+    packet_t::base& operator << (packet_t::base& o, ctl::empty_t);
+    packet_t::base& operator >> (packet_t::base& i, ctl::empty_t);
+
     template<typename T>
-    sf::Packet& operator >> (sf::Packet& p, std::vector<T>& t) {
+    packet_t::base& operator >> (packet_t::base& p, std::vector<T>& t) {
         std::uint32_t s;
         p >> s;
         std::uint32_t i0 = t.size();
@@ -45,7 +50,7 @@ namespace sf {
     }
 
     template<typename T>
-    sf::Packet& operator << (sf::Packet& p, const std::vector<T>& t) {
+    packet_t::base& operator << (packet_t::base& p, const std::vector<T>& t) {
         p << (std::uint32_t)t.size();
         for (auto& i : t) {
             p << i;
@@ -54,7 +59,7 @@ namespace sf {
     }
 
     template<typename T, std::size_t N>
-    sf::Packet& operator >> (sf::Packet& p, std::array<T,N>& t) {
+    packet_t::base& operator >> (packet_t::base& p, std::array<T,N>& t) {
         for (std::size_t i = 0; i < N; ++i) {
             p >> t[i];
         }
@@ -62,15 +67,15 @@ namespace sf {
     }
 
     template<typename T, std::size_t N>
-    sf::Packet& operator << (sf::Packet& p, const std::array<T,N>& t) {
+    packet_t::base& operator << (packet_t::base& p, const std::array<T,N>& t) {
         for (auto& i : t) {
             p << i;
         }
         return p;
     }
 
-    sf::Packet& operator << (sf::Packet& s, const color32& c);
-    sf::Packet& operator >> (sf::Packet& s, color32& c);
+    packet_t::base& operator << (packet_t::base& s, const color32& c);
+    packet_t::base& operator >> (packet_t::base& s, color32& c);
 }
 
 /// Physical type of a packet identifier.

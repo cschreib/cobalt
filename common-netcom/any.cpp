@@ -1,14 +1,14 @@
 #include "any.hpp"
 
 template<typename T>
-void packet_write(sf::Packet& p, const void* vdata, std::uint32_t size) {
+void packet_write(packet_t::base& p, const void* vdata, std::uint32_t size) {
     const T* data = reinterpret_cast<const T*>(vdata);
     for (std::size_t i = 0; i < size; ++i) {
         p << data[i];
     }
 }
 
-sf::Packet& operator << (sf::Packet& p, const any& data) {
+packet_t::base& operator << (packet_t::base& p, const any& data) {
     p << data.type_ << data.size_;
     switch (data.type_) {
         case any_type::none : break;
@@ -28,7 +28,7 @@ sf::Packet& operator << (sf::Packet& p, const any& data) {
 }
 
 template<typename T>
-void packet_read(sf::Packet& p, void*& vdata, std::uint32_t size) {
+void packet_read(packet_t::base& p, void*& vdata, std::uint32_t size) {
     T* data = new T[size];
     vdata = data;
     for (std::size_t i = 0; i < size; ++i) {
@@ -36,7 +36,7 @@ void packet_read(sf::Packet& p, void*& vdata, std::uint32_t size) {
     }
 }
 
-sf::Packet& operator >> (sf::Packet& p, any& data) {
+packet_t::base& operator >> (packet_t::base& p, any& data) {
     p >> data.type_ >> data.size_;
     switch (data.type_) {
         case any_type::none : break;

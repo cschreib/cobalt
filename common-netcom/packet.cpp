@@ -3,7 +3,7 @@
 
 namespace sf {
     #ifdef HAS_UINT64_T
-    sf::Packet& operator << (sf::Packet& p, std::uint64_t data) {
+    packet_t::base& operator << (packet_t::base& p, std::uint64_t data) {
         #ifdef BOOST_BIG_ENDIAN
         p << std::uint32_t(data >> 32) << std::uint32_t(data);
         #else
@@ -13,7 +13,7 @@ namespace sf {
         return p;
     }
 
-    sf::Packet& operator >> (sf::Packet& p, std::uint64_t& data) {
+    packet_t::base& operator >> (packet_t::base& p, std::uint64_t& data) {
         std::uint32_t lo, hi;
         #ifdef BOOST_BIG_ENDIAN
         p >> hi >> lo;
@@ -32,7 +32,7 @@ namespace sf {
         return lo < i.lo;
     }
 
-    sf::Packet& operator << (sf::Packet& p, impl_u64 data) {
+    packet_t::base& operator << (packet_t::base& p, impl_u64 data) {
         #ifdef BOOST_BIG_ENDIAN
         p << data.hi << data.lo;
         #else
@@ -42,7 +42,7 @@ namespace sf {
         return p;
     }
 
-    sf::Packet& operator >> (sf::Packet& p, impl_u64& data) {
+    packet_t::base& operator >> (packet_t::base& p, impl_u64& data) {
         #ifdef BOOST_BIG_ENDIAN
         p >> data.hi >> data.lo;
         #else
@@ -53,11 +53,14 @@ namespace sf {
     }
     #endif
 
-    sf::Packet& operator << (sf::Packet& s, const color32& c) {
+    packet_t::base& operator << (packet_t::base& o, ctl::empty_t) { return o; }
+    packet_t::base& operator >> (packet_t::base& i, ctl::empty_t) { return i; }
+
+    packet_t::base& operator << (packet_t::base& s, const color32& c) {
         return s << c.r << c.g << c.b << c.a;
     }
 
-    sf::Packet& operator >> (sf::Packet& s, color32& c) {
+    packet_t::base& operator >> (packet_t::base& s, color32& c) {
         return s >> c.r >> c.g >> c.b >> c.a;
     }
 }

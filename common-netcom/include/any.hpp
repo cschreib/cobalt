@@ -124,7 +124,7 @@ struct any {
     template<typename T>
     bool extract(T& t) const {
         if (type_ != any_impl::any_traits<T>::type) return false;
-        if (any_impl::any_traits<T>::size != 0u && 
+        if (any_impl::any_traits<T>::size != 0u &&
             size_ > any_impl::any_traits<T>::size) return false;
 
         using etype = typename any_impl::any_traits<T>::etype;
@@ -135,8 +135,8 @@ struct any {
     }
 
 private :
-    friend sf::Packet& operator << (sf::Packet& p, const any& data);
-    friend sf::Packet& operator >> (sf::Packet& p, any& data);
+    friend packet_t::base& operator << (packet_t::base& p, const any& data);
+    friend packet_t::base& operator >> (packet_t::base& p, any& data);
 
     any_type type_ = any_type::none;
     std::uint32_t size_ = 0u;
