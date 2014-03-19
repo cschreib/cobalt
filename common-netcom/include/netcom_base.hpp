@@ -120,6 +120,10 @@ namespace netcom_impl {
             return *this;
         }
 
+        serialized_packet_view view() const {
+            return impl.view();
+        }
+
         actor_id_t from;
         serialized_packet impl;
     };
@@ -144,8 +148,16 @@ namespace netcom_impl {
             return *this;
         }
 
+        serialized_packet_view view() const {
+            return impl.view();
+        }
+
         in_packet_t& to_input() {
             return *reinterpret_cast<in_packet_t*>(this);
+        }
+
+        const in_packet_t& to_input() const {
+            return *reinterpret_cast<const in_packet_t*>(this);
         }
 
         actor_id_t to;

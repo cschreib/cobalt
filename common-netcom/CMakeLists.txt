@@ -5,10 +5,11 @@ include_directories(${PROJECT_SOURCE_DIR}/../common/include)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${SFML_INCLUDE_DIR})
 
-set(SRC_LIST 
+set(SRC_LIST
     ${PROJECT_SOURCE_DIR}/any.cpp
     ${PROJECT_SOURCE_DIR}/netcom_base.cpp
     ${PROJECT_SOURCE_DIR}/packet.cpp
+    ${PROJECT_SOURCE_DIR}/serialized_packet.cpp
 )
 
 add_library(cobalt-common-netcom STATIC ${SRC_LIST})
