@@ -76,7 +76,7 @@ protected :
 
     void call_(arg_type arg) override {
         if (this->blocked()) {
-            this->do_call_(
+            ctl::tuple_to_args(
                 signal_impl::vector_emplace_back_wrapper(args_),
                 std::forward<arg_type>(arg)
             );
@@ -88,12 +88,12 @@ protected :
     using base::do_call_;
 
     template<typename ... Args>
-    void do_call_(std::tuple<Args...>& arg, std::false_type) {
+    void held_call_(std::tuple<Args...>& arg, std::false_type) {
         this->do_call_(arg);
     }
 
     template<typename ... Args>
-    void do_call_(std::tuple<Args...>& arg, std::true_type) {
+    void held_call_(std::tuple<Args...>& arg, std::true_type) {
         this->do_call_(std::move(arg));
     }
 
@@ -104,7 +104,7 @@ public :
         if (args_.empty()) return;
 
         for (auto& arg : args_) {
-            this->do_call_(arg, allow_arg_move{});
+            this->held_call_(arg, allow_arg_move{});
         }
 
         args_.clear();
@@ -142,7 +142,7 @@ protected :
     void call_(arg_type arg) override {
         if (received_) return;
         if (this->blocked()) {
-            arg_ = this->do_call_(
+            arg_ = ctl::tuple_to_args(
                 signal_impl::make_unique_wrapper<stored_tuple_type>{},
                 std::forward<arg_type>(arg)
             );

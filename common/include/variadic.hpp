@@ -404,84 +404,71 @@ namespace ctl {
 
     /// Get the return type of a functor given the parameter types
     template<typename F, typename ... Args>
-    struct result_of_functor {
+    struct result_of_functor_ {
         using type = decltype(std::declval<F>()(std::declval<Args>()...));
     };
 
+    template<typename F, typename ... Args>
+    using result_of_functor = typename result_of_functor_<
+        typename std::decay<F>::type, Args...>::type;
 
     namespace impl {
-        template<typename F, typename T>
-        struct t2a_return_;
+        // template<typename T>
+        // struct copy_cv {
+        //     template<typename U>
+        //     using apply = U;
+        // };
 
-        template<typename F, typename ... Args>
-        struct t2a_return_<F, std::tuple<Args...>> {
-            using type = typename result_of_functor<F, Args...>::type;
-        };
+        // template<typename T>
+        // struct copy_cv<T&> {
+        //     template<typename U>
+        //     using apply = U&;
+        // };
 
-        template<typename F, typename T>
-        using t2a_return = typename t2a_return_<
-            typename std::decay<F>::type,
-            typename std::decay<T>::type
-        >::type;
+        // template<typename T>
+        // struct copy_cv<const T&> {
+        //     template<typename U>
+        //     using apply = const U&;
+        // };
 
-        template<typename F, typename T, std::size_t ... I>
-        t2a_return<F,T> tuple_to_args_(F&& func, T&& tup, seq_t<I...>) {
-            return func(std::get<I>(std::forward<T>(tup))...);
-        }
+        // template<typename F, typename T, typename T2>
+        // struct t2ar_;
 
-        template<typename F, typename T, std::size_t N>
-        t2a_return<F,T> tuple_to_args_(F&& func, T&& tup,
-            std::integral_constant<std::size_t,N>) {
-            return impl::tuple_to_args_(
-                std::forward<F>(func), std::forward<T>(tup), gen_seq<N>{}
-            );
-        }
+        // template<typename F, typename T, typename ... Args>
+        // struct t2ar_<F,T,std::tuple<Args...>> {
+        //     using type = result_of_functor<F, typename copy_cv<T>::template apply<Args>...>;
+        // };
 
-        template<typename F, typename T>
-        t2a_return<F,T> tuple_to_args_(F&& func, T&& tup,
-            std::integral_constant<std::size_t,0>) {
-            return func();
-        }
+        // template<typename F, typename T>
+        // using t2ar = typename t2ar_<
+        //     typename std::decay<F>::type, T, typename std::decay<T>::type>::type;
 
-        template<typename F, typename T, std::size_t ... I>
-        t2a_return<F,T> tuple_to_moved_args_(F&& func, T&& tup, seq_t<I...>) {
-            return func(std::move(std::get<I>(tup))...);
-        }
-
-        template<typename F, typename T, std::size_t N>
-        t2a_return<F,T> tuple_to_moved_args_(F&& func, T&& tup,
-            std::integral_constant<std::size_t,N>) {
-            return impl::tuple_to_moved_args_(
-                std::forward<F>(func), std::move(tup), gen_seq<N>{}
-            );
-        }
-
-        template<typename F, typename T>
-        t2a_return<F,T> tuple_to_moved_args_(F&& func, T&& tup,
-            std::integral_constant<std::size_t,0>) {
-            return func();
+        template<typename F, typename T, typename ... Args, std::size_t ... I>
+        // t2ar<F,T> tuple_to_args_(F&& func, T&& tup, type_list<Args...>, seq_t<I...>) {
+        auto tuple_to_args_(F&& func, T&& tup, seq_t<I...>) -> decltype(
+            std::forward<F>(func)(std::get<I>(std::forward<T>(tup))...)
+            ){
+            // return std::forward<F>(func)(std::forward<typename copy_cv<T>::template apply<Args>>(
+            //     std::get<I>(std::forward<T>(tup)))...);
+            return std::forward<F>(func)(std::get<I>(std::forward<T>(tup))...);
         }
     }
 
     /// Unfold a tuple and use the individual elements as function parameters
     template<typename F, typename T>
-    impl::t2a_return<F,T> tuple_to_args(F&& func, T&& tup) {
+    // impl::t2ar<F,T> tuple_to_args(F&& func, T&& tup) {
+    auto tuple_to_args(F&& func, T&& tup) -> decltype(
+        impl::tuple_to_args_(std::forward<F>(func), std::forward<T>(tup),
+        gen_seq<std::tuple_size<typename std::decay<T>::type>::value>{})
+        ) {
+    // auto tuple_to_args(F&& func, T&& tup) -> void {
         using tuple_type = typename std::decay<T>::type;
-        return impl::tuple_to_args_(
-            std::forward<F>(func), std::forward<T>(tup),
-            std::integral_constant<std::size_t, std::tuple_size<tuple_type>::value>{}
-        );
-    }
-
-    /// Unfold a tuple and move the individual elements as function parameters
-    template<typename F, typename ... Args>
-    impl::t2a_return<F,std::tuple<Args&&...>> tuple_to_moved_args(F&& func,
-        std::tuple<Args...>&& tup) {
-        using tuple_type = std::tuple<Args...>;
-        return impl::tuple_to_moved_args_(
-            std::forward<F>(func), std::move(tup),
-            std::integral_constant<std::size_t, std::tuple_size<tuple_type>::value>{}
-        );
+        using seq_type = gen_seq<std::tuple_size<tuple_type>::value>;
+        // using type_list = tuple_to_type_list<T>;
+        // return impl::tuple_to_args_(std::forward<F>(func), std::forward<T>(tup),
+        //     type_list{}, seq_type{}
+        // );
+        return impl::tuple_to_args_(std::forward<F>(func), std::forward<T>(tup), seq_type{});
     }
 }
 

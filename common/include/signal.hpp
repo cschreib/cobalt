@@ -101,21 +101,9 @@ protected :
         signal_.stop_(*this);
     }
 
-    template<typename F, typename ... Args>
-    typename ctl::result_of_functor<typename std::decay<F>::type, Args...>::type
-    do_call_(F&& func, std::tuple<Args...>& arg) {
-        return ctl::tuple_to_args(std::forward<F>(func), arg);
-    }
-
-    template<typename F, typename ... Args>
-    typename ctl::result_of_functor<typename std::decay<F>::type, Args&&...>::type
-    do_call_(F&& func, std::tuple<Args...>&& arg) {
-        return ctl::tuple_to_moved_args(std::forward<F>(func), std::move(arg));
-    }
-
     template<typename A>
     void do_call_(A&& arg) {
-        do_call_(callback, std::forward<A>(arg));
+        ctl::tuple_to_args(callback, std::forward<A>(arg));
     }
 
     virtual void call_(arg_type arg) {
