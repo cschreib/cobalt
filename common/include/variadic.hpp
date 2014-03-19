@@ -162,6 +162,17 @@ namespace ctl {
         static const std::size_t value = sizeof...(Args);
     };
 
+    template<typename T>
+    struct tuple_to_type_list_;
+
+    template<typename ... Args>
+    struct tuple_to_type_list_<std::tuple<Args...>> {
+        using type = type_list<Args...>;
+    };
+
+    template<typename T>
+    using tuple_to_type_list = typename tuple_to_type_list_<typename std::decay<T>::type>::type;
+
     template<typename ... Args, typename ... TArgs>
     struct are_true<type_list<Args...>, TArgs...> {
         static const bool value = are_true<Args...>::value && are_true<TArgs...>::value;
