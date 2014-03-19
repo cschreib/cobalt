@@ -379,17 +379,27 @@ namespace ctl {
 
     namespace impl {
         template<std::size_t N, std::size_t D, std::size_t ... S>
-        struct gen_seq_ : public gen_seq_<N+1, D, S..., N> {};
+        struct gen_seq__ : public gen_seq__<N+1, D, S..., N> {};
 
         template<std::size_t D, std::size_t ... S>
-        struct gen_seq_<D, D, S...> {
+        struct gen_seq__<D, D, S...> {
           using type = seq_t<S..., D>;
+        };
+
+        template<std::size_t D>
+        struct gen_seq_ {
+            using type = typename impl::gen_seq__<0, D-1>::type;
+        };
+
+        template<>
+        struct gen_seq_<0> {
+            using type = seq_t<>;
         };
     }
 
     /// Generate a sequence of integer from 0 to D (exclusive).
     template<std::size_t D>
-    using gen_seq = typename impl::gen_seq_<0, D-1>::type;
+    using gen_seq = typename impl::gen_seq_<D>::type;
 
 
     /// Get the return type of a functor given the parameter types
