@@ -9,29 +9,30 @@ int main(int argc, const char* argv[]) {
     conf.parse("server.conf");
 
     server::netcom net(conf);
+    conf.bind("netcom.debug_packets", net.debug_packets);
 
     bool stop = false;
     scoped_connection_pool pool;
 
-    pool << net.watch_message([&](message::unhandled_message msg) {
+    pool << net.watch_message([&](const message::unhandled_message& msg) {
         warning("unhandled message: ", msg.message_id);
     });
-    pool << net.watch_message([&](message::server::internal::unknown_client msg) {
+    pool << net.watch_message([&](const message::server::internal::unknown_client& msg) {
         warning("unknown client: ", msg.id);
     });
 
-    pool << net.watch_message([&](message::server::internal::cannot_listen_port msg) {
+    pool << net.watch_message([&](const message::server::internal::cannot_listen_port& msg) {
         error("cannot listen to port ", msg.port);
         stop = true;
     });
-    pool << net.watch_message([&](message::server::internal::start_listening_port msg) {
+    pool << net.watch_message([&](const message::server::internal::start_listening_port& msg) {
         note("now listening to port ", msg.port);
     });
 
-    pool << net.watch_message([&](message::server::internal::client_connected msg) {
+    pool << net.watch_message([&](const message::server::internal::client_connected& msg) {
         note("new client connected (", msg.id, ") from ", msg.ip);
     });
-    pool << net.watch_message([&](message::server::internal::client_disconnected msg) {
+    pool << net.watch_message([&](const message::server::internal::client_disconnected& msg) {
         note("client ", msg.id, " disconnected");
         std::string rsn = "?";
         switch (msg.rsn) {
@@ -42,7 +43,7 @@ int main(int argc, const char* argv[]) {
     });
 
     pool << net.watch_request([](server::netcom::request_t<request::ping>&& req){
-        note("ping client ", req.from);
+        note("ping client ", req.packet.from);
         req.answer();
     });
 

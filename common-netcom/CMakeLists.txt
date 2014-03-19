@@ -10,6 +10,7 @@ set(SRC_LIST
     ${PROJECT_SOURCE_DIR}/netcom_base.cpp
     ${PROJECT_SOURCE_DIR}/packet.cpp
     ${PROJECT_SOURCE_DIR}/serialized_packet.cpp
+    ${PROJECT_SOURCE_DIR}/shared_collection.cpp
 )
 
 add_library(cobalt-common-netcom STATIC ${SRC_LIST})

@@ -4,7 +4,7 @@
 #include <color32.hpp>
 #include <ptr_vector.hpp>
 #include <connection_handler.hpp>
-#include "server_shared_collection.hpp"
+#include <shared_collection.hpp>
 #include "server_netcom.hpp"
 #include "server_player.hpp"
 
@@ -14,10 +14,21 @@ namespace config {
 
 namespace request {
 namespace client {
+    NETCOM_PACKET(player_list_collection_id) {
+        struct answer {
+            shared_collection_id_t id;
+        };
+        struct failure {};
+    };
+    NETCOM_PACKET(leave_players) {
+        struct answer {};
+        struct failure {};
+    };
     NETCOM_PACKET(join_players) {
         std::string name;
         color32 color;
         bool is_ai;
+
         struct answer {};
         struct failure {
             enum class reason {
@@ -25,27 +36,19 @@ namespace client {
             } rsn;
         };
     };
-    NETCOM_PACKET(leave_players) {
-        struct answer {};
-        struct failure {};
-    };
-    NETCOM_PACKET(list_players) {
-        struct answer {
-            struct player_t {
-                actor_id_t id;
-                std::string ip, name;
-                color32 color;
-                bool is_ai;
-            };
-            std::vector<player_t> players;
-        };
-        struct failure {};
-    };
 }
 }
 
-namespace message {
-namespace server {
+namespace packet {
+    NETCOM_PACKET(player_list) {
+        struct player_t {
+            actor_id_t id;
+            std::string ip, name;
+            color32 color;
+            bool is_ai;
+        };
+        std::vector<player_t> players;
+    };
     NETCOM_PACKET(player_connected) {
         actor_id_t id;
         std::string ip, name;
@@ -61,16 +64,11 @@ namespace server {
         } rsn;
     };
 }
-namespace client {
-    NETCOM_PACKET(stop_list_players) {};
-}
-}
 
 struct player_collection_traits {
-    using full_packet = request::client::list_players;
-    using add_packet = message::server::player_connected;
-    using remove_packet = message::server::player_disconnected;
-    using quit_packet = message::client::stop_list_players;
+    using full_packet   = packet::player_list;
+    using add_packet    = packet::player_connected;
+    using remove_packet = packet::player_disconnected;
 };
 
 namespace server {
@@ -89,7 +87,7 @@ namespace server {
 
     private :
         void remove_player_(ctl::ptr_vector<player>::iterator iter,
-            message::server::player_disconnected::reason rsn);
+            packet::player_disconnected::reason rsn);
 
         netcom& net_;
         config::state& conf_;

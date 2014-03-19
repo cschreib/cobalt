@@ -5,6 +5,7 @@
 #include <SFML/Network.hpp>
 #include <connection_handler.hpp>
 #include <unique_id_provider.hpp>
+#include <shared_collection.hpp>
 
 namespace config {
     class state;
@@ -37,6 +38,16 @@ namespace server {
         /// Return the IP address of a given actor.
         std::string get_actor_ip(actor_id_t cid) const;
 
+        template<typename T>
+        shared_collection<T> make_shared_collection() {
+            return sc_factory_.make_shared_collection<T>();
+        }
+
+        template<typename T>
+        shared_collection_observer<T> make_shared_collection_observer(shared_collection_id_t id) {
+            return sc_factory_.make_shared_collection_observer<T>(id);
+        }
+
     private :
         struct client_t {
             std::unique_ptr<sf::TcpSocket> socket;
@@ -65,6 +76,8 @@ namespace server {
         std::atomic<bool> is_connected_;
         std::atomic<bool> terminate_thread_;
         sf::Thread listener_thread_;
+
+        shared_collection_factory sc_factory_;
     };
 }
 

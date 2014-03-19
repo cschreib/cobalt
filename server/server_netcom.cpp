@@ -7,7 +7,8 @@ namespace server {
         conf_(conf), listen_port_(4444), max_client_(1),
         client_id_provider_(max_client_, first_actor_id),
         is_connected_(false), terminate_thread_(false),
-        listener_thread_(std::bind(&netcom::loop_, this)) {
+        listener_thread_(std::bind(&netcom::loop_, this)),
+        sc_factory_(*this) {
 
         pool_ << conf_.bind("netcom.listen_port", listen_port_);
         pool_ << conf_.bind("netcom.max_client", [this](std::size_t max) {
@@ -117,7 +118,7 @@ namespace server {
                             selector_.add(*s);
                             clients_.insert({std::move(s), id});
                         } else {
-                            out_packet_t p = create_message_(
+                            out_packet_t p = create_message(
                                 make_packet<message::server::connection_denied>(
                                     message::server::connection_denied::reason::too_many_clients
                                 )
@@ -125,7 +126,7 @@ namespace server {
                             s->send(p.impl);
                         }
                     } else {
-                        out_packet_t p = create_message_(
+                        out_packet_t p = create_message(
                             make_packet<message::server::connection_denied>(
                                 message::server::connection_denied::reason::too_many_clients
                             )
@@ -160,6 +161,8 @@ namespace server {
             }
 
             // Send packets to clients
+            // TODO: unwrap the queue into a temporary container then process this
+            // Necessary to preserve ordering of packets.
             out_packet_t op;
             while (output_.pop(op)) {
                 if (op.to == all_actor_id) {
@@ -180,7 +183,7 @@ namespace server {
                     // Send to individual clients
                     auto iter = clients_.find(op.to);
                     if (iter == clients_.end()) {
-                        out_packet_t tp = create_message_(
+                        out_packet_t tp = create_message(
                             make_packet<message::server::internal::unknown_client>(
                                 op.to
                             )

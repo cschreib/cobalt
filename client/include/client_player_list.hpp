@@ -4,8 +4,8 @@
 #include <color32.hpp>
 #include <ptr_vector.hpp>
 #include <connection_handler.hpp>
+#include <shared_collection.hpp>
 #include "client_netcom.hpp"
-#include "client_shared_collection.hpp"
 #include "server_player_list.hpp"
 #include "client_player.hpp"
 
@@ -36,7 +36,7 @@ namespace client {
         player* self_;
 
         scoped_connection_pool pool_;
-        shared_collection<player_collection_traits> collection_;
+        shared_collection_observer<player_collection_traits> collection_;
     };
 }
 

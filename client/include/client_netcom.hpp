@@ -3,6 +3,7 @@
 
 #include <netcom_base.hpp>
 #include <SFML/Network.hpp>
+#include <shared_collection.hpp>
 
 namespace client {
     class netcom : public netcom_base {
@@ -43,6 +44,16 @@ namespace client {
         **/
         void run(const std::string& addr, std::uint16_t port);
 
+        template<typename T>
+        shared_collection<T> make_shared_collection() {
+            return sc_factory_.make_shared_collection<T>();
+        }
+
+        template<typename T>
+        shared_collection_observer<T> make_shared_collection_observer(shared_collection_id_t id) {
+            return sc_factory_.make_shared_collection_observer<T>(id);
+        }
+
     private :
         void terminate_() override;
         void loop_();
@@ -53,7 +64,9 @@ namespace client {
         actor_id_t        self_id_;
         std::atomic<bool> is_connected_;
         std::atomic<bool> terminate_thread_;
-        sf::Thread listener_thread_;
+        sf::Thread        listener_thread_;
+
+        shared_collection_factory sc_factory_;
     };
 }
 

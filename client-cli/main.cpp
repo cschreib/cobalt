@@ -17,15 +17,16 @@ int main(int argc, const char* argv[]) {
     conf.parse(conf_file);
 
     client::netcom net;
+    conf.bind("netcom.debug_packets", net.debug_packets);
 
     bool stop = false;
     scoped_connection_pool pool;
 
-    pool << net.watch_message([&](message::unhandled_message msg) {
+    pool << net.watch_message([&](const message::unhandled_message& msg) {
         warning("unhandled message: ", msg.message_id);
     });
 
-    pool << net.watch_message([&](message::server::connection_failed msg) {
+    pool << net.watch_message([&](const message::server::connection_failed& msg) {
         stop = true;
         error("connection failed");
         std::string rsn = "?";
@@ -39,10 +40,10 @@ int main(int argc, const char* argv[]) {
         }
         reason(rsn);
     });
-    pool << net.watch_message([](message::server::connection_established msg) {
+    pool << net.watch_message([](const message::server::connection_established& msg) {
         note("connection established");
     });
-    pool << net.watch_message([&](message::server::connection_denied msg) {
+    pool << net.watch_message([&](const message::server::connection_denied& msg) {
         stop = true;
         error("connection denied");
         std::string rsn = "?";
@@ -54,7 +55,7 @@ int main(int argc, const char* argv[]) {
         }
         reason(rsn);
     });
-    pool << net.watch_message([&](message::server::connection_granted msg) {
+    pool << net.watch_message([&](const message::server::connection_granted& msg) {
         note("connection granted (id=", msg.id, ")!");
     });
 

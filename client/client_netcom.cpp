@@ -4,7 +4,7 @@
 
 namespace client {
     netcom::netcom() : self_id_(invalid_actor_id), is_connected_(false), terminate_thread_(false),
-        listener_thread_(std::bind(&netcom::loop_, this)) {}
+        listener_thread_(std::bind(&netcom::loop_, this)), sc_factory_(*this) {}
 
     netcom::~netcom() {
         terminate();
@@ -130,6 +130,8 @@ namespace client {
 
             // Send outgoing packets
             socket.setBlocking(true);
+            // TODO: unwrap the queue into a temporary container then process this.
+            // Necessary to preserve ordering of packets.
             out_packet_t op;
             while (output_.pop(op)) {
                 switch (socket.send(op.impl)) {
