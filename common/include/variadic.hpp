@@ -29,6 +29,9 @@ namespace ctl {
         static const bool value = std::is_same<T, U>::value;
     };
 
+    template<typename T, typename ... Args>
+    using exclude_overload = is_any_of<typename std::decay<T>::type, Args...>;
+
     struct separator {};
 
     template<typename ... Args>
