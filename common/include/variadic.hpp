@@ -6,6 +6,8 @@
 
 /// Cobalt template library
 namespace ctl {
+    struct empty_t {};
+
     /// value == all the provided types have T::value == true
     template<typename ... Args>
     struct are_true;
