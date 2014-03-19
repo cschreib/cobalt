@@ -1,6 +1,7 @@
 #include "netcom_base.hpp"
 #include "endian.hpp"
 #include <scoped.hpp>
+#include <iostream>
 
 namespace netcom_exception {
     base::base(const std::string& s) : std::runtime_error(s) {}
@@ -11,7 +12,7 @@ namespace netcom_exception {
 
 netcom_base::netcom_base() {}
 
-void netcom_base::send_(out_packet_t&& p) {
+void netcom_base::send(out_packet_t p) {
     if (p.to == invalid_actor_id) throw netcom_exception::invalid_actor();
     if (p.to == self_actor_id) {
         // TODO: check thread safety of this
@@ -62,6 +63,11 @@ void netcom_base::terminate_() {
 bool netcom_base::process_message_(in_packet_t&& p) {
     packet_id_t id;
     p >> id;
+
+    if (debug_packets) {
+        std::cout << p.from << ": " << get_packet_name(id) << std::endl;
+    }
+
     auto iter = message_signals_.find(id);
     if (iter == message_signals_.end() || (*iter)->empty()) return false;
 
@@ -72,11 +78,20 @@ bool netcom_base::process_message_(in_packet_t&& p) {
 bool netcom_base::process_request_(in_packet_t&& p) {
     packet_id_t id;
     p >> id;
+
+    if (debug_packets) {
+        request_id_t rid;
+        p.view() >> rid;
+        std::cout << p.from << ": " << get_packet_name(id) << " (" << rid << ")" << std::endl;
+    }
+
     auto iter = request_signals_.find(id);
     if (iter == request_signals_.end() || (*iter)->empty()) {
         // No one is here to answer this request. Could be an error of either sides.
         // Send 'unhandled request' packet to the requester.
-        send_unhandled_(std::move(p));
+        request_id_t rid;
+        p >> rid;
+        send_unhandled_(p.from, rid);
         return false;
     }
 
@@ -87,6 +102,10 @@ bool netcom_base::process_request_(in_packet_t&& p) {
 bool netcom_base::process_answer_(netcom_impl::packet_type t, in_packet_t&& p) {
     request_id_t id;
     p >> id;
+
+    if (debug_packets) {
+        std::cout << p.from << ": answer to request " << id << std::endl;
+    }
 
     auto iter = answer_signals_.find(id);
     if (iter == answer_signals_.end()) return false;
@@ -100,6 +119,8 @@ void netcom_base::process_packets() {
     auto sc = ctl::make_scoped([this]() { processing_ = false; });
 
     // Process newly arrived packets
+    // TODO: unwrap the queue into a temporary container then process this.
+    // Necessary to preserve ordering of packets.
     in_packet_t p;
     while (input_.pop(p)) {
         netcom_impl::packet_type t;
@@ -110,7 +131,7 @@ void netcom_base::process_packets() {
             if (!process_message_(std::move(p))) {
                 packet_id_t id;
                 op >> id;
-                out_packet_t tp = create_message_(make_packet<message::unhandled_message>(id));
+                out_packet_t tp = create_message(make_packet<message::unhandled_message>(id));
                 process_message_(std::move(tp.to_input()));
             }
             break;
@@ -118,7 +139,7 @@ void netcom_base::process_packets() {
             if (!process_request_(std::move(p))) {
                 packet_id_t id;
                 op >> id;
-                out_packet_t tp = create_message_(make_packet<message::unhandled_request>(id));
+                out_packet_t tp = create_message(make_packet<message::unhandled_request>(id));
                 process_message_(std::move(tp.to_input()));
             }
             break;
@@ -128,7 +149,7 @@ void netcom_base::process_packets() {
             if (!process_answer_(t, std::move(p))) {
                 request_id_t id;
                 p >> id;
-                out_packet_t tp = create_message_(
+                out_packet_t tp = create_message(
                     make_packet<message::unhandled_request_answer>(id)
                 );
                 process_message_(std::move(tp.to_input()));
