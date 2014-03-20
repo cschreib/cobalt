@@ -34,7 +34,6 @@ namespace netcom_impl {
                 clients_.insert(req.packet.from);
             }
         } else {
-            print("not connected");
             req.unhandle();
         }
     }
@@ -52,12 +51,10 @@ void shared_collection_factory::destroy_(shared_collection_id_t id) {
 shared_collection_factory::shared_collection_factory(netcom_base& net) : net_(net) {
     pool_ << net_.watch_request(
         [this](netcom_base::request_t<request::observe_shared_collection>&& req) {
-            print("request to observe: ", req.arg.id);
             auto iter = collections_.find(req.arg.id);
             if (iter != collections_.end()) {
                 (*iter)->register_client(std::move(req));
             } else {
-                print("no such collection");
                 req.unhandle();
             }
         }
