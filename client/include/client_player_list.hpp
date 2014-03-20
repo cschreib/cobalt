@@ -30,6 +30,8 @@ namespace client {
         const player& get_self() const;
 
     private :
+        void request_join_(const std::string& name, const color32& col, bool as_ai);
+
         netcom& net_;
 
         ctl::ptr_vector<player> players_;
