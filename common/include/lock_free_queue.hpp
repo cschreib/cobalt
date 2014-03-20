@@ -5,9 +5,10 @@
 #include <utility>
 
 namespace ctl {
-    // Note : implementation is from
-    // http://www.drdobbs.com/parallel/writing-lock-free-code-a-corrected-queue/210604448
-
+    /// Thread safe and lock free FIFO queue.
+    /** Note: implementation is from:
+        http://www.drdobbs.com/parallel/writing-lock-free-code-a-corrected-queue/210604448
+    **/
     template<typename T>
     class lock_free_queue {
         struct node {
@@ -37,11 +38,12 @@ namespace ctl {
             }
         }
 
-        // Disable copy
         lock_free_queue(const lock_free_queue& q) = delete;
         lock_free_queue& operator = (const lock_free_queue& q) = delete;
 
-        // To be called by the 'producer' thread
+        /// Push a new element at the back of the queue.
+        /** Called by the 'producer' thread only.
+        **/
         template<typename U>
         void push(U&& t) {
             // Add the new item to the queue
@@ -56,7 +58,9 @@ namespace ctl {
             }
         }
 
-        // To be called by the 'consumer' thread
+        /// Pop an element from the front of the queue.
+        /** Called by the 'consumer' thread only.
+        **/
         bool pop(T& t) {
             // Return false if queue is empty
             if (dummy_!= last_) {
@@ -69,12 +73,16 @@ namespace ctl {
             }
         }
 
-        // To be called by the 'consumer' thread
+        /// Check if this queue is empty.
+        /** Called by the 'consumer' thread only.
+        **/
         bool empty() const {
             return dummy_ == last_;
         }
 
-        // This method should not be used in concurrent situations
+        /// Delete all elements from the queue.
+        /** This method should not be used in concurrent situations
+        **/
         void clear() {
             while (first_ != dummy_) {
                 node* temp = first_;
