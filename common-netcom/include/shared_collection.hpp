@@ -470,34 +470,20 @@ public :
         disconnect();
     }
 
-    /// Called when the full collection is received.
-    /** Note: must be set *before* connect(). Any change after the call to connect() has no
-        effect.
-    **/
-    ctl::delegate<void(const full_collection_packet&)> on_received =
-        [](const full_collection_packet&){};
+    /// Triggered when the full collection is received.
+    signal_t<void(const full_collection_packet&)> on_received;
 
-    /// Called if registration to the collection failed.
-    /** Note: must be set *before* connect(). Any change after the call to connect() has no
-        effect.
-    **/
-    ctl::delegate<void(const register_collection_failed_packet&)> on_register_fail =
-        [](const register_collection_failed_packet&){};
-    ctl::delegate<void()>                                         on_register_unhandled = [](){};
+    /// Triggered if registration to the collection failed.
+    signal_t<void(const register_collection_failed_packet&)> on_register_fail;
 
-    /// Called when a new item is added to the collection.
-    /** Note: must be set *before* connect(). Any change after the call to connect() has no
-        effect.
-    **/
-    ctl::delegate<void(const add_collection_element_packet&)> on_add_item =
-        [](const add_collection_element_packet&){};
+    /// Triggered if the collection does not exist.
+    signal_t<void()> on_register_unhandled;
 
-    /// Called when an item is removed from the collection.
-    /** Note: must be set *before* connect(). Any change after the call to connect() has no
-        effect.
-    **/
-    ctl::delegate<void(const remove_collection_element_packet&)> on_remove_item =
-        [](const remove_collection_element_packet&){};
+    /// Triggered when a new item is added to the collection.
+    signal_t<void(const add_collection_element_packet&)> on_add_item;
+
+    /// Triggered when an item is removed from the collection.
+    signal_t<void(const remove_collection_element_packet&)> on_remove_item;
 
     template<typename T = register_collection_packet>
     void connect(actor_id_t aid, T&& arg = register_collection_packet()) {
@@ -521,22 +507,31 @@ public :
             [this](const observe_answer& msg) {
                 if (msg.failed) {
                     if (msg.unhandled) {
-                        on_register_unhandled();
+                        on_register_unhandled.dispatch();
                     } else {
                         register_collection_failed_packet fail;
                         msg.packet.view() >> fail;
-                        on_register_fail(fail);
+                        on_register_fail.dispatch(fail);
                     }
                 } else {
                     full_collection_packet ans;
                     msg.packet.view() >> ans;
 
-                    pool_ << dispatcher_->add_signal_.connect(on_add_item);
-                    pool_ << dispatcher_->remove_signal_.connect(on_remove_item);
+                    pool_ << dispatcher_->add_signal_.connect(
+                        [this](const add_collection_element_packet& p) {
+                            on_add_item.dispatch(p);
+                        }
+                    );
+
+                    pool_ << dispatcher_->remove_signal_.connect(
+                        [this](const remove_collection_element_packet& p) {
+                            on_remove_item.dispatch(p);
+                        }
+                    );
 
                     connected_ = true;
 
-                    on_received(ans);
+                    on_received.dispatch(ans);
                 }
             }
         );
