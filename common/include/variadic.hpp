@@ -413,61 +413,20 @@ namespace ctl {
         typename std::decay<F>::type, Args...>::type;
 
     namespace impl {
-        // template<typename T>
-        // struct copy_cv {
-        //     template<typename U>
-        //     using apply = U;
-        // };
-
-        // template<typename T>
-        // struct copy_cv<T&> {
-        //     template<typename U>
-        //     using apply = U&;
-        // };
-
-        // template<typename T>
-        // struct copy_cv<const T&> {
-        //     template<typename U>
-        //     using apply = const U&;
-        // };
-
-        // template<typename F, typename T, typename T2>
-        // struct t2ar_;
-
-        // template<typename F, typename T, typename ... Args>
-        // struct t2ar_<F,T,std::tuple<Args...>> {
-        //     using type = result_of_functor<F, typename copy_cv<T>::template apply<Args>...>;
-        // };
-
-        // template<typename F, typename T>
-        // using t2ar = typename t2ar_<
-        //     typename std::decay<F>::type, T, typename std::decay<T>::type>::type;
-
         template<typename F, typename T, typename ... Args, std::size_t ... I>
-        // t2ar<F,T> tuple_to_args_(F&& func, T&& tup, type_list<Args...>, seq_t<I...>) {
-        auto tuple_to_args_(F&& func, T&& tup, seq_t<I...>) -> decltype(
-            std::forward<F>(func)(std::get<I>(std::forward<T>(tup))...)
-            ){
-            // return std::forward<F>(func)(std::forward<typename copy_cv<T>::template apply<Args>>(
-            //     std::get<I>(std::forward<T>(tup)))...);
+        auto tuple_to_args_(F&& func, T&& tup, seq_t<I...>) ->
+            decltype(std::forward<F>(func)(std::get<I>(std::forward<T>(tup))...)){
             return std::forward<F>(func)(std::get<I>(std::forward<T>(tup))...);
         }
     }
 
     /// Unfold a tuple and use the individual elements as function parameters
     template<typename F, typename T>
-    // impl::t2ar<F,T> tuple_to_args(F&& func, T&& tup) {
-    auto tuple_to_args(F&& func, T&& tup) -> decltype(
-        impl::tuple_to_args_(std::forward<F>(func), std::forward<T>(tup),
-        gen_seq<std::tuple_size<typename std::decay<T>::type>::value>{})
-        ) {
-    // auto tuple_to_args(F&& func, T&& tup) -> void {
+    auto tuple_to_args(F&& func, T&& tup) ->
+        decltype(impl::tuple_to_args_(std::forward<F>(func), std::forward<T>(tup),
+        gen_seq<std::tuple_size<typename std::decay<T>::type>::value>{})) {
         using tuple_type = typename std::decay<T>::type;
         using seq_type = gen_seq<std::tuple_size<tuple_type>::value>;
-        // using type_list = tuple_to_type_list<T>;
-        // return impl::tuple_to_args_(std::forward<F>(func), std::forward<T>(tup),
-        //     type_list{}, seq_type{}
-        // );
         return impl::tuple_to_args_(std::forward<F>(func), std::forward<T>(tup), seq_type{});
     }
 }
