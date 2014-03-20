@@ -1,6 +1,5 @@
 #include "server_netcom.hpp"
 #include <config.hpp>
-#include <print.hpp>
 
 namespace server {
     netcom::netcom(config::state& conf) :
@@ -161,8 +160,6 @@ namespace server {
             }
 
             // Send packets to clients
-            // TODO: unwrap the queue into a temporary container then process this
-            // Necessary to preserve ordering of packets.
             out_packet_t op;
             while (output_.pop(op)) {
                 if (op.to == all_actor_id) {

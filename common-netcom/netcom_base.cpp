@@ -119,13 +119,14 @@ void netcom_base::process_packets() {
     auto sc = ctl::make_scoped([this]() { processing_ = false; });
 
     // Process newly arrived packets
-    // TODO: unwrap the queue into a temporary container then process this.
-    // Necessary to preserve ordering of packets.
     in_packet_t p;
     while (input_.pop(p)) {
         netcom_impl::packet_type t;
         p >> t;
+
+        // TODO: optimize this copy
         in_packet_t op = p;
+
         switch (t) {
         case netcom_impl::packet_type::message :
             if (!process_message_(std::move(p))) {
