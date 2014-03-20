@@ -65,7 +65,7 @@ bool netcom_base::process_message_(in_packet_t&& p) {
     p >> id;
 
     if (debug_packets) {
-        std::cout << p.from << ": " << get_packet_name(id) << std::endl;
+        std::cout << "<" << p.from << ": " << get_packet_name(id) << std::endl;
     }
 
     auto iter = message_signals_.find(id);
@@ -80,9 +80,9 @@ bool netcom_base::process_request_(in_packet_t&& p) {
     p >> id;
 
     if (debug_packets) {
-        request_id_t rid;
-        p.view() >> rid;
-        std::cout << p.from << ": " << get_packet_name(id) << " (" << rid << ")" << std::endl;
+        request_id_t rid; p.view() >> rid;
+        std::cout << "<" << p.from << ": " << get_packet_name(id)
+            << " (" << rid << ")" << std::endl;
     }
 
     auto iter = request_signals_.find(id);
@@ -100,15 +100,22 @@ bool netcom_base::process_request_(in_packet_t&& p) {
 }
 
 bool netcom_base::process_answer_(netcom_impl::packet_type t, in_packet_t&& p) {
-    request_id_t id;
-    p >> id;
+    request_id_t rid;
+    p >> rid;
 
-    if (debug_packets) {
-        std::cout << p.from << ": answer to request " << id << std::endl;
+    auto iter = answer_signals_.find(rid);
+    if (iter == answer_signals_.end()) {
+        if (debug_packets) {
+            std::cout << "<" << p.from << ": answer to request " << rid
+                << " (unhandled)" << std::endl;
+        }
+        return false;
     }
 
-    auto iter = answer_signals_.find(id);
-    if (iter == answer_signals_.end()) return false;
+    if (debug_packets) {
+        std::cout << "<" << p.from << ": answer to " << get_packet_name((*iter)->id)
+            << " (" << rid << ")" << std::endl;
+    }
 
     (*iter)->dispatch(t, std::move(p));
     return true;

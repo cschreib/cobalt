@@ -397,19 +397,20 @@ namespace netcom_impl {
     };
 
     struct answer_signal_t {
-        explicit answer_signal_t(request_id_t id_) : id(id_) {}
+        explicit answer_signal_t(packet_id_t id_, request_id_t rid_) : id(id_), rid(rid_) {}
         virtual ~answer_signal_t() = default;
         virtual void dispatch(packet_type t, in_packet_t&& p) = 0;
         virtual bool empty() const = 0;
         virtual void clear() = 0;
-        const request_id_t id;
+        const packet_id_t  id;
+        const request_id_t rid;
     };
 
     template<typename P>
     struct answer_signal_impl : answer_signal_t {
         signals::answer<P> signal;
 
-        explicit answer_signal_impl(request_id_t id) : answer_signal_t(id) {}
+        explicit answer_signal_impl(request_id_t rid) : answer_signal_t(P::packet_id__, rid) {}
 
         void dispatch(packet_type t, in_packet_t&& p) override {
             request_answer_t<P> r(t, std::move(p));
@@ -518,7 +519,7 @@ private :
 
     // Answer signals
     using answer_signal_container = ctl::sorted_vector<
-        std::unique_ptr<answer_signal_t>, mem_var_comp(&answer_signal_t::id)
+        std::unique_ptr<answer_signal_t>, mem_var_comp(&answer_signal_t::rid)
     >;
     answer_signal_container answer_signals_;
     ctl::unique_id_provider<request_id_t> request_id_provider_;
