@@ -3,7 +3,7 @@
 
 #include <color32.hpp>
 #include <ptr_vector.hpp>
-#include <connection_handler.hpp>
+#include <scoped_connection_pool.hpp>
 #include <shared_collection.hpp>
 #include "client_netcom.hpp"
 #include "server_player_list.hpp"

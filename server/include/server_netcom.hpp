@@ -3,7 +3,7 @@
 
 #include <netcom_base.hpp>
 #include <SFML/Network.hpp>
-#include <connection_handler.hpp>
+#include <scoped_connection_pool.hpp>
 #include <unique_id_provider.hpp>
 #include <shared_collection.hpp>
 

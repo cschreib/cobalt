@@ -1,7 +1,7 @@
 #ifndef SHARED_COLLECTION_HPP
 #define SHARED_COLLECTION_HPP
 
-#include <connection_handler.hpp>
+#include <scoped_connection_pool.hpp>
 #include <sorted_vector.hpp>
 #include "netcom_base.hpp"
 
