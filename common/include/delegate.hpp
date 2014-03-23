@@ -10,9 +10,9 @@ namespace ctl {
     /// Wrapper to store lambda functions.
     /** This structure is a simple wrapper that, much like std::bind(), stores the "this" pointer of
         member functions in order to use member functions like normal functions.
-        The bound member function does not need to have the same signature as that of the delegate. The
-        delegate parameters just need to be implicitly convertible to that of the member function,
-        and the converse is true for the return value.
+        The bound member function does not need to have the same signature as that of the delegate.
+        The delegate parameters just need to be implicitly convertible to that of the member
+        function, and the converse is true for the return value.
 
         Use case:
 
@@ -26,10 +26,10 @@ namespace ctl {
             }
         \endcode
 
-        It shares similar features with std::function, except that it does not support free functions
-        and custom allocators (not needed). On the other hand, it is tailored for use with lambda
-        functions (or any other functor), and provides substantial performance improvements over
-        std::function (about a factor 2 faster with clang & gcc in -O3).
+        It shares similar features with std::function, except that it does not support free
+        functions and custom allocators (not needed). On the other hand, it is tailored for use with
+        lambda functions (or any other functor), and provides substantial performance improvements
+        over std::function (about a factor 2 faster with clang & gcc in -O3).
 
         Based on "Impossibly fast C++ delegates".
         http://www.codeproject.com/Articles/11015/The-Impossibly-Fast-C-Delegates
@@ -37,13 +37,13 @@ namespace ctl {
     template<typename R, typename ... Args>
     struct delegate<R(Args...)> {
         /// Construct a new delegate.
-        /** In all constructors, the first argument is the object on which the delegate acts, and the
-            second argument is the member function that is to be called. When the object is given as a
-            reference or a pointer, then only a pointer to this object is kept inside the delegate, and
-            the object is expected to outlive the delegate. On the other hand, is the object is given as
-            an r-value (either a temporary or an r-value reference), a new instance is move constructed
-            inside the delegate, and its lifetime is bound to that of the delegate.
-            The member function can be given either as a function pointer, or as an
+        /** In all constructors, the first argument is the object on which the delegate acts, and
+            the second argument is the member function that is to be called. When the object is
+            given as a reference or a pointer, then only a pointer to this object is kept inside the
+            delegate, and the object is expected to outlive the delegate. On the other hand, if the
+            object is given as an r-value (either a temporary or an r-value reference), a new
+            instance is move constructed inside the delegate, and its lifetime is bound to that of
+            the delegate. The member function can be given either as a function pointer, or as an
             std::integral_constant. The latter is usually faster because the function pointer is a
             template argument, and can be more easily inlined by the compiler, but it is also more
             tedious to write.
