@@ -65,7 +65,6 @@ namespace client {
         if (collection_.is_connected()) {
             request_join_(name, col, as_ai);
         } else {
-            // TODO: make it possible for signals to accept fewer arguments than the signature?
             pool_ << collection_.on_received.connect<unique_signal_connection>(
                 [=](const packet::player_list&) {
                     request_join_(name, col, as_ai);
