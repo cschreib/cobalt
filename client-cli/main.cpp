@@ -61,6 +61,20 @@ int main(int argc, const char* argv[]) {
 
     client::player_list plist(net);
 
+    pool << plist.on_list_received.connect([&plist]() {
+        if (plist.empty()) {
+            print("player list received (empty)");
+        } else {
+            print("player list received:");
+            for (const client::player& p : plist) {
+                print(" - id=", p.id, ", ip=", p.ip, ", name=", p.name, ", color=", p.color,
+                    ", ai=", p.is_ai);
+            }
+        }
+    });
+    pool << plist.on_connect_fail.connect([]() {
+        error("could not read player list");
+    });
     pool << plist.on_join.connect([](client::player& p) {
         print("joined as player \"", p.name, "\"");
     });
@@ -70,6 +84,15 @@ int main(int argc, const char* argv[]) {
     pool << plist.on_join_fail.connect([]() {
         error("could not join as player");
     });
+    pool << plist.on_player_connected.connect([](client::player& p) {
+        print("new player connected: id=", p.id, ", ip=", p.ip, ", name=",
+            p.name, ", color=", p.color, ", ai=", p.is_ai);
+    });
+    pool << plist.on_player_disconnected.connect([](const client::player& p) {
+        print("player disconnected: id=", p.id, ", name=", p.name);
+    });
+
+    plist.connect();
 
     std::string behavior = "watcher";
     conf.get_value("player.behavior", behavior, behavior);
@@ -82,14 +105,6 @@ int main(int argc, const char* argv[]) {
         conf.get_value("player.color", player_color, player_color);
         plist.join_as(player_name, player_color, false);
     }
-
-    pool << plist.on_player_connected.connect([](client::player& p) {
-        print("new player connected: id=", p.id, ", ip=", p.ip, ", name=",
-            p.name, ", color=", p.color, ", ai=", p.is_ai);
-    });
-    pool << plist.on_player_disconnected.connect([](const client::player& p) {
-        print("player disconnected: id=", p.id, ", name=", p.name);
-    });
 
     std::string server_ip = "127.0.0.1";
     conf.get_value("netcom.server_ip", server_ip, server_ip);

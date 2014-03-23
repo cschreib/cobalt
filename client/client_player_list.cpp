@@ -3,17 +3,27 @@
 #include "client_player.hpp"
 
 namespace client {
-    player_list::player_list(netcom& net) : net_(net), self_(nullptr) {
+    player_list::player_list(netcom& net) : net_(net), self_(nullptr) {}
+
+    void player_list::connect() {
         pool_ << net_.send_request(netcom::server_actor_id,
             make_packet<request::client::player_list_collection_id>(),
-            [this](const request::client::player_list_collection_id::answer& ans) {
-                collection_ = net_.make_shared_collection_observer<player_collection_traits>(ans.id);
+            [this](const netcom::request_answer_t<request::client::player_list_collection_id>& msg) {
+                if (msg.failed) {
+                    on_connect_fail.dispatch();
+                    return;
+                }
+
+                collection_ = net_.make_shared_collection_observer<player_collection_traits>(
+                    msg.answer.id
+                );
 
                 collection_.on_received.connect([this](const packet::player_list& lst) {
                     for (auto& p : lst.players) {
                         players_.emplace_back(p.id, p.ip, p.name, p.color, p.is_ai);
                     }
-                    // on_list_received.dispatch();
+
+                    on_list_received.dispatch();
                 });
 
                 collection_.on_add_item.connect([this](const packet::player_connected& p) {
@@ -32,12 +42,21 @@ namespace client {
                     players_.erase(iter);
                 });
 
-                // collection_.on_register_unhandled = []() { print("unhandled?!"); };
-                // collection_.on_register_fail = [](ctl::empty_t) { print("failed!!"); };
+                collection_.on_register_unhandled.connect([this]() {
+                    on_connect_fail.dispatch();
+                });
+
+                collection_.on_register_fail.connect([this](ctl::empty_t) {
+                    on_connect_fail.dispatch();
+                });
 
                 collection_.connect(netcom::server_actor_id);
             }
         );
+    }
+
+    bool player_list::is_connected() const {
+        return collection_.is_connected();
     }
 
     bool player_list::is_player(actor_id_t id) const {
@@ -91,5 +110,25 @@ namespace client {
 
     const player& player_list::get_self() const {
         return *self_;
+    }
+
+    bool player_list::empty() const {
+        return players_.empty();
+    }
+
+    player_list::iterator player_list::begin() {
+        return players_.begin();
+    }
+
+    player_list::iterator player_list::end() {
+        return players_.end();
+    }
+
+    player_list::const_iterator player_list::begin() const {
+        return players_.begin();
+    }
+
+    player_list::const_iterator player_list::end() const {
+        return players_.end();
     }
 }

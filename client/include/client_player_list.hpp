@@ -14,6 +14,12 @@ namespace client {
     public :
         explicit player_list(netcom& net);
 
+        void connect();
+        signal_t<void()> on_list_received;
+        signal_t<void()> on_connect_fail;
+
+        bool is_connected() const;
+
         bool is_player(actor_id_t id) const;
         const player& get_player(actor_id_t id) const;
         signal_t<void(player&)>       on_player_connected;
@@ -28,6 +34,16 @@ namespace client {
 
         bool is_joined() const;
         const player& get_self() const;
+
+        using iterator = ctl::ptr_vector<player>::iterator;
+        using const_iterator = ctl::ptr_vector<player>::const_iterator;
+
+        bool empty() const;
+
+        iterator begin();
+        iterator end();
+        const_iterator begin() const;
+        const_iterator end() const;
 
     private :
         void request_join_(const std::string& name, const color32& col, bool as_ai);
