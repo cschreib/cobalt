@@ -56,7 +56,7 @@ namespace server {
         );
 
         pool_ << net_.watch_message(
-            [this](const message::server::internal::client_disconnected& msg) {
+            [this](const message::client_disconnected& msg) {
                 auto iter = players_.find_if([&](const player& p) { return p.id == msg.id; });
                 if (iter == players_.end()) return;
 

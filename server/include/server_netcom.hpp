@@ -95,19 +95,6 @@ namespace server {
         NETCOM_PACKET(unknown_client) {
             actor_id_t id;
         };
-
-        NETCOM_PACKET(client_connected) {
-            actor_id_t id;
-            std::string ip;
-        };
-
-        NETCOM_PACKET(client_disconnected) {
-            actor_id_t id;
-
-            enum class reason : std::uint8_t {
-                connection_lost
-            } rsn;
-        };
     }
 
     NETCOM_PACKET(connection_established) {};

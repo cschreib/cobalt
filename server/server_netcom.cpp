@@ -104,7 +104,7 @@ namespace server {
                         actor_id_t id;
                         if (client_id_provider_.make_id(id)) {
                             send_message(self_actor_id,
-                                make_packet<message::server::internal::client_connected>(
+                                make_packet<message::client_connected>(
                                     id, s->getRemoteAddress().toString()
                                 )
                             );
@@ -205,8 +205,8 @@ namespace server {
             // Remove disconnected clients
             for (auto cid : remove_list) {
                 send_message(self_actor_id,
-                    make_packet<message::server::internal::client_disconnected>(
-                        cid, message::server::internal::client_disconnected::reason::connection_lost
+                    make_packet<message::client_disconnected>(
+                        cid, message::client_disconnected::reason::connection_lost
                     )
                 );
 

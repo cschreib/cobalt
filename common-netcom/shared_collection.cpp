@@ -69,14 +69,13 @@ shared_collection_factory::shared_collection_factory(netcom_base& net) : net_(ne
         }
     );
 
-    // TODO: add client_disconnected into netcom_base
-    // pool_ << net_.watch_message(
-    //     [this](const message::server::internal::client_disconnected& msg) {
-    //         for (auto& c : collections_) {
-    //             c->unregister_client(msg.id);
-    //         }
-    //     }
-    // );
+    pool_ << net_.watch_message(
+        [this](const message::client_disconnected& msg) {
+            for (auto& c : collections_) {
+                c->unregister_client(msg.id);
+            }
+        }
+    );
 
     pool_ << net_.watch_message(
         [this](const netcom_base::message_t<message::shared_collection_add>& msg) {

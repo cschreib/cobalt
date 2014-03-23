@@ -29,14 +29,14 @@ int main(int argc, const char* argv[]) {
         note("now listening to port ", msg.port);
     });
 
-    pool << net.watch_message([&](const message::server::internal::client_connected& msg) {
+    pool << net.watch_message([&](const message::client_connected& msg) {
         note("new client connected (", msg.id, ") from ", msg.ip);
     });
-    pool << net.watch_message([&](const message::server::internal::client_disconnected& msg) {
+    pool << net.watch_message([&](const message::client_disconnected& msg) {
         note("client ", msg.id, " disconnected");
         std::string rsn = "?";
         switch (msg.rsn) {
-            case message::server::internal::client_disconnected::reason::connection_lost :
+            case message::client_disconnected::reason::connection_lost :
                 rsn = "connection lost"; break;
         }
         reason(rsn);

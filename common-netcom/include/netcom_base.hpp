@@ -38,6 +38,19 @@ namespace message {
     NETCOM_PACKET(unhandled_request_answer) {
         request_id_t request_id;
     };
+
+    NETCOM_PACKET(client_connected) {
+        actor_id_t id;
+        std::string ip;
+    };
+
+    NETCOM_PACKET(client_disconnected) {
+        actor_id_t id;
+
+        enum class reason : std::uint8_t {
+            connection_lost
+        } rsn;
+    };
 }
 
 // List of requests that one can send with this class
