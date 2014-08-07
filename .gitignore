@@ -1,6 +1,7 @@
-bin
 build
 *.sublime-workspace
 *.sublime-project
 server/bak/
 bak/
+bin/cobalt-server-cli
+bin/cobalt-client-cli
