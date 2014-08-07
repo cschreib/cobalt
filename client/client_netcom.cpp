@@ -47,9 +47,9 @@ namespace client {
 
                 out_packet_t op(server_actor_id);
                 if (socket.receive(op.impl) == sf::Socket::Done) {
-                    out_packet_t top = op;
+                    auto opv = op.view();
                     netcom_impl::packet_type t;
-                    op >> t;
+                    opv >> t;
                     if (t != netcom_impl::packet_type::message) {
                         send_message(self_actor_id, make_packet<message::server::connection_denied>(
                             message::server::connection_denied::reason::unexpected_packet
@@ -58,14 +58,14 @@ namespace client {
                     }
 
                     packet_id_t id;
-                    op >> id;
+                    opv >> id;
                     switch (id) {
                     case message::server::connection_granted::packet_id__ :
-                        op >> self_id_;
-                        input_.push(std::move(top.to_input()));
+                        opv >> self_id_;
+                        input_.push(std::move(op.to_input()));
                         break;
                     case message::server::connection_denied::packet_id__ :
-                        input_.push(std::move(top.to_input()));
+                        input_.push(std::move(op.to_input()));
                         return;
                     default :
                         send_message(self_actor_id, make_packet<message::server::connection_denied>(
