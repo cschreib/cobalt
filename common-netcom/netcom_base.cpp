@@ -126,22 +126,18 @@ void netcom_base::process_packets() {
         netcom_impl::packet_type t;
         p >> t;
 
-        // TODO: optimize this copy
-        in_packet_t op = p;
+        packet_id_t id;
+        p.impl.view() >> id;
 
         switch (t) {
         case netcom_impl::packet_type::message :
             if (!process_message_(std::move(p))) {
-                packet_id_t id;
-                op >> id;
                 out_packet_t tp = create_message(make_packet<message::unhandled_message>(id));
                 process_message_(std::move(tp.to_input()));
             }
             break;
         case netcom_impl::packet_type::request :
             if (!process_request_(std::move(p))) {
-                packet_id_t id;
-                op >> id;
                 out_packet_t tp = create_message(make_packet<message::unhandled_request>(id));
                 process_message_(std::move(tp.to_input()));
             }
@@ -150,8 +146,6 @@ void netcom_base::process_packets() {
         case netcom_impl::packet_type::failure :
         case netcom_impl::packet_type::unhandled :
             if (!process_answer_(t, std::move(p))) {
-                request_id_t id;
-                p >> id;
                 out_packet_t tp = create_message(
                     make_packet<message::unhandled_request_answer>(id)
                 );
