@@ -57,12 +57,14 @@ namespace space {
     /** It is not splitable, and is the only type of cell that can
         contain actual objects. The only features it offers are:
 
-         * containing an object:
-           content, fill, release, clear, empty
-         * accessing the neighboring cells:
-           reach, try_reach
-         * computing its asolute coordinates:
-           get_coordinates
+         - containing an object:
+           content(), fill(), release(), clear(), empty()
+
+         - accessing the neighboring cells:
+           reach(), try_reach()
+
+         - computing its asolute coordinates:
+           get_coordinates()
 
         The other purpose of this class is to do type erasure:
         the code that uses this set of classes does not need to

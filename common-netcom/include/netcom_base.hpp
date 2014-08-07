@@ -454,8 +454,8 @@ namespace watch_policy {
 /// Base class of network communication.
 /** This class must be inherited from. The derived class must then take care of filling the input
     packet queue (input_) and consuming the output packet queue (output_). These two queues are
-    thread safe, and can thus be filled/consumed in another thread. The rest of the code is not
-    guaranteed to be thread safe, and doesn't use any thread.
+    thread safe, and can thus be filled or consumed in separate threads. The rest of the code is
+    not guaranteed to be thread safe, and doesn't use any thread.
     In particular, this is true for all the callback functions that are registered to requests,
     their answers or simple messages. These are called sequentially in process_packets(), in a
     synchronous way.
@@ -466,7 +466,7 @@ public :
 
     virtual ~netcom_base() = default;
 
-    using in_packet_t = netcom_impl::in_packet_t;
+    using in_packet_t  = netcom_impl::in_packet_t;
     using out_packet_t = netcom_impl::out_packet_t;
 
     /// Invalid ID.
@@ -506,7 +506,7 @@ protected :
 private :
     using message_signal_t = netcom_impl::message_signal_t;
     using request_signal_t = netcom_impl::request_signal_t;
-    using answer_signal_t = netcom_impl::answer_signal_t;
+    using answer_signal_t  = netcom_impl::answer_signal_t;
     template<typename T>
     using message_signal_impl = netcom_impl::message_signal_impl<T>;
     template<typename T>
