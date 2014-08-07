@@ -176,6 +176,9 @@ namespace server {
                         default : break;
                         }
                     }
+                } else if (op.to == self_actor_id) {
+                    // Bounce back packets sent to oneself
+                    input_.push(std::move(op.to_input()));
                 } else {
                     // Send to individual clients
                     auto iter = clients_.find(op.to);

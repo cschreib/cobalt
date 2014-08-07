@@ -131,16 +131,27 @@ namespace client {
             socket.setBlocking(true);
             out_packet_t op;
             while (output_.pop(op)) {
-                switch (socket.send(op.impl)) {
-                case sf::Socket::Done : break;
-                case sf::Socket::NotReady :
-                case sf::Socket::Disconnected :
-                case sf::Socket::Error :
-                    send_message(self_actor_id, make_packet<message::server::connection_failed>(
-                        message::server::connection_failed::reason::disconnected
-                    ));
-                    terminate_thread_ = true;
-                    break;
+                if (op.to == server_actor_id) {
+                    switch (socket.send(op.impl)) {
+                    case sf::Socket::Done : break;
+                    case sf::Socket::NotReady :
+                    case sf::Socket::Disconnected :
+                    case sf::Socket::Error :
+                        send_message(self_actor_id, make_packet<message::server::connection_failed>(
+                            message::server::connection_failed::reason::disconnected
+                        ));
+                        terminate_thread_ = true;
+                        break;
+                    }
+                } else if (op.to == self_actor_id) {
+                    // Bounce back packets sent to oneself
+                    input_.push(std::move(op.to_input()));
+                } else if (op.to == all_actor_id) {
+                    // Clients to not have the right to broadcast
+                    throw netcom_exception::invalid_actor();
+                } else {
+                    // Peer to peer communication is not supported for now
+                    throw netcom_exception::invalid_actor();
                 }
             }
 

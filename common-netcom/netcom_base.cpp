@@ -14,12 +14,7 @@ netcom_base::netcom_base() {}
 
 void netcom_base::send(out_packet_t p) {
     if (p.to == invalid_actor_id) throw netcom_exception::invalid_actor();
-    if (p.to == self_actor_id) {
-        // TODO: check thread safety of this
-        input_.push(std::move(p.to_input()));
-    } else {
-        output_.push(std::move(p));
-    }
+    output_.push(std::move(p));
 }
 
 void netcom_base::stop_request_(request_id_t id) {
