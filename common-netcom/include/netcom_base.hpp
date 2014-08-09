@@ -11,6 +11,7 @@
 #include <signal.hpp>
 #include <holdable_signal_connection.hpp>
 #include "packet.hpp"
+#include "credential.hpp"
 #include "serialized_packet.hpp"
 
 // Unique ID attributed to any request.
@@ -51,13 +52,13 @@ namespace message {
             connection_lost
         } rsn;
     };
-}
 
-// List of requests that one can send with this class
-namespace request {
-    NETCOM_PACKET(ping) {
-        struct answer {};
-        struct failure {};
+    NETCOM_PACKET(credentials_granted) {
+        credential_list_t cred;
+    };
+
+    NETCOM_PACKET(credentials_removed) {
+        credential_list_t cred;
     };
 }
 
@@ -179,11 +180,12 @@ namespace netcom_impl {
 
     // General type of a packet.
     enum class packet_type : std::uint8_t {
-        message,  // simple message, does not expects any answer
-        request,  // asks for a value or an action, and expects an answer
-        answer,   // answer to a successful request
-        failure,  // answer to a failed request
-        unhandled // request cannot be handled
+        message,              // simple message, does not expects any answer
+        request,              // asks for a value or an action, and expects an answer
+        answer,               // answer to a successful request
+        failure,              // answer to a failed request
+        missing_credentials,  // not enough credentials to accept the request
+        unhandled             // request cannot be handled
     };
 
     // Public object that encapsulates request answering.
@@ -273,6 +275,8 @@ namespace netcom_impl {
                 packet >> answer; break;
             case packet_type::failure :
                 failed = true; packet >> failure; break;
+            case packet_type::missing_credentials :
+                failed = true; packet >> missing_credentials; break;
             case packet_type::unhandled :
                 failed = true; unhandled = true; break;
             default : break;
@@ -281,6 +285,7 @@ namespace netcom_impl {
 
     public :
         bool failed, unhandled;
+        credential_list_t missing_credentials;
         mutable in_packet_t packet;
         answer_t  answer;
         failure_t failure;
@@ -378,9 +383,7 @@ namespace netcom_impl {
 
         request_signal_impl() : request_signal_t(P::packet_id__) {}
 
-        void dispatch(netcom_base& net, in_packet_t&& p) override {
-            signal.dispatch(request_t<P>(net, std::move(p)));
-        }
+        void dispatch(netcom_base& net, in_packet_t&& p) override;
 
         bool empty() const override {
             return signal.empty();
@@ -751,6 +754,41 @@ private :
         return netsig.signal.template connect<WP>(std::forward<FR>(receive_func));
     }
 
+protected :
+    virtual credential_list_t get_missing_credentials_(actor_id_t cid,
+        const constant_credential_list_t& lst) {
+        return credential_list_t{};
+    }
+
+private :
+    template<typename P>
+    friend struct netcom_impl::request_signal_impl;
+
+    template<typename RequestType>
+    bool check_request_credentials_(const in_packet_t& p, std::false_type) {
+        return true;
+    }
+
+    template<typename RequestType>
+    bool check_request_credentials_(const in_packet_t& p, std::true_type) {
+        credential_list_t lst = get_missing_credentials_(p.from,
+            constant_credential_list_t(ctl::type_list<RequestType>{})
+        );
+        if (lst.empty()) {
+            return true;
+        } else {
+            request_id_t rid;
+            p.view() >> rid;
+            send_missing_credentials_(p.from, rid, lst);
+            return false;
+        }
+    }
+
+    template<typename RequestType>
+    bool check_request_credentials(const in_packet_t& p) {
+        return check_request_credentials_<RequestType>(p, requires_credentials<RequestType>{});
+    }
+
 public :
     /// Register a slot to be called whenever a given message packet is received.
     /** The slot will be called by process_packets() when the corresponding message is received, and
@@ -788,6 +826,15 @@ private :
         p << netcom_impl::packet_type::failure;
         p << rid;
         packet_write(p, std::forward<Args>(args)...);
+        send(std::move(p));
+    }
+
+    // Send a failure signal to a request with the provided arguments.
+    void send_missing_credentials_(actor_id_t aid, request_id_t rid, const credential_list_t& cl) {
+        out_packet_t p(aid);
+        p << netcom_impl::packet_type::missing_credentials;
+        p << rid;
+        p << cl;
         send(std::move(p));
     }
 
@@ -904,6 +951,14 @@ namespace netcom_impl {
         net_.send_unhandled_(packet.from, rid_);
         answered_ = true;
         failed_ = true;
+    }
+
+
+    template<typename P>
+    void request_signal_impl<P>::dispatch(netcom_base& net, in_packet_t&& p) {
+        if (net.check_request_credentials<P>(p)) {
+            signal.dispatch(request_t<P>(net, std::move(p)));
+        }
     }
 
     template<typename T>

@@ -2,6 +2,9 @@
 #include <config.hpp>
 
 namespace server {
+    netcom::client_t::client_t(std::unique_ptr<sf::TcpSocket> s, actor_id_t i) :
+        socket(std::move(s)), id(i) {}
+
     netcom::netcom(config::state& conf) :
         conf_(conf), listen_port_(4444), max_client_(1),
         client_id_provider_(max_client_, first_actor_id),
@@ -73,6 +76,48 @@ namespace server {
         return iter->socket->getRemoteAddress().toString();
     }
 
+    void netcom::grant_credentials(actor_id_t cid, const credential_list_t& creds) {
+        if (cid == self_actor_id) {
+            throw netcom_exception::invalid_actor{};
+        }
+
+        if (cid == all_actor_id) {
+            for (auto& c : clients_) {
+                c.cred.grant(creds);
+                send_message(c.id, make_packet<message::credentials_granted>(creds));
+            }
+        } else {
+            auto iter = clients_.find(cid);
+            if (iter == clients_.end()) {
+                throw netcom_exception::invalid_actor{};
+            }
+
+            iter->cred.grant(creds);
+            send_message(iter->id, make_packet<message::credentials_granted>(creds));
+        }
+    }
+
+    void netcom::remove_credentials(actor_id_t cid, const credential_list_t& creds) {
+        if (cid == self_actor_id) {
+            throw netcom_exception::invalid_actor{};
+        }
+
+        if (cid == all_actor_id) {
+            for (auto& c : clients_) {
+                c.cred.remove(creds);
+                send_message(c.id, make_packet<message::credentials_removed>(creds));
+            }
+        } else {
+            auto iter = clients_.find(cid);
+            if (iter == clients_.end()) {
+                throw netcom_exception::invalid_actor{};
+            }
+
+            iter->cred.remove(creds);
+            send_message(iter->id, make_packet<message::credentials_removed>(creds));
+        }
+    }
+
     void netcom::loop_() {
         // Try to open the port
         while (listener_.listen(listen_port_) != sf::Socket::Done && !terminate_thread_) {
@@ -115,7 +160,7 @@ namespace server {
                             s->send(p.impl);
 
                             selector_.add(*s);
-                            clients_.insert({std::move(s), id});
+                            clients_.insert(client_t(std::move(s), id));
                         } else {
                             out_packet_t p = create_message(
                                 make_packet<message::server::connection_denied>(
@@ -240,5 +285,16 @@ namespace server {
         selector_.remove(*ic->socket);
         ic->socket->disconnect();
         clients_.erase(ic);
+    }
+
+    credential_list_t netcom::get_missing_credentials_(actor_id_t cid,
+        const constant_credential_list_t& lst) {
+
+        auto iter = clients_.find(cid);
+        if (iter == clients_.end()) {
+            throw netcom_exception::invalid_actor{};
+        }
+
+        return iter->cred.find_missing(lst);
     }
 }

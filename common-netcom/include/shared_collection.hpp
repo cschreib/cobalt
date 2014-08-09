@@ -271,7 +271,8 @@ namespace netcom_impl {
      - add_packet: packet sent to clients when a new object is added
      - remove_packet: packet sent to clients when an object is removed
 
-    A complementary interface for clients is provided by client::shared_collection.
+    This is the server side class. The complementary interface for clients is provided by
+    shared_collection_observer.
 **/
 template<typename ElementTraits>
 class shared_collection {

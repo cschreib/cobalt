@@ -120,6 +120,15 @@ namespace ctl {
         **/
         explicit sorted_vector_t(const Cmp& c) : compare(c) {}
 
+        /// Write an initializer list into this vector.
+        /** The list need not be sorted.
+        **/
+        sorted_vector_t(std::initializer_list<T> l) {
+            for (auto& e : l) {
+                insert(e);
+            }
+        }
+
         /// Insert a copy of the provided object in the vector.
         /** If an object already exists with the same key, it is destroyed and replaced by this
             copy.

@@ -2,6 +2,7 @@
 #include <server_netcom.hpp>
 #include "client_player_list.hpp"
 #include <server_player_list.hpp>
+#include <server_instance.hpp>
 #include <time.hpp>
 #include <print.hpp>
 #include <config.hpp>
@@ -59,6 +60,20 @@ int main(int argc, const char* argv[]) {
         note("connection granted (id=", msg.id, ")!");
     });
 
+    pool << net.watch_message([&](const message::credentials_granted& msg) {
+        note("new credentials acquired:");
+        for (auto& c : msg.cred) {
+            note(" - ", c);
+        }
+    });
+
+    pool << net.watch_message([&](const message::credentials_removed& msg) {
+        note("credentials removed:");
+        for (auto& c : msg.cred) {
+            note(" - ", c);
+        }
+    });
+
     client::player_list plist(net);
 
     pool << plist.on_list_received.connect([&plist]() {
@@ -106,10 +121,30 @@ int main(int argc, const char* argv[]) {
         plist.join_as(player_name, player_color, false);
     }
 
+    if (behavior == "admin") {
+        std::string password = "";
+        conf.get_value("admin.password", password);
+        net.send_request(client::netcom::server_actor_id,
+            make_packet<request::server::admin_rights>(password),
+            [](const client::netcom::request_answer_t<request::server::admin_rights>& msg) {
+                if (msg.failed) {
+                    error("admin rights denied");
+                    std::string rsn;
+                    switch (msg.failure.rsn) {
+                        case request::server::admin_rights::failure::reason::wrong_password :
+                            rsn = "wrong password provided";
+                            break;
+                    }
+                    reason(rsn);
+                }
+            }
+        );
+    }
+
     std::string server_ip = "127.0.0.1";
     conf.get_value("netcom.server_ip", server_ip, server_ip);
     std::uint16_t server_port = 4444;
-    conf.get_value("netcom.serer_port", server_port, server_port);
+    conf.get_value("netcom.server_port", server_port, server_port);
 
     net.run(server_ip, server_port);
     while (!stop && !net.is_connected()) {
@@ -128,13 +163,13 @@ int main(int argc, const char* argv[]) {
         double n = now();
         if (behavior == "ponger" && n - last > 2) {
             last = n;
-            net.send_request(client::netcom::server_actor_id, request::ping{},
-            [n](const client::netcom::request_answer_t<request::ping>& msg) {
+            net.send_request(client::netcom::server_actor_id, request::server::ping{},
+            [n](const client::netcom::request_answer_t<request::server::ping>& msg) {
                 if (msg.failed) {
                     if (msg.unhandled) {
                         error("server does not know how to pong...");
                     } else {
-                        warning("failure to pong ?!");
+                        warning("server failed to pong ?!");
                     }
                 } else {
                     double tn = now();
@@ -149,6 +184,29 @@ int main(int argc, const char* argv[]) {
             pool << plist.on_leave.connect([&]() {
                 net.terminate();
             });
+        }
+
+        if (n - start > 3 && !end && behavior == "admin") {
+            end = true;
+            pool << net.send_request(client::netcom::server_actor_id,
+                request::server::shutdown{},
+                [&](const client::netcom::request_answer_t<request::server::shutdown>& msg) {
+                    if (msg.failed) {
+                        if (msg.missing_credentials.empty()) {
+                            error("server will not shutdown");
+                        } else {
+                            error("insufficient credentials to shutdown server");
+                            note("missing:");
+                            for (auto& c : msg.missing_credentials) {
+                                note(" - ", c);
+                            }
+                        }
+                    } else {
+                        note("server will shutdown soon, disconnecting...");
+                        stop = true;
+                    }
+                }
+            );
         }
     }
 

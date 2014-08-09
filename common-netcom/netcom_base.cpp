@@ -144,6 +144,7 @@ void netcom_base::process_packets() {
             break;
         case netcom_impl::packet_type::answer :
         case netcom_impl::packet_type::failure :
+        case netcom_impl::packet_type::missing_credentials :
         case netcom_impl::packet_type::unhandled :
             if (!process_answer_(t, std::move(p))) {
                 out_packet_t tp = create_message(

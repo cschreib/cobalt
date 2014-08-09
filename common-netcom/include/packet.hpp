@@ -6,6 +6,7 @@
 #include <array>
 #include <crc32.hpp>
 #include <variadic.hpp>
+#include <sorted_vector.hpp>
 #include "serialized_packet.hpp"
 
 struct color32;
@@ -51,6 +52,26 @@ namespace sf {
 
     template<typename T>
     packet_t::base& operator << (packet_t::base& p, const std::vector<T>& t) {
+        p << (std::uint32_t)t.size();
+        for (auto& i : t) {
+            p << i;
+        }
+        return p;
+    }
+
+    template<typename T, typename C>
+    packet_t::base& operator >> (packet_t::base& p, ctl::sorted_vector<T,C>& t) {
+        std::uint32_t s; p >> s;
+        for (std::uint32_t i = 0; i < s; ++i) {
+            T tmp;
+            p >> tmp;
+            t.insert(std::move(tmp));
+        }
+        return p;
+    }
+
+    template<typename T, typename C>
+    packet_t::base& operator << (packet_t::base& p, const ctl::sorted_vector<T,C>& t) {
         p << (std::uint32_t)t.size();
         for (auto& i : t) {
             p << i;

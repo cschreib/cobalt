@@ -8,6 +8,7 @@ include_directories(${PROJECT_SOURCE_DIR}/../client/include)
 include_directories(${SFML_INCLUDE_DIR})
 
 add_library(cobalt-server STATIC
+    server_instance.cpp
     server_netcom.cpp
     server_player_list.cpp
 )
