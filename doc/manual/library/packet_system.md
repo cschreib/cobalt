@@ -115,11 +115,13 @@ net.watch_message<watch_policy::once>([this](const message::server::greetings& m
 });
 ```
 
+This way, the function will be called at most once, and then it will be removed from the packet watching system automatically.
+
 Messages are the simplest form of communication that is exposed through the _cobalt_ interface: one actor sending some information to another. Packets sent this way are called _messages_. When an actor sends a message to another, it does not care whether the other actor has properly received it or not, nor does it expect any answer: the packet just carries an information, and it's totally up to the receiver to decide what to do with it.
 
 ### Requests
 
-Although all other forms of communication can be decomposed as a sequence of such messages, it can be more convenient and more efficient to implement them natively using other protocols. In particular, the second most basic communication element is the _request_: one actor asks a question, or a favor, to another actor. For example, a client may ask the server to send him the list of connected players, or to add him to the list of administrators. But not every actor has to right to request anything: each request optionally comes with a list of required _credentials_, that senders have to possess in order to issue them.
+Although all other forms of communication can be decomposed as a sequence of such messages, it can be more convenient and more efficient to implement them natively using other protocols. In particular, the second most basic communication element is the _request_: one actor asks a question, or a favor, to another actor. For example, a client may ask the server to send him the list of connected players, or to add him to the list of administrators. But not every actor has the right to request anything: each request optionally comes with a list of required _credentials_, that senders have to possess in order to issue them.
 
 When a request is issued, the sender expects to receive some other packet in return, that we call here the _return packet_. In the _cobalt_ interface, this packet can be of four different types:
 
@@ -130,4 +132,134 @@ When a request is issued, the sender expects to receive some other packet in ret
 
 However, when the return packet is received, the sender may have already issued several other requests, so there must be a way to unambiguously match the return packet to the corresponding handling code. To do so, the sender assigns a unique _request ID_ to his original request, that the receiver will also attach to the return packet. This ID is unique from the point of view of the sender only.
 
-We will now detail how these protocols are implemented by looking directly into the code. Most of it is located inside `common-netcom/include/netcom_base.hpp`.
+Again, let us consider an example where a client wants the server to send him the list of ships that are located at a given position.
+
+Declaring a request packet is similar to a message packet, the only differences being that requests may have credential requirements, and that they also need to define the packet structure of the possible answers. In our example, we will call the request packet `send_object_list_at_position`. Here also, it is mandatory to put the packet declaration inside the `request` namespace, and the declaration is made using the `NETCOM_PACKET` macro:
+
+```c++
+// Suppose we have a ship class
+struct ship {
+    std::size_t id;
+    std::string name;
+    std::string model;
+    // Other data ...
+};
+
+// Serialization and de-serialization operators
+packet_t::base& operator << (packet_t::base& p, const ship& s) {
+    p << id << name << model;
+    // Other data ...;
+    return p;
+}
+packet_t::base& operator >> (packet_t::base& p, ship& s) {
+    p >> id >> name >> model;
+    // Other data ...;
+    return p;
+}
+
+// The packet itself
+namespace request {
+    NETCOM_PACKET(send_object_list_at_position) {
+        // First list the request information
+        // Here, simply the position at which to look
+        int x, y;
+
+        // The answer packet (has to be called 'answer')
+        struct answer {
+            std::vector<ship> list;
+        };
+
+        // The failure packet (has to be called 'failure')
+        struct failure {
+            enum class reason {
+                invalid_position,
+                // ...
+            } rsn;
+        };
+    };
+}
+```
+
+From the client point of view, the request is then sent using the `netcom_base::send_request(actor_id_t, R&&, FR&&)`:
+
+```c++
+pool << net.send_request(netcom_base::server_actor_id,
+    make_packet<request::send_object_list_at_position>(10, -50),
+    [this](const netcom_base::request_answer_t<request::send_object_list_at_position>& req) {
+        // First check if the request has been successfully answered
+        if (req.failed) {
+            if (req.unhandled) {
+                error("server does not know how to build the list right now");
+            } else {
+                error("server cannot build the list");
+                if (req.failure.rsn == request::send_object_list_at_position::failure::reason::invalid_position) {
+                    reason("the provided position is invalid");
+                }
+            }
+        } else {
+            // We have the data we requested, do whatever we want with it...
+            // Here we just print the names of the ships
+            for (const ship& s : req.answer.list) {
+                print(s.name);
+            }
+
+            // ... and forward the list to the renderer
+            this->renderer().draw(req.answer.list);
+        }
+    }
+);
+```
+
+Here we may have the same problem as when receiving messages, that the `this` pointer may not point to valid memory when the answer is received. Again, this is solved by returning a connection object that can be stored inside a `scoped_connection_pool` (see the previous section).
+
+The server must then register the corresponding handling code using `netcom_base::watch_request`:
+
+```c++
+pool << net.watch_request([this](netcom_base::request_t<request::send_object_list_at_position>&& req) {
+    if (req.arg.x < this->x_min || req.arg.x >= this->x_max ||
+        req.arg.y < this->y_min || req.arg.y >= this->y_max) {
+        // The position is outside of the allowed region
+        // Send a failed request packet:
+        req.fail(request::send_object_list_at_position::failure::reason::invalid_position);
+    } else {
+        // Else compute the ship list
+        std::vector<ship> lst = this->list_object_at_position(req.arg.x, req.arg.y);
+        // And send it
+        req.answer(lst);
+    }
+});
+```
+
+In this case, the request did not declare any necessary credentials, so any client can issue it and, if the server can, it will answer. Now we will consider another example of a request with required credentials: a client requesting the server to shutdown, and this is only allowed for administrators.
+
+Credentials are specified as simple strings. In this case, the _administrator_ credential is called `"admin"`. The only thing to do is to use the `NETCOM_REQUIRES` macro to list the required credentials:
+
+```c++
+namespace request {
+    namespace server {
+        NETCOM_PACKET(shutdown) {
+            // List credentials here
+            NETCOM_REQUIRES("admin");
+
+            struct answer {};
+            struct failure {};
+        };
+    }
+}
+```
+
+On the client side, the code is very similar to a request with no credentials. The only thing is that it is also possible to check if any credential was missing:
+
+```c++
+...
+```
+
+The code to check the credentials is hidden in the implementation of `netcom_base`, so on the server side there is nothing special to do:
+
+```c++
+...
+```
+
+# Implementation
+
+In this section we will see how the interface described above is implemented inside the `netcom_base` class. We will follow the path of sent and received packets, and see which helper classes and functions are involved in each case.
