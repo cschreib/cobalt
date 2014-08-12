@@ -29,7 +29,7 @@ constexpr std::array<constant_credential_t, sizeof...(Args)> make_credential_arr
      return std::array<constant_credential_t, sizeof...(Args)>{{ std::forward<Args>(args)... }};
 }
 
-#define REQUIRES(...) \
+#define NETCOM_REQUIRES(...) \
     static constexpr auto credentials = make_credential_array(__VA_ARGS__)
 
 template<typename T>

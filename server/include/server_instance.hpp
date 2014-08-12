@@ -34,7 +34,7 @@ namespace server {
     };
 
     NETCOM_PACKET(shutdown) {
-        REQUIRES("admin");
+        NETCOM_REQUIRES("admin");
 
         struct answer {};
         struct failure {};
