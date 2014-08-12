@@ -25,7 +25,7 @@ out << i << s;
 net.send(std::move(out));
 ```
 
-You may refer to the [SFML documentation](http://sfml-dev.org/documentation/2.0/classsf_1_1Packet.php for a more thorough documentation of the SFML packet class. However, when a packet is sent this way from one actor to another, the recipient needs to know how to interpret the received data: is this a chat message, the username and password of a client, or something else?
+You may refer to the [SFML documentation](http://sfml-dev.org/documentation/2.0/classsf_1_1Packet.php) for a more thorough documentation of the SFML packet class. However, when a packet is sent this way from one actor to another, the recipient needs to know how to interpret the received data: is this a chat message, the username and password of a client, or something else?
 
 To disentangle between all the possibilities, we need to append at the beginning of each packet an integer that uniquely identifies the packet type. This number is called the _packet ID_. For example, all packets containing a message to be displayed in the chat would have ID `0`, while all packets containing a client's credentials would have ID `1`, and so on and so forth. Therefore, when the server receives a packet from a client, it first reads the packet ID from the received packet, and it can then forward the handling of this packet to the corresponding function.
 
@@ -53,9 +53,9 @@ Here we are sending the text "hello world!!!" on the 3rd chat channel. On the ot
 ```c++
 net.watch_message([this](const message::send_chat_message& msg) {
     // Find the corresponding channel
-    auto& channel = this->get_chat_channel(msg.channel);
+    channel& c = this->get_chat_channel(msg.channel);
     // Print the text
-    channel.print(msg.text);
+    c.print(msg.text);
 });
 ```
 
@@ -79,7 +79,7 @@ public :
 };
 ```
 
-On some occasions, it may be useful to know from which actor the message came from. In our example, we may want to prepend the username of the client to the chat message. This is done by modifying the argument of the handling lambda function and wrapping the packet_type inside a `netcom_base::message_t<T>`:
+On some occasions, it may be useful to know which actor the message came from. In our example, we may want to prepend the username of the client to the chat message. This is done by modifying the argument of the handling lambda function and wrapping the packet_type inside a `netcom_base::message_t<T>` that gives you access to the underlying `netcom_base::in_packet_t`:
 
 ```c++
 pool << net.watch_message([this](const netcom_base::message_t<message::send_chat_message>& msg) {
@@ -92,9 +92,11 @@ pool << net.watch_message([this](const netcom_base::message_t<message::send_chat
 });
 ```
 
+Not only does this allow you to get the actor ID of the sender, but it allows you to perform additional read operations on the received packet. This is useful if you happen to need a packet that has no fixed structure, and that has to be read dynamically. Because it is less efficient, this should be avoided as much as possible, but there are some cases where it might be the best solution.
+
 Lastly, there are different _watch policies_. The default is `watch_policy::none`, and it implies that the registered handling function will be called as long as the connection object is alive (i.e. in our example as long as the `channel_manager` is alive). Sometimes this is not a desirable behavior. Let us consider another example where the client just connected to the server, and awaits the greeting message:
 
-`̀`c++
+```c++
 namespace message {
     namespace server {
         NETCOM_PACKET(greetings) {
