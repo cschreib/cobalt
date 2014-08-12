@@ -1,16 +1,14 @@
-# Overview
+# The interface
 
 ## Forewords
 
 For network communication, _cobalt_ uses the TCP protocol and a packet based system. The interface is client/server agnostic, i.e. it does not rely on the existence of a "server" and a "client", and more generically considers the interactions between different _actors_, each identified by its _actor ID_. However, for the sake of clarity and because _cobalt_ uses a client/server architecture, we will most of the time give examples with two actors named "client" and "server" in what follows.
 
-## The interface
-
-### The `netcom_base` class
+## The `netcom_base` class
 
 To communicate over the network, all actors use the `netcom_base` class. This is an abstract class that only provides the communication interface: the actual connection to the network and sending of data is handled by a implementation class derived from `netcom_base`, and which may be specific to the actor. For example, the implementation is different between the server and the clients: the server accepts multiple incoming connections from different clients, while clients are simply connected to the server and will therefore only communicate with it directly. In the examples that follow, we will consider that each actor has its own instance of `netcom_base`, and we will refer to it as the `net` object.
 
-### Messages
+## Messages
 
 The low level interface `netcom_base::send(out_packet&&)` allows sending arbitrary data through the network using packets (with the SFML implementation [sf::Packet](http://sfml-dev.org/documentation/2.0/classsf_1_1Packet.php) for serialization). An output packet (of type `netcom_base::out_packet`) contains the ID of the actor that the packet is to be sent to, along with the actual packet data. Here is an example:
 
@@ -43,7 +41,10 @@ namespace message {
 This packet definition needs to be the same for both the client and the server, and so it should ideally be placed inside a header that is included on both sides. Then, to create and send the packet, the client uses the `netcom_base::send_message(actor_id_t, MessageType&&)` function:
 
 ```c++
-net.send_message(netcom_base::server_actor_id,
+net.send_message(
+    // Recipient
+    netcom_base::server_actor_id,
+    // Message data
     make_packet<message::send_chat_message>(3, "hello world!!!")
 );
 ```
@@ -51,12 +52,15 @@ net.send_message(netcom_base::server_actor_id,
 Here we are sending the text "hello world!!!" on the 3rd chat channel. On the other side, the server has to react when it receives such a packet. To do so, we register a handling function using the `netcom_base::watch_message(F&&)`:
 
 ```c++
-net.watch_message([this](const message::send_chat_message& msg) {
-    // Find the corresponding channel
-    channel& c = this->get_chat_channel(msg.channel);
-    // Print the text
-    c.print(msg.text);
-});
+net.watch_message(
+    // Function to call when receiving the message
+    [this](const message::send_chat_message& msg) {
+        // Find the corresponding channel
+        channel& c = this->get_chat_channel(msg.channel);
+        // Print the text
+        c.print(msg.text);
+    }
+);
 ```
 
 The above code is fine, but may introduce some bugs if, for some reason, the object pointed by `this` is destroyed. In this case, and if the `netcom_base` class receives a new packet, it will try to invoke the above function, and the program will crash because `this` does not exist anymore. To prevent this, the `watch_message` function returns a _connection object_ (see the signal/slot manual), that can be stored inside a `scoped_connection_pool`:
@@ -70,9 +74,7 @@ class channel_manager {
 public :
     channel_manager(netcom_base& net) {
         pool << net.watch_message([this](const message::send_chat_message& msg) {
-            // Find the corresponding channel
             channel& c = this->get_chat_channel(msg.channel);
-            // Print the text
             c.print(msg.text);
         });
     }
@@ -119,7 +121,9 @@ This way, the function will be called at most once, and then it will be removed 
 
 Messages are the simplest form of communication that is exposed through the _cobalt_ interface: one actor sending some information to another. Packets sent this way are called _messages_. When an actor sends a message to another, it does not care whether the other actor has properly received it or not, nor does it expect any answer: the packet just carries an information, and it's totally up to the receiver to decide what to do with it.
 
-### Requests
+Therefore, it is possible for the receiver to register multiple functions to call when receiving a given message. They will just be called sequentially.
+
+## Requests
 
 Although all other forms of communication can be decomposed as a sequence of such messages, it can be more convenient and more efficient to implement them natively using other protocols. In particular, the second most basic communication element is the _request_: one actor asks a question, or a favor, to another actor. For example, a client may ask the server to send him the list of connected players, or to add him to the list of administrators. But not every actor has the right to request anything: each request optionally comes with a list of required _credentials_, that senders have to possess in order to issue them.
 
@@ -130,7 +134,7 @@ When a request is issued, the sender expects to receive some other packet in ret
 3. _Failed request_: the receiver could not issue this request because of some other reason. For example, a client asks the server to move a ship to an invalid position.
 4. _The actual answer_.
 
-However, when the return packet is received, the sender may have already issued several other requests, so there must be a way to unambiguously match the return packet to the corresponding handling code. To do so, the sender assigns a unique _request ID_ to his original request, that the receiver will also attach to the return packet. This ID is unique from the point of view of the sender only.
+However, when the return packet is received, the sender may have already issued several other requests, so there must be a way to unambiguously match the return packet to the corresponding handling code. To do so, the sender assigns a unique _request ID_ to his original request, that the receiver will also attach to the return packet. This ID is unique from the point of view of the sender only. A consequence of this system is that the receiver may only register _one_ function to handle all given requests, else the sender would receive multiple answers without knowing which is "the right one".
 
 Again, let us consider an example where a client wants the server to send him the list of ships that are located at a given position.
 
@@ -183,8 +187,12 @@ namespace request {
 From the client point of view, the request is then sent using the `netcom_base::send_request(actor_id_t, R&&, FR&&)`:
 
 ```c++
-pool << net.send_request(netcom_base::server_actor_id,
+pool << net.send_request(
+    // Recipient
+    netcom_base::server_actor_id,
+    // The request parameters
     make_packet<request::send_object_list_at_position>(10, -50),
+    // The function to call when receiving the answer
     [this](const netcom_base::request_answer_t<request::send_object_list_at_position>& req) {
         // First check if the request has been successfully answered
         if (req.failed) {
@@ -215,19 +223,22 @@ Here we may have the same problem as when receiving messages, that the `this` po
 The server must then register the corresponding handling code using `netcom_base::watch_request`:
 
 ```c++
-pool << net.watch_request([this](netcom_base::request_t<request::send_object_list_at_position>&& req) {
-    if (req.arg.x < this->x_min || req.arg.x >= this->x_max ||
-        req.arg.y < this->y_min || req.arg.y >= this->y_max) {
-        // The position is outside of the allowed region
-        // Send a failed request packet:
-        req.fail(request::send_object_list_at_position::failure::reason::invalid_position);
-    } else {
-        // Else compute the ship list
-        std::vector<ship> lst = this->list_object_at_position(req.arg.x, req.arg.y);
-        // And send it
-        req.answer(lst);
+pool << net.watch_request(
+    // Function to call when receiving the request
+    [this](netcom_base::request_t<request::send_object_list_at_position>&& req) {
+        if (req.arg.x < this->x_min || req.arg.x >= this->x_max ||
+            req.arg.y < this->y_min || req.arg.y >= this->y_max) {
+            // The position is outside of the allowed region
+            // Send a failed request packet:
+            req.fail(request::send_object_list_at_position::failure::reason::invalid_position);
+        } else {
+            // Else compute the ship list
+            std::vector<ship> lst = this->list_object_at_position(req.arg.x, req.arg.y);
+            // And send it
+            req.answer(lst);
+        }
     }
-});
+);
 ```
 
 In this case, the request did not declare any necessary credentials, so any client can issue it and, if the server can, it will answer. Now we will consider another example of a request with required credentials: a client requesting the server to shutdown, and this is only allowed for administrators.
@@ -251,15 +262,43 @@ namespace request {
 On the client side, the code is very similar to a request with no credentials. The only thing is that it is also possible to check if any credential was missing:
 
 ```c++
-...
+pool << net.send_request(server_actor_id, request::server::shutdown{},
+    [&](const netcom_base::request_answer_t<request::server::shutdown>& ans) {
+        if (ans.failed) {
+            // If the request failed, it may be because of missing credentials
+            if (!ans.missing_credentials.empty()) {
+                error("not enough credentials to shutdown the server");
+                note("missing:");
+                for (auto& c : msg.missing_credentials) {
+                    note(" - ", c);
+                }
+            } else {
+                error("server could not shutdown");
+            }
+        } else {
+            note("server will shutdown!");
+        }
+    }
+);
 ```
 
 The code to check the credentials is hidden in the implementation of `netcom_base`, so on the server side there is nothing special to do:
 
 ```c++
-...
+pool << net.watch_request([this](netcom_base::request_t<request::server::shutdown>&& req) {
+    this->shutdown = true;
+    req.answer();
+});
 ```
 
-# Implementation
+As for messages, it is possible to specify different watch policies when calling `netcom_base::watch_request()`.
+
+# The implementation
 
 In this section we will see how the interface described above is implemented inside the `netcom_base` class. We will follow the path of sent and received packets, and see which helper classes and functions are involved in each case.
+
+## The `netcom_base` class
+
+## Messages
+
+## Requests
