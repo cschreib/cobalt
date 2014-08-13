@@ -343,7 +343,7 @@ namespace packet_impl {
 
 #define NETCOM_PACKET(name) \
     struct name : packet_impl::base<#name ## _crc32>
-`̀`
+```
 
 It declares a new structure whose name is provided in argument, and specifies a base class of type `packet_impl::base<>`. The template argument is the CRC32 integer associated to the name of the packet (`"send_chat_message"_crc32 == 3013527476`). This is a good way to get a unique identifier for this packet type, and it is thus chosen as the corresponding packet ID. Note that the CRC32 algorithm can generate collision, i.e. different packet names that yield the same CRC32 integer. This is rare, but it can happen.
 
@@ -362,7 +362,7 @@ packet_t::base& operator << (packet_t::base& p, const message::send_chat_message
 packet_t::base& operator >> (packet_t::base& p, message::send_chat_message& m) {
     return p >> m.channel >> m.text;
 }
-`̀̀
+```
 
 But it is tedious to write. When C++ will get native reflection, it will be possible to generate such functions automatically using template metaprogramming. For now, we must rely on an external tool that will parse the C++ code and generate the necessary functions in a second pass. This tool is called `refgen`, and it is automatically invoked by the Makefile. More details about this tool is given in the corresponding manual.
 
