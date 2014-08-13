@@ -299,6 +299,130 @@ In this section we will see how the interface described above is implemented ins
 
 ## The `netcom_base` class
 
+As stated in the previous chapter, the actual implementation of the network communication is delegated to implementation classes that derive from `netcom_base`. Therefore, the `netcom_base` class itself only contains generic structures.
+
+The most important one is the pair of output and input packet queues, `netcom_base::output_` and `netcom_base::input_`.
+
+The output queue is filled by the `netcom_base` class itself when sending messages, requests or request answers using the `netcom_base::send()` function, and it is consumed by the implementation class to send the packets over the network.
+
+On the other hand, the input queue is consumed by the `netcom_base` class inside the `netcom_base::process_packets()` function, and is filled by the implementation whenever a packet is received from the network.
+
+Because both queues are declared as `ctl::lock_free_queue<>`, they can be manipulated in a thread safe way. Therefore, all the "true" network communication (i.e. physical sending and receiving of packets) can be done in a separate thread within the implementation class, in order not to block the whole program if the internet is slow.
+
+## Packets
+
+Let us go back to the example of the previous chapter, of a client sending a message to be displayed in the chat. The packet structure was:
+
+```c++
+namespace message {
+    NETCOM_PACKET(send_chat_message) {
+        int channel;      // the chat channel to send this message to
+        std::string text; // the text to display in the chat
+    };
+}
+```
+
+Before going further, let us see what the `NETCOM_PACKET` macro actually does:
+
+```c++
+namespace packet_impl {
+    struct base_ {};
+
+    template<packet_id_t ID>
+    struct base : base_ {
+        static const packet_id_t packet_id__ = ID;
+        static const char* packet_name__;
+    };
+
+    template<packet_id_t ID>
+    const packet_id_t base<ID>::packet_id__;
+
+    template<typename T>
+    using is_packet = std::is_base_of<base_, T>;
+}
+
+#define NETCOM_PACKET(name) \
+    struct name : packet_impl::base<#name ## _crc32>
+`̀`
+
+It declares a new structure whose name is provided in argument, and specifies a base class of type `packet_impl::base<>`. The template argument is the CRC32 integer associated to the name of the packet (`"send_chat_message"_crc32 == 3013527476`). This is a good way to get a unique identifier for this packet type, and it is thus chosen as the corresponding packet ID. Note that the CRC32 algorithm can generate collision, i.e. different packet names that yield the same CRC32 integer. This is rare, but it can happen.
+
+So all the macro does is to:
+
+1. generate a unique ID for this packet type,
+2. assign a base class to the packet type that will define the `base::packet_id__` static member, allowing to get an integer identifier for this packet type,
+3. give a common public base to all packets, for the sole purpose of the `packet_impl::is_packet<>` trait. This is used to check that packets are properly declared using the `NETCOM_PACKET` macro.
+
+The point of this library is to get rid of most redundancies, by generating code automatically as much as possible. In this case, we do not ask the library user to define the packet ID by himself. But this is not the only thing we want. In particular, we want to serialize and deserialize these packets. The code to do so is simple, and was already illustrated in the previous chapter when serializing a `ship` structure:
+
+```c++
+packet_t::base& operator << (packet_t::base& p, const message::send_chat_message& m) {
+    return p << m.channel << m.text;
+}
+packet_t::base& operator >> (packet_t::base& p, message::send_chat_message& m) {
+    return p >> m.channel >> m.text;
+}
+`̀̀
+
+But it is tedious to write. When C++ will get native reflection, it will be possible to generate such functions automatically using template metaprogramming. For now, we must rely on an external tool that will parse the C++ code and generate the necessary functions in a second pass. This tool is called `refgen`, and it is automatically invoked by the Makefile. More details about this tool is given in the corresponding manual.
+
+The code to send the packet was:
+
+```c++
+net.send_message(
+    // Recipient
+    netcom_base::server_actor_id,
+    // Message data
+    make_packet<message::send_chat_message>(3, "hello world!!!")
+);
+```
+
+First, we make use of the `make_packet` helper function that simplifies the creation of packets. This is yet another feature provided by the `refgen` tool. In an ideal world, we would be able to write `message::send_chat_message{3, "hellow world!!!"}`. But this syntax is only available for _aggregate_ types, and with the current definition of the C++ standard, our packets are not aggregates because they have a base class. The fact that, in our case, the base class has no non static data member and no virtual function does not matter. This is inconvenient, and was [reported](https://groups.google.com/a/isocpp.org/forum/#!topic/std-proposals/77IY0cAlYR8) in the C++ standardization mailing list. It may be fixed in the C++17 standard if the corresponding proposal gets accepted.
+
+Back to plain old C++11, the `make_packet` function is a shortcut:
+
+```c++
+template<typename T, typename ... Args>
+T make_packet(Args&& ... args) {
+    return packet_impl::packet_builder<T>()(std::forward<Args>(args)...);
+}
+```
+
+The `packet_impl::packet_builder<>` class is generated automatically by the `refgen` tool, and its body is the following:
+
+```c++
+namespace packet_impl {
+    template<> struct packet_builder<message::send_chat_message> {
+        template<typename T0, typename T1>
+        message::send_chat_message operator () (T0&& t0, T1&& t1) {
+            message::send_chat_message p;
+            p.channel = std::forward<T0>(t0);
+            p.text = std::forward<T1>(t1);
+            return p;
+        }
+    };
+}
+```
+
+So in other word, this is simply a shortcut for:
+
+```c++
+message::send_chat_message msg;
+msg.channel = 3;
+msg.text = "hello world!!!";
+
+net.send_message(
+    // Recipient
+    netcom_base::server_actor_id,
+    // Message data
+    std::move(msg)
+);
+```
+
+Now we are ready to dig inside the implementation of `netcom_base::send_message`.
+
 ## Messages
+
+
 
 ## Requests
