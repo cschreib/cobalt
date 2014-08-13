@@ -16,14 +16,16 @@ The low level interface `netcom_base::send(out_packet&&)` allows sending arbitra
 // Create a new packet to be sent to the server
 netcom_base::out_packet out(netcom_base::server_actor_id);
 // The data to send
-int i = 12; std::string s = "hello";
+std::int32_t i = 12; std::string s = "hello";
 // Serialize the data inside the packet
 out << i << s;
 // Send the packet
 net.send(std::move(out));
 ```
 
-You may refer to the [SFML documentation](http://sfml-dev.org/documentation/2.0/classsf_1_1Packet.php) for a more thorough documentation of the SFML packet class. However, when a packet is sent this way from one actor to another, the recipient needs to know how to interpret the received data: is this a chat message, the username and password of a client, or something else?
+You may refer to the [SFML documentation](http://sfml-dev.org/documentation/2.0/classsf_1_1Packet.php) for a more thorough documentation of the SFML packet class. Note in particular the use of _fixed size integers_ (`std::int32_t`), that are interpreted the same way regardless of the host CPU architecture. This is mandatory to preserve the meaning of a packet across multiple platforms: while most systems have `sizeof(int) == 4`, this is not guaranteed by the C++ standard, but `sizeof(std::int32_t) == 4` is always true.
+
+However, when a packet is sent this way from one actor to another, the recipient needs to know how to interpret the received data: is this a chat message, the username and password of a client, or something else?
 
 To disentangle between all the possibilities, we need to append at the beginning of each packet an integer that uniquely identifies the packet type. This number is called the _packet ID_. For example, all packets containing a message to be displayed in the chat would have ID `0`, while all packets containing a client's credentials would have ID `1`, and so on and so forth. Therefore, when the server receives a packet from a client, it first reads the packet ID from the received packet, and it can then forward the handling of this packet to the corresponding function.
 
@@ -32,8 +34,8 @@ Let's consider a simple example. A client wants to send a packet to the server t
 ```c++
 namespace message {
     NETCOM_PACKET(send_chat_message) {
-        int channel;      // the chat channel to send this message to
-        std::string text; // the text to display in the chat
+        std::uint8_t channel; // the chat channel to send this message to
+        std::string text;     // the text to display in the chat
     };
 }
 ```
@@ -69,7 +71,7 @@ The above code is fine, but may introduce some bugs if, for some reason, the obj
 class channel_manager {
     scoped_connection_pool pool;
 
-    channel& get_chat_channel(int id);
+    channel& get_chat_channel(std::uint8_t id);
 
 public :
     channel_manager(netcom_base& net) {
@@ -143,7 +145,7 @@ Declaring a request packet is similar to a message packet, the only differences 
 ```c++
 // Suppose we have a ship class
 struct ship {
-    std::size_t id;
+    std::uint32_t id;
     std::string name;
     std::string model;
     // Other data ...
@@ -166,7 +168,7 @@ namespace request {
     NETCOM_PACKET(send_object_list_at_position) {
         // First list the request information
         // Here, simply the position at which to look
-        int x, y;
+        std::int32_t x, y;
 
         // The answer packet (has to be called 'answer')
         struct answer {
@@ -316,8 +318,8 @@ Let us go back to the example of the previous chapter, of a client sending a mes
 ```c++
 namespace message {
     NETCOM_PACKET(send_chat_message) {
-        int channel;      // the chat channel to send this message to
-        std::string text; // the text to display in the chat
+        std::uint8_t channel; // the chat channel to send this message to
+        std::string text;     // the text to display in the chat
     };
 }
 ```
@@ -377,7 +379,7 @@ net.send_message(
 );
 ```
 
-First, we make use of the `make_packet` helper function that simplifies the creation of packets. This is yet another feature provided by the `refgen` tool. In an ideal world, we would be able to write `message::send_chat_message{3, "hellow world!!!"}`. But this syntax is only available for _aggregate_ types, and with the current definition of the C++ standard, our packets are not aggregates because they have a base class. The fact that, in our case, the base class has no non static data member and no virtual function does not matter. This is inconvenient, and was [reported](https://groups.google.com/a/isocpp.org/forum/#!topic/std-proposals/77IY0cAlYR8) in the C++ standardization mailing list. It may be fixed in the C++17 standard if the corresponding proposal gets accepted.
+First, we make use of the `make_packet` helper function that simplifies the creation of packets. This is yet another feature provided by the `refgen` tool. In an ideal world, we would be able to write `message::send_chat_message{3, "hello world!!!"}`. But this syntax is only available for _aggregate_ types, and with the current definition of the C++ standard, our packets are not aggregates because they have a base class. The fact that, in our case, the base class has no non static data member and no virtual function does not matter. This is inconvenient, and was [reported](https://groups.google.com/a/isocpp.org/forum/#!topic/std-proposals/77IY0cAlYR8) in the C++ standardization mailing list. It may be fixed in the C++17 standard if the corresponding proposal gets accepted.
 
 Back to plain old C++11, the `make_packet` function is a shortcut:
 
