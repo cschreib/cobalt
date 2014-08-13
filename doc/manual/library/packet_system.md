@@ -81,7 +81,7 @@ public :
 };
 ```
 
-On some occasions, it may be useful to know which actor the message came from. In our example, we may want to prepend the username of the client to the chat message. This is done by modifying the argument of the handling lambda function and wrapping the packet_type inside a `netcom_base::message_t<T>` that gives you access to the underlying `netcom_base::in_packet_t`:
+On some occasions, it may be useful to know which actor the message came from. In our example, we may want to append the username of the client to the chat message. This is done by modifying the argument of the handling lambda function and wrapping the packet_type inside a `netcom_base::message_t<T>` that gives you access to the underlying `netcom_base::in_packet_t`:
 
 ```c++
 pool << net.watch_message([this](const netcom_base::message_t<message::send_chat_message>& msg) {
@@ -94,7 +94,7 @@ pool << net.watch_message([this](const netcom_base::message_t<message::send_chat
 });
 ```
 
-Not only does this allow you to get the actor ID of the sender, but it allows you to perform additional read operations on the received packet. This is useful if you happen to need a packet that has no fixed structure, and that has to be read dynamically. Because it is less efficient, this should be avoided as much as possible, but there are some cases where it might be the best solution.
+With this alternative syntax, the packet data is available in `msg.arg`. Not only does this allow you to get the actor ID of the sender (`msg.packet.from`), but it allows you to perform additional read operations on the received packet (`msg.packet`). This is useful if you happen to need a packet that has no fixed structure, and that has to be read dynamically. Because it is less efficient and more error prone, this should be avoided as much as possible, but there are some cases where it might be the best available solution.
 
 Lastly, there are different _watch policies_. The default is `watch_policy::none`, and it implies that the registered handling function will be called as long as the connection object is alive (i.e. in our example as long as the `channel_manager` is alive). Sometimes this is not a desirable behavior. Let us consider another example where the client just connected to the server, and awaits the greeting message:
 
@@ -119,7 +119,7 @@ net.watch_message<watch_policy::once>([this](const message::server::greetings& m
 
 This way, the function will be called at most once, and then it will be removed from the packet watching system automatically.
 
-Messages are the simplest form of communication that is exposed through the _cobalt_ interface: one actor sending some information to another. Packets sent this way are called _messages_. When an actor sends a message to another, it does not care whether the other actor has properly received it or not, nor does it expect any answer: the packet just carries an information, and it's totally up to the receiver to decide what to do with it.
+This is the simplest form of communication that is exposed through the _cobalt_ interface: one actor sending some information to another. Packets sent this way are called _messages_. When an actor sends a message to another, it does not care whether the other actor has properly received it or not, nor does it expect any answer: the packet just carries an information, and it's totally up to the receiver to decide what to do with it.
 
 Therefore, it is possible for the receiver to register multiple functions to call when receiving a given message. They will just be called sequentially.
 
@@ -134,7 +134,7 @@ When a request is issued, the sender expects to receive some other packet in ret
 3. _Failed request_: the receiver could not issue this request because of some other reason. For example, a client asks the server to move a ship to an invalid position.
 4. _The actual answer_.
 
-However, when the return packet is received, the sender may have already issued several other requests, so there must be a way to unambiguously match the return packet to the corresponding handling code. To do so, the sender assigns a unique _request ID_ to his original request, that the receiver will also attach to the return packet. This ID is unique from the point of view of the sender only. A consequence of this system is that the receiver may only register _one_ function to handle all given requests, else the sender would receive multiple answers without knowing which is "the right one".
+As for messages, requests are identified using a unique packet ID. However, when the return packet is received, the sender may have already issued several other requests, so there must be a way to unambiguously match the return packet to the corresponding handling code. To do so, the sender assigns a _request ID_ to his original request, that the receiver will also attach to the return packet. This ID is unique from the point of view of the sender only, and it completely orthogonal to the packet ID. For example, if the sender sends two requests to move two ships, the packet ID will be the same, but each will have a different request ID. A consequence of this system is that the receiver may only register _one_ function to handle all given requests of the same type, else the sender would receive multiple answers without knowing which is the right one.
 
 Again, let us consider an example where a client wants the server to send him the list of ships that are located at a given position.
 
