@@ -585,9 +585,9 @@ private :
 
 private :
     // Packet processing
-    bool process_message_(in_packet_t&& p);
-    bool process_request_(in_packet_t&& p);
-    bool process_answer_(netcom_impl::packet_type t, in_packet_t&& p);
+    void process_message_(in_packet_t&& p);
+    void process_request_(in_packet_t&& p);
+    void process_answer_(netcom_impl::packet_type t, in_packet_t&& p);
 
 protected :
     template<typename MessageType, typename ... Args>

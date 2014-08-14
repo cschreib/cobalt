@@ -55,7 +55,7 @@ void netcom_base::terminate_() {
     }
 }
 
-bool netcom_base::process_message_(in_packet_t&& p) {
+void netcom_base::process_message_(in_packet_t&& p) {
     packet_id_t id;
     p >> id;
 
@@ -64,13 +64,19 @@ bool netcom_base::process_message_(in_packet_t&& p) {
     }
 
     auto iter = message_signals_.find(id);
-    if (iter == message_signals_.end() || (*iter)->empty()) return false;
-
-    (*iter)->dispatch(std::move(p));
-    return true;
+    if (iter == message_signals_.end() || (*iter)->empty()) {
+        if (id != message::unhandled_message::packet_id__ &&
+            id != message::unhandled_request::packet_id__ &&
+            id != message::unhandled_request_answer::packet_id__) {
+            out_packet_t tp = create_message(make_packet<message::unhandled_message>(id));
+            process_message_(std::move(tp.to_input()));
+        }
+    } else {
+        (*iter)->dispatch(std::move(p));
+    }
 }
 
-bool netcom_base::process_request_(in_packet_t&& p) {
+void netcom_base::process_request_(in_packet_t&& p) {
     packet_id_t id;
     p >> id;
 
@@ -87,14 +93,15 @@ bool netcom_base::process_request_(in_packet_t&& p) {
         request_id_t rid;
         p >> rid;
         send_unhandled_(p.from, rid);
-        return false;
-    }
 
-    (*iter)->dispatch(*this, std::move(p));
-    return true;
+        out_packet_t tp = create_message(make_packet<message::unhandled_request>(id));
+        process_message_(std::move(tp.to_input()));
+    } else {
+        (*iter)->dispatch(*this, std::move(p));
+    }
 }
 
-bool netcom_base::process_answer_(netcom_impl::packet_type t, in_packet_t&& p) {
+void netcom_base::process_answer_(netcom_impl::packet_type t, in_packet_t&& p) {
     request_id_t rid;
     p >> rid;
 
@@ -104,16 +111,17 @@ bool netcom_base::process_answer_(netcom_impl::packet_type t, in_packet_t&& p) {
             std::cout << "<" << p.from << ": answer to request " << rid
                 << " (unhandled)" << std::endl;
         }
-        return false;
-    }
 
-    if (debug_packets) {
-        std::cout << "<" << p.from << ": answer to " << get_packet_name((*iter)->id)
-            << " (" << rid << ")" << std::endl;
-    }
+        out_packet_t tp = create_message(make_packet<message::unhandled_request_answer>(rid));
+        process_message_(std::move(tp.to_input()));
+    } else {
+        if (debug_packets) {
+            std::cout << "<" << p.from << ": answer to " << get_packet_name((*iter)->id)
+                << " (" << rid << ")" << std::endl;
+        }
 
-    (*iter)->dispatch(t, std::move(p));
-    return true;
+        (*iter)->dispatch(t, std::move(p));
+    }
 }
 
 void netcom_base::process_packets() {
@@ -126,32 +134,18 @@ void netcom_base::process_packets() {
         netcom_impl::packet_type t;
         p >> t;
 
-        packet_id_t id;
-        p.impl.view() >> id;
-
         switch (t) {
         case netcom_impl::packet_type::message :
-            if (!process_message_(std::move(p))) {
-                out_packet_t tp = create_message(make_packet<message::unhandled_message>(id));
-                process_message_(std::move(tp.to_input()));
-            }
+            process_message_(std::move(p));
             break;
         case netcom_impl::packet_type::request :
-            if (!process_request_(std::move(p))) {
-                out_packet_t tp = create_message(make_packet<message::unhandled_request>(id));
-                process_message_(std::move(tp.to_input()));
-            }
+            process_request_(std::move(p));
             break;
         case netcom_impl::packet_type::answer :
         case netcom_impl::packet_type::failure :
         case netcom_impl::packet_type::missing_credentials :
         case netcom_impl::packet_type::unhandled :
-            if (!process_answer_(t, std::move(p))) {
-                out_packet_t tp = create_message(
-                    make_packet<message::unhandled_request_answer>(id)
-                );
-                process_message_(std::move(tp.to_input()));
-            }
+            process_answer_(t, std::move(p));
             break;
         }
     }
