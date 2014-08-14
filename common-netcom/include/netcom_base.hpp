@@ -671,7 +671,7 @@ public :
 
 private :
     template<typename RequestType, typename FR>
-    signal_connection_base& send_request_(FR&& receive_func, request_id_t rid, std::false_type) {
+    signal_connection_base& watch_request_answer_(FR&& receive_func, request_id_t rid, std::false_type) {
         using ArgType = request_answer_t<RequestType>;
         answer_signal_impl<RequestType>& netsig = get_answer_signal_<RequestType>(rid);
         return netsig.signal.template connect<netcom_impl::answer_connection>(
@@ -684,7 +684,7 @@ private :
     }
 
     template<typename RequestType, typename FR>
-    signal_connection_base& send_request_(FR&& receive_func, request_id_t rid, std::true_type) {
+    signal_connection_base& watch_request_answer_(FR&& receive_func, request_id_t rid, std::true_type) {
         answer_signal_impl<RequestType>& netsig = get_answer_signal_<RequestType>(rid);
         return netsig.signal.template connect<netcom_impl::answer_connection>(
             std::forward<FR>(receive_func), *this, rid
@@ -714,6 +714,7 @@ public :
     **/
     template<typename RequestType, typename R, typename FR>
     signal_connection_base& send_custom_request(actor_id_t aid, R&& req, FR&& receive_func) {
+        // Check the function signature
         static_assert(ctl::argument_count<FR>::value == 1,
             "answer reception handler can only take one argument");
         using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
@@ -722,16 +723,18 @@ public :
             "answer reception handler argument must either be a packet::answer or "
             "a request_answer_t");
 
+        // Create a new request
         request_id_t rid;
         out_packet_t p = create_request_<RequestType>(rid, std::forward<R>(req));
         p.to = aid;
 
-        auto& ac = send_request_<RequestType>(
+        // Register the answer handling function
+        auto& ac = watch_request_answer_<RequestType>(
             std::forward<FR>(receive_func), rid, netcom_impl::is_request_answer<ArgType>{}
         );
 
+        // Send the request
         send(std::move(p));
-
         return ac;
     }
 
