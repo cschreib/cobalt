@@ -669,12 +669,19 @@ public :
     }
 
 private :
+    // Answer function argument is a plain answer packet
     template<typename RequestType, typename FR>
     signal_connection_base& watch_request_answer_(FR&& receive_func, request_id_t rid, std::false_type) {
         using ArgType = request_answer_t<RequestType>;
+
+        // Find the corresponding signal
         answer_signal_impl<RequestType>& netsig = get_answer_signal_<RequestType>(rid);
+
+        // Register the handling function
         return netsig.signal.template connect<netcom_impl::answer_connection>(
             [receive_func](const ArgType& msg) {
+                // Create a glue function that only forwards the actual answer to the
+                // provided handler function
                 if (!msg.failed) {
                     receive_func(msg.answer);
                 }
@@ -682,9 +689,13 @@ private :
         );
     }
 
+    // Answer function argument is a request_answer_t<P>
     template<typename RequestType, typename FR>
     signal_connection_base& watch_request_answer_(FR&& receive_func, request_id_t rid, std::true_type) {
+        // Find the corresponding signal
         answer_signal_impl<RequestType>& netsig = get_answer_signal_<RequestType>(rid);
+
+        // Register the handling function
         return netsig.signal.template connect<netcom_impl::answer_connection>(
             std::forward<FR>(receive_func), *this, rid
         );
