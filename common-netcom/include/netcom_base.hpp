@@ -291,7 +291,7 @@ namespace netcom_impl {
         failure_t failure;
     };
 
-    // Public object that encapsulates request answering.
+    // Public object that encapsulates messages.
     template<typename MessageType>
     struct message_t {
         static_assert(packet_impl::is_packet<MessageType>::value,
@@ -736,27 +736,61 @@ public :
     }
 
 private :
+    /// Watch function argument is a plain packet
     template<template<typename> class WP, typename FR>
     signal_connection_base& watch_message_(FR&& receive_func, std::false_type) {
         using MessageType = typename std::decay<ctl::functor_argument<FR>>::type;
         using ArgType = message_t<MessageType>;
+
+        // Find the signal corresponding to this packet type
         message_signal_impl<MessageType>& netsig = get_message_signal_<MessageType>();
+
+        // Register this new function
         return netsig.signal.template connect<WP>([receive_func](const ArgType& msg) {
+            // Create a glue function that only forwards the extracted packet to the
+            // provided handler function
             receive_func(msg.arg);
         });
     }
 
+    /// Watch function argument is a message_t<P>
     template<template<typename> class WP, typename FR>
     signal_connection_base& watch_message_(FR&& receive_func, std::true_type) {
         using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
         using MessageType = typename ArgType::packet_t;
+
+        // Find the signal corresponding to this packet type
         message_signal_impl<MessageType>& netsig = get_message_signal_<MessageType>();
+
+        // Register this new function
         return netsig.signal.template connect<WP>(std::forward<FR>(receive_func));
+    }
+
+public :
+    /// Register a slot to be called whenever a given message packet is received.
+    /** The slot will be called by process_packets() when the corresponding message is received, and
+        has to take only one argument whose type is that of the corresponding packet.
+    **/
+    template<template<typename> class WP = watch_policy::none, typename FR>
+    signal_connection_base& watch_message(FR&& receive_func) {
+        // Check the function signature
+        static_assert(ctl::argument_count<FR>::value == 1,
+            "message reception handler can only take one argument");
+        using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
+        static_assert(netcom_impl::is_message<ArgType>::value ||
+                      packet_impl::is_packet<ArgType>::value,
+            "message reception handler argument must either be a packet or a message_t");
+
+        // Register slot
+        return watch_message_<WP>(
+            std::forward<FR>(receive_func), netcom_impl::is_message<ArgType>{}
+        );
     }
 
 protected :
     virtual credential_list_t get_missing_credentials_(actor_id_t cid,
         const constant_credential_list_t& lst) {
+        // Default implementation, does not check credentials
         return credential_list_t{};
     }
 
@@ -789,26 +823,6 @@ private :
         return check_request_credentials_<RequestType>(p, requires_credentials<RequestType>{});
     }
 
-public :
-    /// Register a slot to be called whenever a given message packet is received.
-    /** The slot will be called by process_packets() when the corresponding message is received, and
-        has to take only one argument whose type is that of the corresponding packet.
-    **/
-    template<template<typename> class WP = watch_policy::none, typename FR>
-    signal_connection_base& watch_message(FR&& receive_func) {
-        static_assert(ctl::argument_count<FR>::value == 1,
-            "message reception handler can only take one argument");
-        using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
-        static_assert(netcom_impl::is_message<ArgType>::value ||
-                      packet_impl::is_packet<ArgType>::value,
-            "message reception handler argument must either be a packet or a message_t");
-
-        return watch_message_<WP>(
-            std::forward<FR>(receive_func), netcom_impl::is_message<ArgType>{}
-        );
-    }
-
-private :
     // Send an answer to a request with the provided arguments.
     template<typename ... Args>
     void send_answer_(actor_id_t aid, request_id_t rid, Args&& ... args) {
