@@ -1,3 +1,16 @@
+# Table of content
+
+- [The interface](#the-interface)
+    - [Forewords](#forewords)
+    - [The `netcom_base` class](#the-netcom_base-class)
+    - [Messages](#messages)
+    - [Requests](#requests)
+- [The implementation](#the-implementation)
+    - [The `netcom_base` class](#the-netcom_base-class-1)
+    - [Packets](#packets)
+    - [Messages](#messages-1)
+    - [Requests](#requests-1)
+
 # The interface
 
 ## Forewords
@@ -297,7 +310,7 @@ As for messages, it is possible to specify different watch policies when calling
 
 # The implementation
 
-In this section we will see how the interface described above is implemented inside the `netcom_base` class. We will follow the path of sent and received packets, and see which helper classes and functions are involved in each case.
+In this chapter we will see how the interface described above is implemented inside the `netcom_base` class. We will follow the path of sent and received packets, and see which helper classes and functions are involved in each case.
 
 ## The `netcom_base` class
 
@@ -343,8 +356,7 @@ namespace packet_impl {
     using is_packet = std::is_base_of<base_, T>;
 }
 
-#define NETCOM_PACKET(name) \
-    struct name : packet_impl::base<#name ## _crc32>
+#define NETCOM_PACKET(name) struct name : packet_impl::base<#name ## _crc32>
 ```
 
 It declares a new structure whose name is provided in argument, and specifies a base class of type `packet_impl::base<>`. The template argument is the CRC32 integer associated to the name of the packet (`"send_chat_message"_crc32 == 3013527476`). This is a good way to get a unique identifier for this packet type, and it is thus chosen as the corresponding packet ID. Note that the CRC32 algorithm can generate collision, i.e. different packet names that yield the same CRC32 integer. This is rare, but it can happen.
@@ -353,7 +365,8 @@ So all the macro does is to:
 
 1. generate a unique ID for this packet type,
 2. assign a base class to the packet type that will define the `base::packet_id__` static member, allowing to get an integer identifier for this packet type,
-3. give a common public base to all packets, for the sole purpose of the `packet_impl::is_packet<>` trait. This is used to check that packets are properly declared using the `NETCOM_PACKET` macro.
+3. define the static member `base::packet_name__` that is filled automatically (using the `refgen` tool, see below) and only used for debugging purposes,
+4. give a common public base to all packets, for the sole purpose of the `packet_impl::is_packet<>` trait. This is used to check that packets are properly declared using the `NETCOM_PACKET` macro.
 
 The point of this library is to get rid of most redundancies, by generating code automatically as much as possible. In this case, we do not ask the library user to define the packet ID by himself. But this is not the only thing we want. In particular, we want to serialize and deserialize these packets. The code to do so is simple, and was already illustrated in the previous chapter when serializing a `ship` structure:
 
@@ -421,10 +434,295 @@ net.send_message(
 );
 ```
 
-Now we are ready to dig inside the implementation of `netcom_base::send_message`.
+Finally, we saw in the previous section that it was possible to define credential requirements:
+
+```c++
+namespace request {
+    namespace server {
+        NETCOM_PACKET(shutdown) {
+            // List credentials here
+            NETCOM_REQUIRES("admin");
+
+            struct answer {};
+            struct failure {};
+        };
+    }
+}
+```
+
+The `NETCOM_REQUIRES` macro is defined as follows:
+
+```c++
+using constant_credential_t = const char*;
+
+template<typename... Args>
+constexpr std::array<constant_credential_t, sizeof...(Args)> make_credential_array(Args&&... args) {
+     return std::array<constant_credential_t, sizeof...(Args)>{{ std::forward<Args>(args)... }};
+}
+
+#define NETCOM_REQUIRES(...) \
+    static constexpr auto credentials = make_credential_array(__VA_ARGS__)
+```
+
+In other words, it simply stores the provided list of strings inside a `static constexpr std::array<const char*,N>`. This list is then read at compile time by the `netcom_base::watch_request` function to create the code to check the sender's credentials.
+
+Now we are ready to dig inside the implementation of `netcom_base`.
 
 ## Messages
 
+Messages are sent using the `netcom_base::send_message` function. The code here is rather straightforward:
 
+```c++
+template<typename M>
+void send_message(actor_id_t aid, M&& msg = M()) {
+    // Create the corresponding packet
+    out_packet_t p = create_message(std::forward<M>(msg));
+    // Set the recipient
+    p.to = aid;
+    // Push the packet to the output queue
+    send(std::move(p));
+}
+```
+
+The packet is actually created inside the `netcom_base::create_message_` function:
+
+```c++
+template<typename M>
+out_packet_t create_message(M&& msg) {
+    return create_message_<typename std::decay<M>::type>(std::forward<M>(msg));
+}
+
+template<typename MessageType, typename ... Args>
+out_packet_t create_message_(Args&& ... args) {
+    // Create a new packet
+    out_packet_t p;
+    // Specify this is a message
+    p << netcom_impl::packet_type::message;
+    // Specify the packet ID of this message
+    p << MessageType::packet_id__;
+    // Serialize the packet data
+    packet_write(p, std::forward<Args>(args)...);
+    return p;
+}
+```
+
+And that's about it. On the other side, the packet is (hopefully) received and pushed to the input queue. It is then processed by the `netcom_base::process_packet()` function:
+
+```c++
+void netcom_base::process_packets() {
+    processing_ = true;
+    auto sc = ctl::make_scoped([this]() { processing_ = false; });
+
+    // Process newly arrived packets
+    in_packet_t p;
+    while (input_.pop(p)) {
+        // Read packet type
+        netcom_impl::packet_type t;
+        p >> t;
+
+        // Forward processing to the corresponding function
+        switch (t) {
+        case netcom_impl::packet_type::message :
+            process_message_(std::move(p));
+            break;
+        case netcom_impl::packet_type::request :
+            process_request_(std::move(p));
+            break;
+        case netcom_impl::packet_type::answer :
+        case netcom_impl::packet_type::failure :
+        case netcom_impl::packet_type::missing_credentials :
+        case netcom_impl::packet_type::unhandled :
+            process_answer_(t, std::move(p));
+            break;
+        }
+    }
+
+    if (call_terminate_) {
+        terminate_();
+    }
+}
+```
+
+The packet type is read, and since it is a message, it is forwarded to the `netcom_base::process_message_()` function:
+
+```c++
+void netcom_base::process_message_(in_packet_t&& p) {
+    // Read the message packet ID
+    packet_id_t id;
+    p >> id;
+
+    if (debug_packets) {
+        std::cout << "<" << p.from << ": " << get_packet_name(id) << std::endl;
+    }
+
+    // Try to find registered handling functions
+    auto iter = message_signals_.find(id);
+    if (iter == message_signals_.end() || (*iter)->empty()) {
+        if (id != message::unhandled_message::packet_id__ &&
+            id != message::unhandled_request::packet_id__ &&
+            id != message::unhandled_request_answer::packet_id__) {
+            // If none, notify the receiver that a packet has not been handled
+            out_packet_t tp = create_message(make_packet<message::unhandled_message>(id));
+            process_message_(std::move(tp.to_input()));
+        }
+    } else {
+        // If some are found, forward handling of the packet to the signal
+        (*iter)->dispatch(std::move(p));
+    }
+}
+```
+
+This function extracts the packet ID, and looks in `message_signals_` for any registered handling code. If none, an `unhandled_message` message is produced, else the packet is forwarded to the corresponding `netcom_impl::message_signal_t`:
+
+```c++
+namespace netcom_impl {
+    struct message_signal_t {
+        explicit message_signal_t(packet_id_t id_) : id(id_) {}
+        virtual ~message_signal_t() = default;
+        virtual void dispatch(in_packet_t&& p) = 0;
+        virtual bool empty() const = 0;
+        virtual void clear() = 0;
+        const packet_id_t id;
+    };
+
+    template<typename P>
+    struct message_signal_impl : message_signal_t {
+        signals::message<P> signal;
+
+        message_signal_impl() : message_signal_t(P::packet_id__) {}
+
+        void dispatch(in_packet_t&& p) override {
+            message_t<P> m(std::move(p));
+            signal.dispatch(m);
+        }
+
+        bool empty() const override {
+            return signal.empty();
+        }
+
+        void clear() override {
+            signal.clear();
+        }
+    };
+}
+```
+
+`netcom_impl::message_signal_t` is just a type erased interface. It is implemented by `netcom_impl::message_signal_impl<P>` for each different packet type `P`. When the packet is sent to the `message_signal_t::dispatch(in_packet&&)` function, the implementation reads the packet back into the C++ packet structure. This is done by `netcom_impl::message_t<P>`:
+
+```c++
+namespace netcom_impl {
+    template<typename MessageType>
+    struct message_t {
+        static_assert(packet_impl::is_packet<MessageType>::value,
+            "template argument of message_t must be a packet");
+
+        using packet_t = MessageType;
+
+    private :
+        template<typename P>
+        friend struct message_signal_impl;
+
+        explicit message_t(in_packet_t&& p) : packet(std::move(p)) {
+            // Extract the packet back into the C++ structure
+            packet >> arg;
+        }
+
+    public :
+        in_packet_t packet;
+        packet_t arg;
+    };
+}
+```
+
+This type is exposed to the public interface, as we saw in the previous chapter, therefore it has a corresponding alias inside the `netcom_base` class: `netcom_base::message_t<P>`. Then, the `message_t<P>` is sent to the actual signal (see signal/slot manual). Its type is `netcom_impl::signals::message<P>`, which is just an alias for `signal_t<void(const message_t<P>&)>`.
+
+The last step is to actually register a handling function. We saw this was done using the `netcom_base::watch_message()` function:
+
+```c++
+pool << net.watch_message([this](const netcom_base::message_t<message::send_chat_message>& msg) {
+    // Find the corresponding channel
+    channel& c = this->get_chat_channel(msg.arg.channel);
+    // Get the username of the sender
+    std::string name = this->get_client_username(msg.packet.from);
+    // Print the text
+    c.print(name+"> "+msg.arg.text);
+});
+```
+
+The only argument is the handling function, here given as a lambda function (it can also be provided as any other kind of functor or function pointer). The only argument of the lambda function is a `message_t<P>`, with `P` the packet type this function is supposed to handle. It is therefore possible for the `watch_message` function to guess automatically which packet type to register this function to:
+
+```c++
+template<template<typename> class WP = watch_policy::none, typename FR>
+signal_connection_base& watch_message(FR&& receive_func) {
+    // Check the function signature
+    static_assert(ctl::argument_count<FR>::value == 1,
+        "message reception handler can only take one argument");
+    using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
+    static_assert(netcom_impl::is_message<ArgType>::value ||
+                  packet_impl::is_packet<ArgType>::value,
+        "message reception handler argument must either be a packet or a message_t");
+
+    // Proceed further
+    return watch_message_<WP>(
+        std::forward<FR>(receive_func), netcom_impl::is_message<ArgType>{}
+    );
+}
+```
+
+The first template argument, as we saw, allows choosing the _watch policy_, and defaults to `watch_policy::none`. Inside the body of the function, we start by various checks to make sure that the provided function has a suitable signature. Then we check if the argument of this function is a `message_t<P>` or a plain packet `P`, and go for different versions of `netcom_base::watch_message_()`:
+
+```c++
+// The argument is a plain packet
+template<template<typename> class WP, typename FR>
+signal_connection_base& watch_message_(FR&& receive_func, std::false_type) {
+    using MessageType = typename std::decay<ctl::functor_argument<FR>>::type;
+    using ArgType = message_t<MessageType>;
+
+    // Find the signal corresponding to this packet type
+    message_signal_impl<MessageType>& netsig = get_message_signal_<MessageType>();
+
+    // Register this new function
+    return netsig.signal.template connect<WP>([receive_func](const ArgType& msg) {
+        // Create a glue function that only forwards the extracted packet to the
+        // provided handler function
+        receive_func(msg.arg);
+    });
+}
+
+// The argument is a message_t<P>
+template<template<typename> class WP, typename FR>
+signal_connection_base& watch_message_(FR&& receive_func, std::true_type) {
+    using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
+    using MessageType = typename ArgType::packet_t;
+
+    // Find the signal corresponding to this packet type
+    message_signal_impl<MessageType>& netsig = get_message_signal_<MessageType>();
+
+    // Register this new function
+    return netsig.signal.template connect<WP>(std::forward<FR>(receive_func));
+}
+```
+
+In our case, the chosen overload is the second one. We first look (or create) the signal corresponding to the reception of such packet type, and then bind the provided function directly to the signal, and that's it. If we had provided a lambda function whose argument was simply the packet type, we would have gone for the first overload. This overload is doing exactly the same thing, except that a _glue_ function is created, taking the extracted C++ packet structure from the `message_t<P>` and forwarding it to the provided function.
+
+The code of `get_message_signal_<P>()` is rather straightforward:
+
+```c++
+template<typename T>
+message_signal_impl<T>& get_message_signal_() {
+    auto iter = message_signals_.find(T::packet_id__);
+    if (iter == message_signals_.end()) {
+        iter = message_signals_.insert(std::unique_ptr<message_signal_t>(
+            new message_signal_impl<T>()
+        ));
+    }
+
+    return static_cast<message_signal_impl<T>&>(**iter);
+}
+```
+
+It looks for the signal in the `message_signals_` container, and creates it if it does not exists.
+
+That's all for how messages are handled. All the magic is then done by the signal/slot library.
 
 ## Requests
