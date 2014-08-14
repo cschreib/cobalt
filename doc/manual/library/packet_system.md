@@ -256,9 +256,9 @@ pool << net.watch_request(
 );
 ```
 
-In this case, the request did not declare any necessary credentials, so any client can issue it and, if the server can, it will answer. Now we will consider another example of a request with required credentials: a client requesting the server to shutdown, and this is only allowed for administrators.
+The handling code has to answer the request. Either by calling `request_t::answer()` with the answer data in argument, or by calling `request_t::fail()` to inform the sender that the request could not be issued. These functions will take care of sending back the appropriate packets.
 
-Credentials are specified as simple strings. In this case, the _administrator_ credential is called `"admin"`. The only thing to do is to use the `NETCOM_REQUIRES` macro to list the required credentials:
+In this case, the request did not declare any necessary credentials, so any client can issue it and, if the server can, it will answer. Now we will consider another example of a request with required credentials: a client requesting the server to shutdown, and this is only allowed for administrators. Credentials are specified as simple strings. In this case, the _administrator_ credential is called `"admin"`. The only thing to do is to use the `NETCOM_REQUIRES` macro to list the required credentials:
 
 ```c++
 namespace request {
@@ -473,13 +473,22 @@ Now we are ready to dig inside the implementation of `netcom_base`.
 Messages are sent using the `netcom_base::send_message` function. The code here is rather straightforward:
 
 ```c++
+/// Send a message to a given actor.
 template<typename M>
 void send_message(actor_id_t aid, M&& msg = M()) {
-    // Create the corresponding packet
-    out_packet_t p = create_message(std::forward<M>(msg));
-    // Set the recipient
+    using MessageType = typename std::decay<M>::type;
+    send_custom_message<MessageType>(aid, std::forward<M>(msg));
+}
+
+/// Send a custom message to a given actor.
+/** Should only be used when the standard message system is too restrictive.
+    Typical use cases are when sending generic messages that are then to be read differently
+    depending on their origin, recipient or any other context dependent parameter.
+**/
+template<typename MessageType, typename ... Args>
+void send_custom_message(actor_id_t aid, Args&& ... args) {
+    out_packet_t p = create_message<MessageType>(std::forward<Args>(args)...);
     p.to = aid;
-    // Push the packet to the output queue
     send(std::move(p));
 }
 ```
@@ -726,3 +735,151 @@ It looks for the signal in the `message_signals_` container, and creates it if i
 That's all for how messages are handled. All the magic is then done by the signal/slot library.
 
 ## Requests
+
+The path of request packets is very similar to that of messages, but substantial differences arise from the fact that there is a answer to return.
+
+Requests are sent using the `netcom_base::send_request` function. The code here is rather straightforward:
+
+```c++
+template<typename R, typename FR>
+signal_connection_base& send_request(actor_id_t aid, R&& req, FR&& receive_func) {
+    using RequestType = typename std::decay<R>::type;
+    return send_custom_request<RequestType>(
+        aid, std::forward<R>(req), std::forward<FR>(receive_func)
+    );
+}
+
+template<typename RequestType, typename R, typename FR>
+signal_connection_base& send_custom_request(actor_id_t aid, R&& req, FR&& receive_func) {
+    // Check the function signature
+    static_assert(ctl::argument_count<FR>::value == 1,
+        "answer reception handler can only take one argument");
+    using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
+    static_assert(netcom_impl::is_request_answer<ArgType>::value ||
+                  std::is_same<ArgType, typename RequestType::answer>::value,
+        "answer reception handler argument must either be a packet::answer or "
+        "a request_answer_t");
+
+    // Create a new request
+    request_id_t rid;
+    out_packet_t p = create_request_<RequestType>(rid, std::forward<R>(req));
+    p.to = aid;
+
+    // Register the answer handling function
+    auto& ac = watch_request_answer_<RequestType>(
+        std::forward<FR>(receive_func), rid, netcom_impl::is_request_answer<ArgType>{}
+    );
+
+    // Send the request
+    send(std::move(p));
+    return ac;
+}
+```
+
+First we make sure that the provided function has a suitable signature. Then we create the request packet and assign it a new request ID, register the answer handler, and finaly send the request packet.
+
+The code to create the request is located in `netcom_base::create_request_()`. First we generate a new request ID, then we create the request packet:
+
+```c++
+template<typename RequestType, typename ... Args>
+out_packet_t create_request_(request_id_t& rid, Args&& ... args) {
+    if (!request_id_provider_.make_id(rid)) {
+        throw netcom_exception::too_many_requests();
+    }
+
+    // Create the packet
+    out_packet_t p;
+    // Specify that this is a request
+    p << netcom_impl::packet_type::request;
+    // Specify the request packet ID
+    p << RequestType::packet_id__;
+    // Specify the request ID
+    p << rid;
+    // And finally append the request data
+    packet_write(p, std::forward<Args>(args)...);
+    return p;
+}
+```
+
+Then we register the answer handling function using `netcom_base::watch_request_answer_()`. Depending on the argument of the provided function, i.e. if it is a `request_answer_t<P>` or a plain answer packet `P::answer`, we choose between two overloads:
+
+```c++
+// Answer function argument is a plain answer packet
+template<typename RequestType, typename FR>
+signal_connection_base& watch_request_answer_(FR&& receive_func, request_id_t rid, std::false_type) {
+    using ArgType = request_answer_t<RequestType>;
+
+    // Find the corresponding signal
+    answer_signal_impl<RequestType>& netsig = get_answer_signal_<RequestType>(rid);
+
+    // Register the handling function
+    return netsig.signal.template connect<netcom_impl::answer_connection>(
+        [receive_func](const ArgType& msg) {
+            // Create a glue function that only forwards the actual answer to the
+            // provided handler function
+            if (!msg.failed) {
+                receive_func(msg.answer);
+            }
+        }, *this, rid
+    );
+}
+
+// Answer function argument is a request_answer_t<P>
+template<typename RequestType, typename FR>
+signal_connection_base& watch_request_answer_(FR&& receive_func, request_id_t rid, std::true_type) {
+    // Find the corresponding signal
+    answer_signal_impl<RequestType>& netsig = get_answer_signal_<RequestType>(rid);
+
+    // Register the handling function
+    return netsig.signal.template connect<netcom_impl::answer_connection>(
+        std::forward<FR>(receive_func), *this, rid
+    );
+}
+```
+
+Here also the code of `get_answer_signal_<P>()` is rather straightforward:
+
+```c++
+template<typename T>
+answer_signal_impl<T>& get_answer_signal_(request_id_t id) {
+    auto iter = answer_signals_.insert(std::unique_ptr<answer_signal_t>(
+        new answer_signal_impl<T>(id)
+    ));
+    return static_cast<answer_signal_impl<T>&>(**iter);
+}
+```
+
+Since only a single request can exist with this request ID, it simply creates the signal and returns it. And that's it for sending requests.
+
+The request packet is pushed to the output queue and sent. On the other side, it is received, pushed to the input queue, and is processed in `netcom_base::process_packet()`. As we saw in the section on messages, this function forwards the packet to the `netcom_base::process_request_()` function:
+
+```c++
+void netcom_base::process_request_(in_packet_t&& p) {
+    packet_id_t id;
+    p >> id;
+
+    if (debug_packets) {
+        request_id_t rid; p.view() >> rid;
+        std::cout << "<" << p.from << ": " << get_packet_name(id)
+            << " (" << rid << ")" << std::endl;
+    }
+
+    auto iter = request_signals_.find(id);
+    if (iter == request_signals_.end() || (*iter)->empty()) {
+        // No one is here to answer this request. Could be an error of either sides.
+        // Send 'unhandled request' packet to the requester.
+        request_id_t rid;
+        p >> rid;
+        send_unhandled_(p.from, rid);
+
+        out_packet_t tp = create_message(make_packet<message::unhandled_request>(id));
+        process_message_(std::move(tp.to_input()));
+    } else {
+        (*iter)->dispatch(*this, std::move(p));
+    }
+}
+```
+
+We first read the packet ID, and look for a registered request handler. If none is found, we send back an "unhandled" packet to the sender, and process an "unhandled request" message. Else, we forward the packet to the signal we just found.
+
+The next step is to actually register a handling function to answer this request. As we saw, this is done using the `netcom_base::watch_request` function. The code is very similar to `netcom_base::watch_message`, so we will not go into the details. Suffice to say: the main difference is that, when the request is received, the handler function has to give an answer.
