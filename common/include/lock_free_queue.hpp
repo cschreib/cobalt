@@ -20,8 +20,12 @@ namespace ctl {
             node* next;
         };
 
+        // Modified and read by 'procuder' only
         node* first_;
-        std::atomic<node*> dummy_, last_;
+        // Modified and read by 'consumer', read by 'producer'
+        std::atomic<node*> dummy_;
+        // Modified and read by 'procuder', read by 'consumer'
+        std::atomic<node*> last_;
 
     public :
         lock_free_queue() {
@@ -63,7 +67,7 @@ namespace ctl {
         **/
         bool pop(T& t) {
             // Return false if queue is empty
-            if (dummy_!= last_) {
+            if (dummy_ != last_) {
                 // Consume the value
                 t = std::move((*dummy_).next->data);
                 dummy_ = (*dummy_).next;
@@ -71,6 +75,24 @@ namespace ctl {
             } else {
                 return false;
             }
+        }
+
+        /// Compute the current number of elements in the queue.
+        /** Called by the 'consumer' thread only.
+            Note that the true size may actually be larger than the returned value if the
+            'producer' thread pushes new elements while the size is computed.
+        **/
+        std::size_t size() const {
+            node* tmp = dummy_.load();
+            node* end = last_.load();
+            std::size_t n = 0;
+
+            while (tmp != end) {
+                tmp = tmp->next;
+                ++n;
+            }
+
+            return n;
         }
 
         /// Check if this queue is empty.
