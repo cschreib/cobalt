@@ -134,6 +134,8 @@ void netcom_base::process_packets() {
         netcom_impl::packet_type t;
         p >> t;
 
+        // TODO: implement optional packet compression?
+
         switch (t) {
         case netcom_impl::packet_type::message :
             process_message_(std::move(p));
