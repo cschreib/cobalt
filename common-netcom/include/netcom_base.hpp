@@ -652,9 +652,8 @@ public :
     /// Send a message to a given actor.
     template<typename M>
     void send_message(actor_id_t aid, M&& msg = M()) {
-        out_packet_t p = create_message(std::forward<M>(msg));
-        p.to = aid;
-        send(std::move(p));
+        using MessageType = typename std::decay<M>::type;
+        send_custom_message<MessageType>(aid, std::forward<M>(msg));
     }
 
     /// Send a custom message to a given actor.
@@ -811,6 +810,7 @@ private :
         credential_list_t lst = get_missing_credentials_(p.from,
             constant_credential_list_t(ctl::type_list<RequestType>{})
         );
+
         if (lst.empty()) {
             return true;
         } else {
@@ -874,6 +874,7 @@ public :
     **/
     template<template<typename> class WP = watch_policy::none, typename FR>
     signal_connection_base& watch_request(FR&& receive_func) {
+        // Check the function signature
         static_assert(ctl::argument_count<FR>::value == 1,
             "request reception handler can only take one argument");
         using Arg = typename std::decay<ctl::functor_argument<FR>>::type;
@@ -882,9 +883,11 @@ public :
 
         using RequestType = typename Arg::packet_t;
 
+        // Find the signal corresponding to this request
         request_signal_impl<RequestType>& netsig = get_request_signal_<RequestType>();
         if (!netsig.empty()) throw netcom_exception::request_already_watched<RequestType>();
 
+        // Register slot
         return netsig.signal.template connect<WP>(std::forward<FR>(receive_func));
     }
 };
