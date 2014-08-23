@@ -5,3 +5,4 @@ server/bak/
 bak/
 bin/cobalt-server-cli
 bin/cobalt-client-cli
+bin/*.log
