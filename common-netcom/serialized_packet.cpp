@@ -1,5 +1,4 @@
 #include "serialized_packet.hpp"
-#include "print.hpp"
 
 serialized_packet::serialized_packet() :
     read_pos_(&(this->*rob_impl::stolen<rob_impl::sf_packet_read_pos>::ptr)) {}

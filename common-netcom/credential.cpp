@@ -1,6 +1,5 @@
 #include "credential.hpp"
 #include "packet.hpp"
-#include <print.hpp>
 
 credential_list_t::credential_list_t(std::initializer_list<credential_t> lst) :
     list_(lst) {}
