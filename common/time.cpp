@@ -1,4 +1,5 @@
 #include "time.hpp"
+#include "string.hpp"
 
 double now() {
     return std::chrono::duration_cast<std::chrono::microseconds>(
@@ -6,13 +7,24 @@ double now() {
     ).count()*1e-6;
 }
 
-std::string today() {
+double time_of_the_day() {
     std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::tm tm = *std::localtime(&t);
-    std::ostringstream ss;
-    ss << string::convert(tm.tm_year+1900,4) << string::convert(tm.tm_mon+1, 2)
-       << string::convert(tm.tm_mday,2);
-    return ss.str();
+    return tm.tm_sec + tm.tm_min*60 + tm.tm_hour*3600;
+}
+
+std::string time_of_day_str(const std::string& sep) {
+    std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm tm = *std::localtime(&t);
+    return string::convert(tm.tm_hour,2)+sep+string::convert(tm.tm_min,2)+sep
+        +string::convert(tm.tm_sec,2);
+}
+
+std::string today_str(const std::string& sep) {
+    std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm tm = *std::localtime(&t);
+    return string::convert(tm.tm_year+1900,4)+sep+string::convert(tm.tm_mon+1, 2)+sep
+       +string::convert(tm.tm_mday,2);
 }
 
 std::string time_str(double t) {
