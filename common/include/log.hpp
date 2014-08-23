@@ -45,7 +45,13 @@ public :
     explicit logger_base(const std::string& name, config::state& conf) {
         std::string file;
         if (conf.get_value("log."+name+".file", file, "") && !file.empty()) {
-            out_.open(file);
+            bool append = true;
+            conf.get_value("log."+name+".append", append, append);
+            if (append) {
+                out_.open(file, std::ios::app);
+            } else {
+                out_.open(file);
+            }
         }
 
         conf.get_value("log."+name+".stdout", stdout_, stdout_);
