@@ -44,8 +44,8 @@ namespace color {
 
         std::ostream& operator << (std::ostream& o, set s) {
             if (s.col_ == color::normal) {
-                reset(o);
-                if (s.bold_) bold(o);
+                o << reset;
+                if (s.bold_) o << bold;
                 return o;
             } else {
                 return o << color_codes[s.bold_ ? 1 : 0][(char)s.col_ & 7];
