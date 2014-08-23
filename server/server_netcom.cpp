@@ -6,13 +6,14 @@ namespace server {
         socket(std::move(s)), id(i) {}
 
     netcom::netcom(config::state& conf) :
-        conf_(conf), listen_port_(4444), max_client_(1),
+        conf_(conf), connected_(false), connection_time_out_(5.0),
+        listen_port_(4444), max_client_(1),
         client_id_provider_(max_client_, first_actor_id),
-        is_connected_(false), terminate_thread_(false),
-        listener_thread_(std::bind(&netcom::loop_, this)),
+        terminate_thread_(false), listener_thread_(std::bind(&netcom::loop_, this)),
         sc_factory_(*this) {
 
         pool_ << conf_.bind("netcom.listen_port", listen_port_);
+        pool_ << conf_.bind("netcom.connection.time_out", connection_time_out_);
         pool_ << conf_.bind("netcom.max_client", [this](std::size_t max) {
             set_max_client_(max);
         }, max_client_);
@@ -35,7 +36,7 @@ namespace server {
     }
 
     bool netcom::is_connected() const {
-        return is_connected_;
+        return connected_;
     }
 
     void netcom::run() {
@@ -43,7 +44,7 @@ namespace server {
     }
 
     void netcom::run(std::uint16_t port) {
-        if (is_connected_) {
+        if (connected_) {
             terminate();
         }
         terminate_thread_ = false;
@@ -125,11 +126,11 @@ namespace server {
                 make_packet<message::server::internal::cannot_listen_port>(listen_port_)
             );
 
-            sf::sleep(sf::seconds(5));
+            sf::sleep(sf::seconds(connection_time_out_));
             if (terminate_thread_) return;
         }
 
-        is_connected_ = true;
+        connected_ = true;
 
         send_message(self_actor_id,
             make_packet<message::server::internal::start_listening_port>(listen_port_)
@@ -271,7 +272,7 @@ namespace server {
         selector_.clear();
         listener_.close();
 
-        is_connected_ = false;
+        connected_ = false;
     }
 
     void netcom::remove_client_(actor_id_t cid) {

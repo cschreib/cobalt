@@ -77,15 +77,17 @@ namespace server {
         config::state& conf_;
         scoped_connection_pool pool_;
 
+        std::atomic<bool> connected_;
+        double            connection_time_out_;
+
         std::uint16_t      listen_port_;
-        std::size_t        max_client_;
         sf::TcpListener    listener_;
         sf::SocketSelector selector_;
 
+        std::size_t                         max_client_;
         client_list_t                       clients_;
         ctl::unique_id_provider<actor_id_t> client_id_provider_;
 
-        std::atomic<bool> is_connected_;
         std::atomic<bool> terminate_thread_;
         sf::Thread listener_thread_;
 
