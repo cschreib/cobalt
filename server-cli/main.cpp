@@ -69,6 +69,7 @@ int main(int argc, const char* argv[]) {
     }
 
     out.note("terminating program");
+    out.print("--------------------------------");
 
     return 0;
 }
