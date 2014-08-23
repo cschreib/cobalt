@@ -1,86 +1,8 @@
 std::ostream& out = std::cerr;
 
-namespace color {
-    enum color_value : char {
-        black = 0, red, green, yellow, blue, magenta, cyan, white, normal = -1
-    };
-
-    std::ostream& reset(std::ostream& o);
-    std::ostream& bold(std::ostream& o);
-
-    struct set {
-        color_value col_;
-        bool bold_;
-
-        explicit set(color_value col, bool bold = false) : col_(col), bold_(bold) {}
-    };
-
-    std::ostream& operator << (std::ostream& o, set s);
-}
-
-// Use POSIX terminal colors
 #ifdef POSIX
     #include <unistd.h>
     #include <sys/ioctl.h>
-
-    // Note: code for coloring the terminal is inspired from LLVM
-    #define COLOR(FGBG, CODE, BOLD) "\033[0;" BOLD FGBG CODE "m"
-
-    #define ALLCOLORS(FGBG,BOLD) {\
-    COLOR(FGBG, "0", BOLD),\
-    COLOR(FGBG, "1", BOLD),\
-    COLOR(FGBG, "2", BOLD),\
-    COLOR(FGBG, "3", BOLD),\
-    COLOR(FGBG, "4", BOLD),\
-    COLOR(FGBG, "5", BOLD),\
-    COLOR(FGBG, "6", BOLD),\
-    COLOR(FGBG, "7", BOLD)\
-    }
-
-    static const char color_codes[2][8][10] = {
-        ALLCOLORS("3",""), ALLCOLORS("3","1;")
-    };
-
-    #undef COLOR
-    #undef ALLCOLORS
-
-    namespace color {
-        std::ostream& reset(std::ostream& o) {
-            return o << "\033[0m";
-        }
-
-        std::ostream& bold(std::ostream& o) {
-            return o << "\033[1m";
-        }
-
-        std::ostream& operator << (std::ostream& o, set s) {
-            if (s.col_ == color::normal) {
-                reset(o);
-                if (s.bold_) bold(o);
-                return o;
-            } else {
-                return o << color_codes[s.bold_ ? 1 : 0][(char)s.col_ & 7];
-            }
-        }
-    }
-
-// Fallback: no terminal color
-#else
-
-    namespace color {
-        std::ostream& reset(std::ostream& o) {
-            return o;
-        }
-
-        std::ostream& bold(std::ostream& o) {
-            return o;
-        }
-
-        std::ostream& operator << (std::ostream& o, set s) {
-            return o;
-        }
-    }
-
 #endif
 
 bool file_is_same(CXFile f1, CXFile f2) {

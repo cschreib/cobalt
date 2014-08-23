@@ -4,7 +4,7 @@
 #include <server_player_list.hpp>
 #include <server_instance.hpp>
 #include <time.hpp>
-#include <print.hpp>
+#include <log.hpp>
 #include <config.hpp>
 #include <iostream>
 
@@ -24,12 +24,12 @@ int main(int argc, const char* argv[]) {
     scoped_connection_pool pool;
 
     pool << net.watch_message([&](const message::unhandled_message& msg) {
-        warning("unhandled message: ", msg.message_id);
+        cout.warning("unhandled message: ", msg.message_id);
     });
 
     pool << net.watch_message([&](const message::server::connection_failed& msg) {
         stop = true;
-        error("connection failed");
+        cout.error("connection failed");
         std::string rsn = "?";
         switch (msg.rsn) {
             case message::server::connection_failed::reason::cannot_authenticate :
@@ -39,14 +39,14 @@ int main(int argc, const char* argv[]) {
             case message::server::connection_failed::reason::timed_out :
                 rsn = "timed out"; break;
         }
-        reason(rsn);
+        cout.reason(rsn);
     });
     pool << net.watch_message([](const message::server::connection_established& msg) {
-        note("connection established");
+        cout.note("connection established");
     });
     pool << net.watch_message([&](const message::server::connection_denied& msg) {
         stop = true;
-        error("connection denied");
+        cout.error("connection denied");
         std::string rsn = "?";
         switch (msg.rsn) {
             case message::server::connection_denied::reason::too_many_clients :
@@ -54,23 +54,23 @@ int main(int argc, const char* argv[]) {
             case message::server::connection_denied::reason::unexpected_packet :
                 rsn = "unexpected packet received"; break;
         }
-        reason(rsn);
+        cout.reason(rsn);
     });
     pool << net.watch_message([&](const message::server::connection_granted& msg) {
-        note("connection granted (id=", msg.id, ")!");
+        cout.note("connection granted (id=", msg.id, ")!");
     });
 
     pool << net.watch_message([&](const message::credentials_granted& msg) {
-        note("new credentials acquired:");
+        cout.note("new credentials acquired:");
         for (auto& c : msg.cred) {
-            note(" - ", c);
+            cout.note(" - ", c);
         }
     });
 
     pool << net.watch_message([&](const message::credentials_removed& msg) {
-        note("credentials removed:");
+        cout.note("credentials removed:");
         for (auto& c : msg.cred) {
-            note(" - ", c);
+            cout.note(" - ", c);
         }
     });
 
@@ -78,40 +78,40 @@ int main(int argc, const char* argv[]) {
 
     pool << plist.on_list_received.connect([&plist]() {
         if (plist.empty()) {
-            print("player list received (empty)");
+            cout.print("player list received (empty)");
         } else {
-            print("player list received:");
+            cout.print("player list received:");
             for (const client::player& p : plist) {
-                print(" - id=", p.id, ", ip=", p.ip, ", name=", p.name, ", color=", p.color,
-                    ", ai=", p.is_ai);
+                cout.print(" - id=", p.id, ", ip=", p.ip, ", name=", p.name, ", color=",
+                    p.color, ", ai=", p.is_ai);
             }
         }
     });
     pool << plist.on_connect_fail.connect([]() {
-        error("could not read player list");
+        cout.error("could not read player list");
     });
     pool << plist.on_join.connect([](client::player& p) {
-        print("joined as player \"", p.name, "\"");
+        cout.print("joined as player \"", p.name, "\"");
     });
     pool << plist.on_leave.connect([]() {
-        print("left player list");
+        cout.print("left player list");
     });
     pool << plist.on_join_fail.connect([]() {
-        error("could not join as player");
+        cout.error("could not join as player");
     });
     pool << plist.on_player_connected.connect([](client::player& p) {
-        print("new player connected: id=", p.id, ", ip=", p.ip, ", name=",
+        cout.print("new player connected: id=", p.id, ", ip=", p.ip, ", name=",
             p.name, ", color=", p.color, ", ai=", p.is_ai);
     });
     pool << plist.on_player_disconnected.connect([](const client::player& p) {
-        print("player disconnected: id=", p.id, ", name=", p.name);
+        cout.print("player disconnected: id=", p.id, ", name=", p.name);
     });
 
     plist.connect();
 
     std::string behavior = "watcher";
     conf.get_value("player.behavior", behavior, behavior);
-    print("client behavior: \"", behavior, "\"");
+    cout.print("client behavior: \"", behavior, "\"");
 
     if (behavior == "player") {
         std::string player_name = "kalith";
@@ -128,14 +128,14 @@ int main(int argc, const char* argv[]) {
             make_packet<request::server::admin_rights>(password),
             [](const client::netcom::request_answer_t<request::server::admin_rights>& msg) {
                 if (msg.failed) {
-                    error("admin rights denied");
+                    cout.error("admin rights denied");
                     std::string rsn;
                     switch (msg.failure.rsn) {
                         case request::server::admin_rights::failure::reason::wrong_password :
                             rsn = "wrong password provided";
                             break;
                     }
-                    reason(rsn);
+                    cout.reason(rsn);
                 }
             }
         );
@@ -167,13 +167,13 @@ int main(int argc, const char* argv[]) {
             [n](const client::netcom::request_answer_t<request::server::ping>& msg) {
                 if (msg.failed) {
                     if (msg.unhandled) {
-                        error("server does not know how to pong...");
+                        cout.error("server does not know how to pong...");
                     } else {
-                        warning("server failed to pong ?!");
+                        cout.warning("server failed to pong ?!");
                     }
                 } else {
                     double tn = now();
-                    note("pong from server (", seconds_str(tn - n), ")");
+                    cout.note("pong from server (", seconds_str(tn - n), ")");
                 }
             });
         }
@@ -193,16 +193,16 @@ int main(int argc, const char* argv[]) {
                 [&](const client::netcom::request_answer_t<request::server::shutdown>& msg) {
                     if (msg.failed) {
                         if (msg.missing_credentials.empty()) {
-                            error("server will not shutdown");
+                            cout.error("server will not shutdown");
                         } else {
-                            error("insufficient credentials to shutdown server");
-                            note("missing:");
+                            cout.error("insufficient credentials to shutdown server");
+                            cout.note("missing:");
                             for (auto& c : msg.missing_credentials) {
-                                note(" - ", c);
+                                cout.note(" - ", c);
                             }
                         }
                     } else {
-                        note("server will shutdown soon, disconnecting...");
+                        cout.note("server will shutdown soon, disconnecting...");
                         stop = true;
                     }
                 }

@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <filesystem.hpp>
 #include <string.hpp>
-#include <print.hpp>
+#include <log.hpp>
 #include <crc32.hpp>
 #include <SFML/Network/Packet.hpp>
 #include "format.hpp"
@@ -415,7 +415,7 @@ bool parse(const std::string& dir, const std::string& filename, std::deque<packe
         return true;
     }
 
-    print(" ", file);
+    cout.print(" ", file);
 
     CXIndex cidx = clang_createIndex(0, 0);
     CXTranslationUnit ctu = clang_parseTranslationUnit(
@@ -440,13 +440,13 @@ bool parse(const std::string& dir, const std::string& filename, std::deque<packe
             clang_getFileUniqueID(main_file, &data.main_file_id);
             clang_visitChildren(clang_getTranslationUnitCursor(ctu), &visitor, &data);
         } else {
-            error("could not parse '", file, "'");
+            cout.error("could not parse '", file, "'");
             return false;
         }
 
         clang_disposeTranslationUnit(ctu);
     } else {
-        error("could not parse '", file, "'");
+        cout.error("could not parse '", file, "'");
         return false;
     }
 
@@ -463,8 +463,8 @@ bool parse(const std::string& dir, const std::string& filename, std::deque<packe
 
     std::ofstream out(autogen);
     if (!out.is_open()) {
-        error("could not open output file");
-        note(autogen);
+        cout.error("could not open output file");
+        cout.note(autogen);
         return false;
     }
 
@@ -480,7 +480,7 @@ bool parse(const std::string& dir, const std::string& filename, std::deque<packe
 }
 
 bool parse_directory(const std::string& dir, std::deque<packet>& db, int argc, char* argv[]) {
-    print(dir);
+    cout.print(dir);
 
     std::vector<std::string> files = file::list_files(dir+"/*.hpp");
     for (auto& f : files) {
@@ -550,14 +550,14 @@ int main(int argc, char* argv[]) {
     std::deque<packet> db;
     for (auto& d : dirs) {
         if (!file::mkdir(d+"/autogen/packets")) {
-            error("could not create 'autogen' directory");
-            note(d+"/autogen/packets");
+            cout.error("could not create 'autogen' directory");
+            cout.note(d+"/autogen/packets");
             return 1;
         }
 
         if (!file::mkdir(d+"/autogen/packets/cached")) {
-            error("could not create 'autogen' directory");
-            note(d+"/autogen/packets/cached");
+            cout.error("could not create 'autogen' directory");
+            cout.note(d+"/autogen/packets/cached");
             return 1;
         }
 
@@ -575,16 +575,16 @@ int main(int argc, char* argv[]) {
             if (db[j].parent == nullptr && db[i].id == db[j].id &&
                 db[i].category == db[j].category) {
                 error = true;
-                std::cout << "crc32 collision test: collision detected:" << std::endl;
-                std::cout << "  " << get_position(db[i]) << std::endl;
-                std::cout << "  " << get_position(db[j]) << std::endl;
+                cout.print("crc32 collision test: collision detected:");
+                cout.print("  ", get_position(db[i]));
+                cout.print("  ", get_position(db[j]));
             }
         }
     }
 
     if (!error) {
-        std::cout << "crc32 collision test: no collision found (over " <<
-            db.size() << " packets)" << std::endl;
+        cout.print("crc32 collision test: no collision found (over ",
+            db.size(), " packets)");
     } else {
         return 1;
     }
