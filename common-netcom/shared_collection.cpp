@@ -93,3 +93,11 @@ shared_collection_factory::shared_collection_factory(netcom_base& net) : net_(ne
         }
     );
 }
+
+void shared_collection_factory::clear() {
+    observers_.clear();
+
+    while (!collections_.empty()) {
+        (*collections_.begin())->destroy();
+    }
+}

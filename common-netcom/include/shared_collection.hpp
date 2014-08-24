@@ -615,6 +615,8 @@ public :
 
         return dptr->create_observer();
     }
+
+    void clear();
 };
 
 #endif
