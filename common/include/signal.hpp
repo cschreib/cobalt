@@ -247,8 +247,7 @@ public :
     template<typename ... TArgs>
     void dispatch(TArgs&& ... args) {
         {
-            dispatching_ = true;
-            auto sd = ctl::make_scoped([this]() { dispatching_ = false; });
+            auto sc = ctl::scoped_toggle(dispatching_);
 
             tuple_type arg(std::forward<TArgs>(args)...);
             for (auto& s : slots_) {

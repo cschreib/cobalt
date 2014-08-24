@@ -37,8 +37,7 @@ void netcom_base::terminate_() {
 }
 
 void netcom_base::do_terminate_() {
-    clearing_ = true;
-    auto sd = ctl::make_scoped([this]() { clearing_ = false; });
+    auto sd = ctl::scoped_toggle(clearing_);
 
     input_.clear();
     output_.clear();
@@ -144,8 +143,7 @@ void netcom_base::process_answer_(netcom_impl::packet_type t, in_packet_t&& p) {
 }
 
 void netcom_base::process_packets() {
-    processing_ = true;
-    auto sc = ctl::make_scoped([this]() { processing_ = false; });
+    auto sc = ctl::scoped_toggle(processing_);
 
     // Process newly arrived packets
     in_packet_t p;

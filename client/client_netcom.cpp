@@ -124,8 +124,7 @@ namespace client {
             }
         }
 
-        connected_ = true;
-        auto sc = ctl::make_scoped([this]() { connected_ = false; });
+        auto sc = ctl::scoped_toggle(connected_);
 
         // Enter main loop
         while (!terminate_thread_) {

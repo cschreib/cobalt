@@ -1,6 +1,8 @@
 #ifndef SCOPED_HPP
 #define SCOPED_HPP
 
+#include <atomic>
+
 namespace ctl {
     /// Function that is automatically called once on destruction.
     /** This simple helper is useful to make exception safe code, mostly when working with external C
@@ -77,9 +79,22 @@ namespace ctl {
 
     namespace impl {
         template<typename T>
+        struct base_type_t {
+            using type = T;
+        };
+
+        template<typename T>
+        struct base_type_t<std::atomic<T>> {
+            using type = T;
+        };
+
+        template<typename T>
+        using base_type = typename base_type_t<T>::type;
+
+        template<typename T>
         struct assigner {
             T& obj;
-            T val;
+            base_type<T> val;
 
             template<typename U>
             assigner(T& o, U&& v) : obj(o), val(std::forward<U>(v)) {}
@@ -94,6 +109,12 @@ namespace ctl {
     inline scoped_t<impl::assigner<bool>> scoped_toggle(bool& b) {
         b = !b;
         return make_scoped(impl::assigner<bool>(b, !b));
+    }
+
+    inline scoped_t<impl::assigner<std::atomic<bool>>> scoped_toggle(std::atomic<bool>& b) {
+        bool tb = b.load();
+        b = !tb;
+        return make_scoped(impl::assigner<std::atomic<bool>>(b, tb));
     }
 }
 

@@ -170,8 +170,7 @@ namespace server {
             if (shutdown_) return;
         }
 
-        connected_ = true;
-        auto sc = ctl::make_scoped([this](){ connected_ = false; });
+        auto sc = ctl::scoped_toggle(connected_);
 
         send_message(self_actor_id,
             make_packet<message::server::internal::start_listening_port>(listen_port_)
