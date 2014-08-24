@@ -46,6 +46,13 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   # using Visual Studio C++
 endif()
 
+if (UNIX)
+    add_definitions(-DPOSIX)
+endif()
+if (WINDOWS)
+    add_definitions(-DWIN32)
+endif()
+
 file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
 file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/bin")
 

@@ -6,13 +6,6 @@ include_directories(${CLANG_INCLUDE})
 include_directories(${SFML_INCLUDE_DIR})
 add_definitions(-DNO_AUTOGEN)
 
-if (UNIX)
-    add_definitions(-DPOSIX)
-endif()
-if (WINDOWS)
-    add_definitions(-DWIN32)
-endif()
-
 add_executable(refgen
     main.cpp
 )

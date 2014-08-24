@@ -4,10 +4,6 @@ project(cobalt-common)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${SFML_INCLUDE_DIR})
 
-if (UNIX)
-    add_definitions(-DPOSIX)
-endif()
-
 set(SRC_LIST
     ${PROJECT_SOURCE_DIR}/color32.cpp
     ${PROJECT_SOURCE_DIR}/config.cpp
