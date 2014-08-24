@@ -59,17 +59,8 @@ public :
     }
 
 private :
-    void println_() {
-        if (out_.is_open()) {
-            out_ << std::endl;
-        }
-        if (stdout_) {
-            std::cout << std::endl;
-        }
-    }
-
     template<typename T>
-    void print_(const T& t) {
+    void print__(const T& t) {
         if (out_.is_open()) {
             out_ << t;
         }
@@ -78,9 +69,19 @@ private :
         }
     }
 
-public :
     template<typename ... Args>
-    void print(Args&&... args) {
+    void print_(Args&& ... args) {
+        int v[] = {(print__(std::forward<Args>(args)), 0)...};
+
+        if (out_.is_open()) {
+            out_ << std::endl;
+        }
+        if (stdout_) {
+            std::cout << std::endl;
+        }
+    }
+
+    void print_stamp_() {
         if (!nostamp_) {
             if (out_.is_open()) {
                 logger_impl::print_stamp(out_);
@@ -93,29 +94,105 @@ public :
                 }
             }
         }
+    }
 
-        int v[] = {(print_(std::forward<Args>(args)), 0)...};
-        println_();
+public :
+    template<typename ... Args>
+    void print(Args&&... args) {
+        print_stamp_();
+        print_(std::forward<Args>(args)...);
     }
 
     template<typename ... Args>
     void error(Args&& ... args) {
-        print("error: ", std::forward<Args>(args)...);
+        print_stamp_();
+
+        if (out_.is_open()) {
+            out_ << "error: ";
+        }
+
+        if (stdout_) {
+            if (!nocolor_) {
+                std::cout << color::set(color::red, true);
+            }
+
+            std::cout << "error: ";
+
+            if (!nocolor_) {
+                std::cout << color::reset;
+            }
+        }
+
+        print_(std::forward<Args>(args)...);
     }
 
     template<typename ... Args>
     void warning(Args&& ... args) {
-        print("warning: ", std::forward<Args>(args)...);
+        print_stamp_();
+
+        if (out_.is_open()) {
+            out_ << "warning: ";
+        }
+
+        if (stdout_) {
+            if (!nocolor_) {
+                std::cout << color::set(color::yellow, true);
+            }
+
+            std::cout << "warning: ";
+
+            if (!nocolor_) {
+                std::cout << color::reset;
+            }
+        }
+
+        print_(std::forward<Args>(args)...);
     }
 
     template<typename ... Args>
     void note(Args&& ... args) {
-        print("note: ", std::forward<Args>(args)...);
+        print_stamp_();
+
+        if (out_.is_open()) {
+            out_ << "note: ";
+        }
+
+        if (stdout_) {
+            if (!nocolor_) {
+                std::cout << color::set(color::blue, true);
+            }
+
+            std::cout << "note: ";
+
+            if (!nocolor_) {
+                std::cout << color::reset;
+            }
+        }
+
+        print_(std::forward<Args>(args)...);
     }
 
     template<typename ... Args>
     void reason(Args&& ... args) {
-        print("reason: ", std::forward<Args>(args)...);
+        print_stamp_();
+
+        if (out_.is_open()) {
+            out_ << "reason: ";
+        }
+
+        if (stdout_) {
+            if (!nocolor_) {
+                std::cout << color::set(color::blue, true);
+            }
+
+            std::cout << "reason: ";
+
+            if (!nocolor_) {
+                std::cout << color::reset;
+            }
+        }
+
+        print_(std::forward<Args>(args)...);
     }
 };
 

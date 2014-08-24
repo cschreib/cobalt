@@ -79,7 +79,7 @@ namespace logger_impl {
 
     void print_stamp_colored(std::ostream& o) {
         o << color::set(color::normal,true) << "["
-            << color::set(color::green,true) << today_str("/")
+            << color::set(color::cyan,true) << today_str("/")
             << color::set(color::normal,true) << "|"
             << color::set(color::green,true) << time_of_day_str(":")
             << color::set(color::normal,true) << "] "
