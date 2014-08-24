@@ -1,5 +1,4 @@
 #include "netcom_base.hpp"
-#include "endian.hpp"
 #include <scoped.hpp>
 #include <iostream>
 
