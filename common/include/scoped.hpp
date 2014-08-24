@@ -35,6 +35,14 @@ namespace ctl {
     **/
     template<typename T>
     struct scoped_t {
+        scoped_t(const scoped_t&) = delete;
+        scoped_t& operator= (const scoped_t&) = delete;
+        scoped_t& operator= (scoped_t&& s) = delete;
+
+        scoped_t(scoped_t&& s) : do_(std::move(s.do_)), done_(s.done_) {
+            s.done_ = true;
+        }
+
         /// Call the function.
         ~scoped_t() {
             if (!done_) {
@@ -65,6 +73,27 @@ namespace ctl {
     template<typename U>
     scoped_t<U> make_scoped(U&& u) {
         return scoped_t<U>(std::forward<U>(u));
+    }
+
+    namespace impl {
+        template<typename T>
+        struct assigner {
+            T& obj;
+            T val;
+
+            template<typename U>
+            assigner(T& o, U&& v) : obj(o), val(std::forward<U>(v)) {}
+
+            void operator() () {
+                obj = std::move(val);
+            }
+        };
+    }
+
+    /// Toggle the provided boolean and return a scoped_t that toggles it back.
+    inline scoped_t<impl::assigner<bool>> scoped_toggle(bool& b) {
+        b = !b;
+        return make_scoped(impl::assigner<bool>(b, !b));
     }
 }
 
