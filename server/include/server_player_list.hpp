@@ -92,7 +92,7 @@ namespace server {
         netcom& net_;
         config::state& conf_;
 
-        std::uint32_t      max_player_;
+        std::uint32_t           max_player_;
         ctl::ptr_vector<player> players_;
 
         scoped_connection_pool pool_;
