@@ -1,25 +1,49 @@
 #include "server_instance.hpp"
 #include "log.hpp"
 #include "config.hpp"
-#include <iostream>
+#include <signal.h>
+
+server::instance* gserv = nullptr;
+
+#ifdef POSIX
+void sigint_handler(int) {
+    gserv->shutdown();
+}
+#endif
 
 int main(int argc, const char* argv[]) {
-    config::state conf;
-    conf.parse("server.conf");
-
-    server::instance serv(conf);
-    logger& out = serv.get_log();
-    server::netcom& net = serv.get_netcom();
-
-    out.note("starting server");
-
     bool stop = false;
     while (!stop) {
+        config::state conf;
+        conf.parse("server.conf");
+
+        server::instance serv(conf);
+        gserv = &serv;
+        logger& out = serv.get_log();
+        server::netcom& net = serv.get_netcom();
+
+        #ifdef POSIX
+        struct sigaction act;
+        act.sa_handler = sigint_handler;
+        sigaction(SIGINT, &act, nullptr);
+
+        auto sc = ctl::make_scoped([]() {
+            sigaction(SIGINT, nullptr, nullptr);
+        });
+        #endif
+
+        // player_list plist(net, conf);
+
+        out.note("starting server");
+
         try {
             scoped_connection_pool pool;
 
             pool << net.watch_message([&](const message::unhandled_message& msg) {
-                out.warning("unhandled message: ", msg.message_id);
+                out.warning("unhandled message: ", get_packet_name(msg.packet_id));
+            });
+            pool << net.watch_message([&](const message::unhandled_request& msg) {
+                out.warning("unhandled request: ", get_packet_name(msg.packet_id));
             });
             pool << net.watch_message([&](const message::server::internal::unknown_client& msg) {
                 out.warning("unknown client: ", msg.id);
@@ -61,15 +85,18 @@ int main(int argc, const char* argv[]) {
             out.error("unhandled exception");
         }
 
+        conf.save("server.conf");
+
         if (!stop) {
-            out.note("restarting server");
+            out.note("restarting server in one second...");
+            sf::sleep(sf::seconds(1));
+        } else {
+            out.note("terminating program");
+            out.print("--------------------------------");
         }
 
-        conf.save("server.conf");
+        gserv = nullptr;
     }
-
-    out.note("terminating program");
-    out.print("--------------------------------");
 
     return 0;
 }

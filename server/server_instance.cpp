@@ -1,13 +1,10 @@
 #include "server_instance.hpp"
-#include <time.hpp>
 
 namespace server {
     instance::instance(config::state& conf) :
-        log_("server", conf), net_(conf), shutdown_timer_(4.0), plist_(net_, conf) {
+        log_("server", conf), net_(conf, log_), shutdown_(false) {
 
-        pool_ << conf.bind("netcom.debug_packets", net_.debug_packets)
-              << conf.bind("admin.password", admin_password_)
-              << conf.bind("shutdown.timer", shutdown_timer_);
+        pool_ << conf.bind("admin.password", admin_password_);
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::admin_rights>&& req) {
@@ -21,8 +18,7 @@ namespace server {
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::shutdown>&& req) {
-            shutdown_countdown_ = shutdown_timer_;
-            shutdown_ = true;
+            shutdown();
             req.answer();
         });
     }
@@ -36,35 +32,28 @@ namespace server {
     }
 
     bool instance::is_running() const {
-        return running_;
+        return net_.is_running();
+    }
+
+    void instance::shutdown() {
+        shutdown_ = true;
     }
 
     void instance::run() {
-        running_ = true;
-        auto sc = ctl::make_scoped([this]() { running_ = false; });
-
         net_.run();
-
-        double last = now();
-        bool stop = false;
-
-        while (!stop) {
+        while (net_.is_running()) {
             sf::sleep(sf::milliseconds(5));
 
-            double thetime = now();
-            double dt = thetime - last;
-            last = thetime;
-
-            net_.process_packets();
-
             if (shutdown_) {
-                shutdown_countdown_ -= dt;
-                if (shutdown_countdown_ < 0) {
-                    stop = true;
-                }
+                net_.shutdown();
+                shutdown_ = false;
             }
 
+            // Receive and send packets
+            net_.process_packets();
             if (!net_.is_connected()) continue;
+
+            // Update server logic
         }
     }
 }

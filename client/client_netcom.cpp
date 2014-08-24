@@ -2,37 +2,57 @@
 #include "server_netcom.hpp"
 
 namespace client {
-    netcom::netcom() : self_id_(invalid_actor_id), is_connected_(false), terminate_thread_(false),
+    netcom::netcom() : self_id_(invalid_actor_id), running_(false), connected_(false),
+        terminate_thread_(false),
         listener_thread_(std::bind(&netcom::loop_, this)), sc_factory_(*this) {}
 
     netcom::~netcom() {
-        terminate();
+        shutdown();
     }
 
     actor_id_t netcom::self_id() const {
+        // TODO: make this thread safe
         return self_id_;
     }
 
+    bool netcom::is_running() const {
+        return running_;
+    }
+
     bool netcom::is_connected() const {
-        return is_connected_;
+        return connected_;
     }
 
     void netcom::run(const std::string& addr, std::uint16_t port) {
-        if (is_connected_) {
-            terminate();
+        if (running_) {
+            throw netcom_exception::already_running{};
         }
+
+        watch_message([this](const message::server::will_shutdown&) {
+            shutdown();
+        });
+
         terminate_thread_ = false;
         address_ = addr;
         port_ = port;
+        running_ = true;
         listener_thread_.launch();
     }
 
-    void netcom::terminate_() {
+    void netcom::shutdown() {
+        if (running_) {
+            terminate_();
+        }
+    }
+
+    void netcom::do_terminate_() {
         terminate_thread_ = true;
         listener_thread_.wait();
 
-        netcom_base::terminate_();
+        netcom_base::do_terminate_();
+        sc_factory_.clear();
         self_id_ = invalid_actor_id;
+        running_ = false;
     }
 
     void netcom::loop_() {
@@ -104,7 +124,8 @@ namespace client {
             }
         }
 
-        is_connected_ = true;
+        connected_ = true;
+        auto sc = ctl::make_scoped([this]() { connected_ = false; });
 
         // Enter main loop
         while (!terminate_thread_) {
@@ -157,9 +178,5 @@ namespace client {
 
             sf::sleep(sf::milliseconds(5));
         }
-
-        input_.clear();
-        output_.clear();
-        is_connected_ = false;
     }
 }

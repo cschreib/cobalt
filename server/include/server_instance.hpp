@@ -17,14 +17,9 @@ namespace server {
         netcom net_;
         scoped_connection_pool pool_;
 
-        bool   running_ = false;
-        bool   shutdown_ = false;
-        double shutdown_timer_;
-        double shutdown_countdown_ = 0.0;
+        std::atomic<bool> shutdown_;
 
         std::string admin_password_;
-
-        player_list plist_;
 
     public :
         explicit instance(config::state& conf);
@@ -34,6 +29,7 @@ namespace server {
 
         bool is_running() const;
         void run();
+        void shutdown();
     };
 }
 

@@ -20,15 +20,16 @@ int main(int argc, const char* argv[]) {
     client::netcom net;
     conf.bind("netcom.debug_packets", net.debug_packets);
 
-    bool stop = false;
     scoped_connection_pool pool;
 
     pool << net.watch_message([&](const message::unhandled_message& msg) {
-        cout.warning("unhandled message: ", msg.message_id);
+        cout.warning("unhandled message: ", msg.packet_id);
+    });
+    pool << net.watch_message([&](const message::unhandled_request& msg) {
+        cout.warning("unhandled request: ", msg.packet_id);
     });
 
     pool << net.watch_message([&](const message::server::connection_failed& msg) {
-        stop = true;
         cout.error("connection failed");
         std::string rsn = "?";
         switch (msg.rsn) {
@@ -40,12 +41,12 @@ int main(int argc, const char* argv[]) {
                 rsn = "timed out"; break;
         }
         cout.reason(rsn);
+        net.shutdown();
     });
     pool << net.watch_message([](const message::server::connection_established& msg) {
         cout.note("connection established");
     });
     pool << net.watch_message([&](const message::server::connection_denied& msg) {
-        stop = true;
         cout.error("connection denied");
         std::string rsn = "?";
         switch (msg.rsn) {
@@ -55,6 +56,7 @@ int main(int argc, const char* argv[]) {
                 rsn = "unexpected packet received"; break;
         }
         cout.reason(rsn);
+        net.shutdown();
     });
     pool << net.watch_message([&](const message::server::connection_granted& msg) {
         cout.note("connection granted (id=", msg.id, ")!");
@@ -72,6 +74,10 @@ int main(int argc, const char* argv[]) {
         for (auto& c : msg.cred) {
             cout.note(" - ", c);
         }
+    });
+
+    pool << net.watch_message([&](const message::server::will_shutdown& msg) {
+        cout.note("server will shutdown in ", msg.countdown, "sec");
     });
 
     client::player_list plist(net);
@@ -147,7 +153,7 @@ int main(int argc, const char* argv[]) {
     conf.get_value("netcom.server_port", server_port, server_port);
 
     net.run(server_ip, server_port);
-    while (!stop && !net.is_connected()) {
+    while (net.is_running() && !net.is_connected()) {
         sf::sleep(sf::milliseconds(5));
         net.process_packets();
     }
@@ -155,7 +161,7 @@ int main(int argc, const char* argv[]) {
     double start = now();
     double last = start;
     bool end = false;
-    while (!stop) {
+    while (net.is_running()) {
         sf::sleep(sf::milliseconds(5));
         net.process_packets();
         if (!net.is_connected()) break;
@@ -182,7 +188,7 @@ int main(int argc, const char* argv[]) {
             end = true;
             plist.leave();
             pool << plist.on_leave.connect([&]() {
-                net.terminate();
+                net.shutdown();
             });
         }
 
@@ -202,8 +208,7 @@ int main(int argc, const char* argv[]) {
                             }
                         }
                     } else {
-                        cout.note("server will shutdown soon, disconnecting...");
-                        stop = true;
+                        cout.note("server will shutdown soon!");
                     }
                 }
             );

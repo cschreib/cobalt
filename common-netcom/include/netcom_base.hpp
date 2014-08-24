@@ -9,6 +9,7 @@
 #include <unique_id_provider.hpp>
 #include <std_addon.hpp>
 #include <signal.hpp>
+#include <log.hpp>
 #include <holdable_signal_connection.hpp>
 #include "packet.hpp"
 #include "credential.hpp"
@@ -29,11 +30,11 @@ class netcom_base;
 // List of messages that can be sent by this class
 namespace message {
     NETCOM_PACKET(unhandled_message) {
-        packet_id_t message_id;
+        packet_id_t packet_id;
     };
 
     NETCOM_PACKET(unhandled_request) {
-        request_id_t request_id;
+        packet_id_t packet_id;
     };
 
     NETCOM_PACKET(unhandled_request_answer) {
@@ -109,6 +110,18 @@ namespace netcom_exception {
     // Exception thrown when working on packets with unspecified origin/recipient. This is a bug.
     struct invalid_actor : public base {
         invalid_actor() : base("error.netcom.invalid_actor") {}
+    };
+
+    // Exception thrown when trying to launch a netcom that is already running.
+    struct already_running : public base {
+        already_running() : base("error.netcom.already_running") {}
+    };
+
+    // Exception thrown when receiving content from the network that does not match a packet
+    struct invalid_packet_id : public base {
+        packet_id_t id;
+
+        invalid_packet_id(packet_id_t i) : base("error.netcom.invalid_packet_id"), id(i) {}
     };
 }
 
@@ -466,6 +479,7 @@ namespace watch_policy {
 class netcom_base {
 public :
     netcom_base();
+    netcom_base(logger& out);
 
     virtual ~netcom_base() = default;
 
@@ -494,6 +508,9 @@ public :
     using message_t        = netcom_impl::message_t<T>;
 
 protected :
+    /// Default logger
+    logger& out_;
+
     /// Packet input queue
     /** Filled by derivate when recieved from the network, consumed by netcom_base
         (process_packets()).
@@ -617,11 +634,17 @@ protected :
     /// Clear all incoming and outgoing packets without processing them, and clear all signals.
     /** When this function is called, the class is expected to be in the same state as when
         constructed. It modifies the input_ and output_ queues in a non thread safe way.
-        This base function should be called by derivatives.
+        This base function *must* be called by derivatives.
         Note that this function will have to be called explicitely in the derived class' destructor,
         since netcom_base cannot do it.
     **/
-    virtual void terminate_();
+    virtual void do_terminate_();
+
+    /// Stop this netcom.
+    /** Will delay the call to the end of process_packet() if called in one of the registered
+        callbacks. Calls the virtual function do_terminate_().
+    **/
+    void terminate_();
 
 public :
     /// Distributes all the received packets to the registered callback functions.
@@ -630,12 +653,6 @@ public :
     **/
     void process_packets();
     bool debug_packets = false;
-
-    /// Stop this netcom.
-    /** Will delay the call to the end of process_packet() if called in one of the registered
-        callbacks. Calls the virtual function terminate_().
-    **/
-    void terminate();
 
     /// Create a message packet without sending it
     template<typename M>

@@ -18,6 +18,9 @@ namespace client {
         **/
         actor_id_t self_id() const;
 
+        /// Return true as long as the loop is running.
+        bool is_running() const;
+
         /// Return true as long as there is an active connection with the server.
         bool is_connected() const;
 
@@ -44,6 +47,9 @@ namespace client {
         **/
         void run(const std::string& addr, std::uint16_t port);
 
+        /// Disconnects from server and free all resources.
+        void shutdown();
+
         template<typename T>
         shared_collection<T> make_shared_collection() {
             return sc_factory_.make_shared_collection<T>();
@@ -55,14 +61,15 @@ namespace client {
         }
 
     private :
-        void terminate_() override;
+        void do_terminate_() override;
         void loop_();
 
         std::string   address_;
         std::uint16_t port_;
 
         actor_id_t        self_id_;
-        std::atomic<bool> is_connected_;
+        bool              running_;
+        std::atomic<bool> connected_;
         std::atomic<bool> terminate_thread_;
         sf::Thread        listener_thread_;
 

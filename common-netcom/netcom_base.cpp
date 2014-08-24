@@ -9,7 +9,8 @@ namespace netcom_exception {
     base::~base() noexcept {}
 }
 
-netcom_base::netcom_base() {}
+netcom_base::netcom_base() : out_(cout) {}
+netcom_base::netcom_base(logger& out) : out_(out) {}
 
 void netcom_base::send(out_packet_t p) {
     if (p.to == invalid_actor_id) throw netcom_exception::invalid_actor();
@@ -27,7 +28,7 @@ void netcom_base::stop_request_(request_id_t id) {
     request_id_provider_.free_id(id);
 }
 
-void netcom_base::terminate() {
+void netcom_base::terminate_() {
     if (processing_) {
         call_terminate_ = true;
     } else {
@@ -35,7 +36,7 @@ void netcom_base::terminate() {
     }
 }
 
-void netcom_base::terminate_() {
+void netcom_base::do_terminate_() {
     clearing_ = true;
     auto sd = ctl::make_scoped([this]() { clearing_ = false; });
 
@@ -59,7 +60,7 @@ void netcom_base::process_message_(in_packet_t&& p) {
     p >> id;
 
     if (debug_packets) {
-        std::cout << "<" << p.from << ": " << get_packet_name(id) << std::endl;
+        out_.print("<", p.from, ": ", get_packet_name(id), " (id=", id, ")");
     }
 
     auto iter = message_signals_.find(id);
@@ -67,8 +68,18 @@ void netcom_base::process_message_(in_packet_t&& p) {
         if (id != message::unhandled_message::packet_id__ &&
             id != message::unhandled_request::packet_id__ &&
             id != message::unhandled_request_answer::packet_id__) {
+            if (!is_packet_id(id)) {
+                throw netcom_exception::invalid_packet_id(id);
+            }
+
+            if (debug_packets) {
+                out_.print(" -> unhandled");
+            }
+
             out_packet_t tp = create_message(make_packet<message::unhandled_message>(id));
-            process_message_(std::move(tp.to_input()));
+            in_packet_t& itp = tp.to_input();
+            netcom_impl::packet_type t; itp >> t; // Trash packet type
+            process_message_(std::move(itp));
         }
     } else {
         (*iter)->dispatch(std::move(p));
@@ -81,12 +92,19 @@ void netcom_base::process_request_(in_packet_t&& p) {
 
     if (debug_packets) {
         request_id_t rid; p.view() >> rid;
-        std::cout << "<" << p.from << ": " << get_packet_name(id)
-            << " (" << rid << ")" << std::endl;
+        out_.print("<", p.from, ": ", get_packet_name(id),  " (", rid, ")");
     }
 
     auto iter = request_signals_.find(id);
     if (iter == request_signals_.end() || (*iter)->empty()) {
+        if (!is_packet_id(id)) {
+            throw netcom_exception::invalid_packet_id(id);
+        }
+
+        if (debug_packets) {
+            out_.print(" -> unhandled");
+        }
+
         // No one is here to answer this request. Could be an error of either sides.
         // Send 'unhandled request' packet to the requester.
         request_id_t rid;
@@ -94,7 +112,9 @@ void netcom_base::process_request_(in_packet_t&& p) {
         send_unhandled_(p.from, rid);
 
         out_packet_t tp = create_message(make_packet<message::unhandled_request>(id));
-        process_message_(std::move(tp.to_input()));
+        in_packet_t& itp = tp.to_input();
+        netcom_impl::packet_type t; itp >> t; // Trash packet type
+        process_message_(std::move(itp));
     } else {
         (*iter)->dispatch(*this, std::move(p));
     }
@@ -107,16 +127,16 @@ void netcom_base::process_answer_(netcom_impl::packet_type t, in_packet_t&& p) {
     auto iter = answer_signals_.find(rid);
     if (iter == answer_signals_.end()) {
         if (debug_packets) {
-            std::cout << "<" << p.from << ": answer to request " << rid
-                << " (unhandled)" << std::endl;
+            out_.print("<", p.from, ": answer to request ", rid, " (unhandled)");
         }
 
         out_packet_t tp = create_message(make_packet<message::unhandled_request_answer>(rid));
-        process_message_(std::move(tp.to_input()));
+        in_packet_t& itp = tp.to_input();
+        netcom_impl::packet_type t; itp >> t; // Trash packet type
+        process_message_(std::move(itp));
     } else {
         if (debug_packets) {
-            std::cout << "<" << p.from << ": answer to " << get_packet_name((*iter)->id)
-                << " (" << rid << ")" << std::endl;
+            out_.print("<", p.from, ": answer to ", get_packet_name((*iter)->id), " (", rid, ")");
         }
 
         (*iter)->dispatch(t, std::move(p));
@@ -152,6 +172,6 @@ void netcom_base::process_packets() {
     }
 
     if (call_terminate_) {
-        terminate_();
+        do_terminate_();
     }
 }

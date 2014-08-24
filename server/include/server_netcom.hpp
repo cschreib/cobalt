@@ -14,9 +14,13 @@ namespace config {
 namespace server {
     class netcom : public netcom_base {
     public :
-        explicit netcom(config::state& conf);
+        /// Constructor.
+        /** Create a netcom in "stopped" state. You need to call run() to actually launch the
+            connection.
+        **/
+        explicit netcom(config::state& conf, logger& out);
 
-        /// Call terminate().
+        /// Call wait_shutdown().
         ~netcom();
 
         /// Define the maximum number of simultaneously connected clients.
@@ -26,14 +30,40 @@ namespace server {
         **/
         void set_max_client(std::size_t max_client);
 
+        /// Will return true as long as the netcom loop is running.
+        /** This function will return true if run() has been called. It will only come back
+            to false after shutdown() has been called and the netcom loop is effectively
+            stopped, i.e. all connected clients are properly disconnected. This may take some
+            time, and will not always happen right after shutdown() is closed.
+        **/
+        bool is_running() const;
+
         /// Will return true as long as the server is listening to incoming connections.
         bool is_connected() const;
 
         /// Start the server, listening to the last or default port.
+        /** Try to activate the connection, and then set the netcom to the "running" state.
+        **/
         void run();
 
         /// Start the server, listening to the given port.
+        /** Try to activate the connection, and then set the netcom to the "running" state.
+        **/
         void run(std::uint16_t port);
+
+        /// Gracefully stop the server.
+        /** This function switches the netcom in "shutdown" state. A signal is sent to all
+            clients asking them to terminate the connection. All other packets are no longer sent
+            nor received. When all clients are disconnected, or after time out, the server stops
+            listening to the chosen port, the loop is stopped, and the netcom is in "stopped"
+            state.
+        **/
+        void shutdown();
+
+        /// Same as shutdown(), but explicitely waits for the loop to end.
+        /** Called in the destructor.
+        **/
+        void wait_shutdown();
 
         /// Return the IP address of a given actor.
         std::string get_actor_ip(actor_id_t cid) const;
@@ -65,7 +95,7 @@ namespace server {
 
         using client_list_t = ctl::sorted_vector<client_t, mem_var_comp(&client_t::id)>;
 
-        void terminate_() override;
+        void do_terminate_() override;
         void loop_();
         void set_max_client_(std::size_t max_client);
         void remove_client_(actor_id_t cid);
@@ -77,6 +107,7 @@ namespace server {
         config::state& conf_;
         scoped_connection_pool pool_;
 
+        bool              running_;
         std::atomic<bool> connected_;
         double            connection_time_out_;
 
@@ -88,7 +119,9 @@ namespace server {
         client_list_t                       clients_;
         ctl::unique_id_provider<actor_id_t> client_id_provider_;
 
-        std::atomic<bool> terminate_thread_;
+        std::atomic<bool> shutdown_;
+        double            shutdown_time_out_;
+        double            shutdown_countdown_ = 0.0;
         sf::Thread listener_thread_;
 
         shared_collection_factory sc_factory_;
@@ -109,6 +142,8 @@ namespace server {
         NETCOM_PACKET(unknown_client) {
             actor_id_t id;
         };
+
+        NETCOM_PACKET(do_terminate) {};
     }
 
     NETCOM_PACKET(connection_established) {};
@@ -130,6 +165,10 @@ namespace server {
 
     NETCOM_PACKET(connection_granted) {
         actor_id_t id;
+    };
+
+    NETCOM_PACKET(will_shutdown) {
+        double countdown;
     };
 }
 }
