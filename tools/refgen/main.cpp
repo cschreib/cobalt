@@ -314,6 +314,18 @@ void generate_packet_code(std::ostream& out, const std::deque<packet>& db) {
     out << "        default: return \"\";\n";
     out << "    }\n";
     out << "}\n";
+
+    out << "bool is_packet_id(packet_id_t id) {\n";
+    out << "    switch (id) {\n";
+    for (auto& p : db) {
+        if (p.parent != nullptr) continue;
+        out << "        case " << p.id << ":\n";
+    }
+    out << "            return true;\n";
+    out << "        default:\n";
+    out << "            return false;\n";
+    out << "    }\n";
+    out << "}\n";
 }
 
 template<typename T>

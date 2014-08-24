@@ -105,6 +105,9 @@ using packet_id_t = std::uint32_t;
 /// Return a user readable name for a given packet.
 std::string get_packet_name(packet_id_t id);
 
+/// Check if the provided ID matches that of a real packet.
+bool is_packet_id(packet_id_t id);
+
 namespace packet_impl {
     template<typename T>
     struct packet_builder;
