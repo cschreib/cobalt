@@ -143,6 +143,7 @@ namespace server {
             actor_id_t id;
         };
 
+        NETCOM_PACKET(begin_terminate) {};
         NETCOM_PACKET(do_terminate) {};
     }
 

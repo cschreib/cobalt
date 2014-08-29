@@ -68,6 +68,12 @@ namespace server {
 
     void netcom::shutdown() {
         if (running_) {
+            watch_message([this](const message::server::internal::begin_terminate&) {
+                send_message(self_actor_id,
+                    make_packet<message::server::internal::do_terminate>()
+                );
+            });
+
             watch_message([this](const message::server::internal::do_terminate&) {
                 terminate_();
             });
