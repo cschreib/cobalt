@@ -3,6 +3,7 @@
 
 #include <SFML/Network/Packet.hpp>
 #include <vector>
+#include <atomic>
 #include <array>
 #include <crc32.hpp>
 #include <variadic.hpp>
@@ -92,6 +93,19 @@ namespace sf {
         for (auto& i : t) {
             p << i;
         }
+        return p;
+    }
+
+    template<typename T>
+    packet_t::base& operator >> (packet_t::base& p, std::atomic<T>& t) {
+        T tmp; p >> tmp;
+        t = tmp;
+        return p;
+    }
+
+    template<typename T, typename C>
+    packet_t::base& operator << (packet_t::base& p, const std::atomic<T>& t) {
+        p << t.load();
         return p;
     }
 
