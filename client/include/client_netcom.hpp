@@ -67,11 +67,11 @@ namespace client {
         std::string   address_;
         std::uint16_t port_;
 
-        actor_id_t        self_id_;
-        bool              running_;
-        std::atomic<bool> connected_;
-        std::atomic<bool> terminate_thread_;
-        sf::Thread        listener_thread_;
+        std::atomic<actor_id_t> self_id_;
+        bool                    running_;
+        std::atomic<bool>       connected_;
+        std::atomic<bool>       terminate_thread_;
+        sf::Thread              listener_thread_;
 
         shared_collection_factory sc_factory_;
     };

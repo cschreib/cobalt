@@ -11,7 +11,6 @@ namespace client {
     }
 
     actor_id_t netcom::self_id() const {
-        // TODO: make this thread safe
         return self_id_;
     }
 
