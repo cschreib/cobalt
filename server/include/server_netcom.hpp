@@ -85,12 +85,21 @@ namespace server {
         }
 
     private :
-        struct client_t {
-            client_t(std::unique_ptr<sf::TcpSocket> s, actor_id_t i);
+        struct connected_client_t {
+            connected_client_t(std::unique_ptr<sf::TcpSocket> s, actor_id_t i);
 
             std::unique_ptr<sf::TcpSocket> socket;
             actor_id_t                     id;
-            credential_list_t              cred;
+        };
+
+        using connected_client_list_t = ctl::sorted_vector<connected_client_t, mem_var_comp(&connected_client_t::id)>;
+
+        struct client_t {
+            client_t(actor_id_t i, std::string ip);
+
+            actor_id_t        id;
+            std::string       ip;
+            credential_list_t cred;
         };
 
         using client_list_t = ctl::sorted_vector<client_t, mem_var_comp(&client_t::id)>;
@@ -99,7 +108,7 @@ namespace server {
         void loop_();
         void set_max_client_(std::size_t max_client);
         void remove_client_(actor_id_t cid);
-        void remove_client_(client_list_t::iterator ic);
+        void remove_client_(connected_client_list_t::iterator ic);
 
         credential_list_t get_missing_credentials_(actor_id_t cid,
             const constant_credential_list_t& lst) override;
@@ -116,8 +125,10 @@ namespace server {
         sf::SocketSelector selector_;
 
         std::size_t                         max_client_;
-        client_list_t                       clients_;
+        connected_client_list_t             connected_clients_;
         ctl::unique_id_provider<actor_id_t> client_id_provider_;
+
+        client_list_t clients_;
 
         std::atomic<bool> shutdown_;
         double            shutdown_time_out_;

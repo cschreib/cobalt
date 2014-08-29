@@ -3,8 +3,10 @@
 #include <time.hpp>
 
 namespace server {
-    netcom::client_t::client_t(std::unique_ptr<sf::TcpSocket> s, actor_id_t i) :
+    netcom::connected_client_t::connected_client_t(std::unique_ptr<sf::TcpSocket> s, actor_id_t i) :
         socket(std::move(s)), id(i) {}
+
+    netcom::client_t::client_t(actor_id_t i, std::string a) : id(i), ip(a) {}
 
     netcom::netcom(config::state& conf, logger& out) :
         netcom_base(out),
@@ -23,6 +25,14 @@ namespace server {
         pool_ << conf_.bind("netcom.max_client", [this](std::size_t max) {
             set_max_client_(max);
         }, max_client_);
+
+        watch_message([this](const message::client_connected& msg) {
+            clients_.insert(client_t{msg.id, msg.ip});
+        });
+
+        watch_message([this](const message::client_disconnected& msg) {
+            clients_.erase(msg.id);
+        });
     }
 
     netcom::~netcom() {
@@ -109,16 +119,15 @@ namespace server {
         if (cid == self_actor_id) {
             return "127.0.0.1";
         } else if (cid == all_actor_id) {
-            return "...";
+            return "broadcast";
         }
 
-        // TODO: make this thread safe
         auto iter = clients_.find(cid);
-        if (iter == clients_.end() || !iter->socket) {
-            return "?";
+        if (iter == clients_.end()) {
+            throw netcom_exception::invalid_actor{};
         }
 
-        return iter->socket->getRemoteAddress().toString();
+        return iter->ip;
     }
 
     void netcom::grant_credentials(actor_id_t cid, const credential_list_t& creds) {
@@ -126,7 +135,6 @@ namespace server {
             throw netcom_exception::invalid_actor{};
         }
 
-        // TODO: make this thread safe
         if (cid == all_actor_id) {
             for (auto& c : clients_) {
                 c.cred.grant(creds);
@@ -148,7 +156,6 @@ namespace server {
             throw netcom_exception::invalid_actor{};
         }
 
-        // TODO: make this thread safe
         if (cid == all_actor_id) {
             for (auto& c : clients_) {
                 c.cred.remove(creds);
@@ -195,7 +202,7 @@ namespace server {
             if (!shutdown_ && selector_.isReady(listener_)) {
                 std::unique_ptr<sf::TcpSocket> s(new sf::TcpSocket());
                 if (listener_.accept(*s) == sf::Socket::Done) {
-                    if (clients_.size() < max_client_) {
+                    if (connected_clients_.size() < max_client_) {
                         actor_id_t id;
                         if (client_id_provider_.make_id(id)) {
                             send_message(self_actor_id,
@@ -210,7 +217,7 @@ namespace server {
                             s->send(p.impl);
 
                             selector_.add(*s);
-                            clients_.insert(client_t(std::move(s), id));
+                            connected_clients_.insert(connected_client_t(std::move(s), id));
                         } else {
                             out_packet_t p = create_message(
                                 make_packet<message::server::connection_denied>(
@@ -233,7 +240,7 @@ namespace server {
             std::vector<actor_id_t> remove_list;
 
             // Receive packets from each clients
-            for (auto& c : clients_) {
+            for (auto& c : connected_clients_) {
                 auto& s = c.socket;
                 if (selector_.isReady(*s)) {
                     sf::Packet p;
@@ -259,7 +266,7 @@ namespace server {
             while (output_.pop(op)) {
                 if (op.to == all_actor_id) {
                     // Send to all clients
-                    for (auto& c : clients_) {
+                    for (auto& c : connected_clients_) {
                         auto& s = c.socket;
                         switch (s->send(op.impl)) {
                         case sf::Socket::Done : break;
@@ -278,8 +285,8 @@ namespace server {
                     input_.push(std::move(op.to_input()));
                 } else {
                     // Send to individual clients
-                    auto iter = clients_.find(op.to);
-                    if (iter == clients_.end()) {
+                    auto iter = connected_clients_.find(op.to);
+                    if (iter == connected_clients_.end()) {
                         out_packet_t tp = create_message(
                             make_packet<message::server::internal::unknown_client>(
                                 op.to
@@ -304,17 +311,11 @@ namespace server {
 
             // Remove disconnected clients
             for (auto cid : remove_list) {
-                send_message(self_actor_id,
-                    make_packet<message::client_disconnected>(
-                        cid, message::client_disconnected::reason::connection_lost
-                    )
-                );
-
                 remove_client_(cid);
             }
 
             if (shutdown_) {
-                if (clients_.empty()) {
+                if (connected_clients_.empty()) {
                     stop = true;
                 } else {
                     if (last == 0.0) {
@@ -342,16 +343,22 @@ namespace server {
     }
 
     void netcom::remove_client_(actor_id_t cid) {
-        auto iter = clients_.find(cid);
-        if (iter == clients_.end()) return;
+        auto iter = connected_clients_.find(cid);
+        if (iter == connected_clients_.end()) return;
         remove_client_(iter);
     }
 
-    void netcom::remove_client_(client_list_t::iterator ic) {
+    void netcom::remove_client_(connected_client_list_t::iterator ic) {
+        send_message(self_actor_id,
+            make_packet<message::client_disconnected>(
+                ic->id, message::client_disconnected::reason::connection_lost
+            )
+        );
+
         client_id_provider_.free_id(ic->id);
         selector_.remove(*ic->socket);
         ic->socket->disconnect();
-        clients_.erase(ic);
+        connected_clients_.erase(ic);
     }
 
     credential_list_t netcom::get_missing_credentials_(actor_id_t cid,
