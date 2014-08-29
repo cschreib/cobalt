@@ -364,7 +364,6 @@ namespace server {
     credential_list_t netcom::get_missing_credentials_(actor_id_t cid,
         const constant_credential_list_t& lst) {
 
-        // TODO: make this thread safe
         auto iter = clients_.find(cid);
         if (iter == clients_.end()) {
             throw netcom_exception::invalid_actor{};
