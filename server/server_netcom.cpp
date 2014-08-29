@@ -271,6 +271,8 @@ namespace server {
                         default : break;
                         }
                     }
+                    // Including oneself
+                    input_.push(std::move(op.to_input()));
                 } else if (op.to == self_actor_id) {
                     // Bounce back packets sent to oneself
                     input_.push(std::move(op.to_input()));
