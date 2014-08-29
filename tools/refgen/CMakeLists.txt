@@ -6,6 +6,8 @@ include_directories(${CLANG_INCLUDE})
 include_directories(${SFML_INCLUDE_DIR})
 add_definitions(-DNO_AUTOGEN)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/../bin")
+
 add_executable(refgen
     main.cpp
 )

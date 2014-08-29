@@ -3,6 +3,7 @@ build
 *.sublime-project
 server/bak/
 bak/
-bin/cobalt-server-cli
-bin/cobalt-client-cli
-bin/*.log
+bin/server/cobalt-server-cli
+bin/client/cobalt-client-cli
+bin/server/*.log
+bin/client/*.log

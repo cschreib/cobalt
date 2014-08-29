@@ -56,7 +56,7 @@ file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
 file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/bin")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
+set(BINARY_DIR "${PROJECT_SOURCE_DIR}/bin")
 
 find_package(SFML 2 COMPONENTS system network)
 find_package(LibClang 3)
@@ -65,9 +65,7 @@ find_package(LibClang 3)
 add_subdirectory(common)
 
 # build and launch refgen
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/bin")
 add_subdirectory(tools/refgen)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
 
 # build the common netcom library
 add_subdirectory(common-netcom)

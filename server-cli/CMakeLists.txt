@@ -7,6 +7,8 @@ include_directories(${PROJECT_SOURCE_DIR}/../server/include)
 include_directories(${PROJECT_SOURCE_DIR}/../client/include)
 include_directories(${SFML_INCLUDE_DIR})
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${BINARY_DIR}/server")
+
 add_executable(cobalt-server-cli
     main.cpp
 )
