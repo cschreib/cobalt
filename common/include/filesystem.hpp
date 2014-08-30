@@ -5,6 +5,7 @@
 #include <vector>
 
 namespace file {
+    bool library_exists(const std::string& file);
     bool exists(const std::string& file);
     std::vector<std::string> list_directories(const std::string& path = "");
     std::vector<std::string> list_files(const std::string& pattern = "*");

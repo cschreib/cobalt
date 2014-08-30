@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <direct.h>
 #include <io.h>
+#include <fstream>
 
 namespace file {
     std::vector<std::string> list_directories(const std::string& path = "") {
@@ -84,7 +85,7 @@ namespace file {
         std::string path = string::replace(string::trim(tpath, " \t"), "\\", "/");
         std::vector<std::string> dirs = string::split(path, "/");
         path = "";
-        
+
         // Take care of the drive letter
         if (!dirs.empty() && !dirs.front().empty() && dirs.front().back() == ':') {
             path = dirs.front()+'/';
@@ -115,5 +116,14 @@ namespace file {
         GetFileAttributesEx(file1.c_str(), GetFileExInfoStandard, &st1);
         GetFileAttributesEx(file2.c_str(), GetFileExInfoStandard, &st2);
         return CompareFileTime(&st1.ftCreationTime, &st2.ftCreationTime) < 0;
+    }
+
+    bool library_exists(const std::string& file) {
+        if (file.empty()) {
+            return false;
+        }
+
+        std::ifstream f((file+".dll").c_str());
+        return f.is_open();
     }
 }

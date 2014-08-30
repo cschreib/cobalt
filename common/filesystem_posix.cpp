@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <ctime>
 #include <iostream>
+#include <fstream>
 
 namespace file {
     namespace impl {
@@ -206,7 +207,7 @@ namespace file {
         std::string path = string::replace(string::trim(tpath, " \t"), "\\", "/");
         if (path.empty()) return true;
         std::vector<std::string> dirs = string::split(path, "/");
-        path = path[0] == '/' ? "/" : "";  
+        path = path[0] == '/' ? "/" : "";
 
         for (auto& d : dirs) {
             if (d.empty()) continue;
@@ -235,5 +236,14 @@ namespace file {
         if (::stat(file1.c_str(), &st1) != 0) return false;
         if (::stat(file2.c_str(), &st2) != 0) return false;
         return std::difftime(st1.st_ctime, st2.st_ctime) < 0.0;
+    }
+
+    bool library_exists(const std::string& file) {
+        if (file.empty()) {
+            return false;
+        }
+
+        std::ifstream f((file+".so").c_str());
+        return f.is_open();
     }
 }
