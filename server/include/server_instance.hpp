@@ -4,7 +4,7 @@
 #include <config.hpp>
 #include <log.hpp>
 #include "server_netcom.hpp"
-#include "server_player_list.hpp"
+#include "server_state.hpp"
 
 namespace config {
     class state;
@@ -21,6 +21,8 @@ namespace server {
 
         std::string admin_password_;
 
+        std::unique_ptr<server::state::base> current_state_;
+
     public :
         explicit instance(config::state& conf);
 
@@ -30,6 +32,11 @@ namespace server {
         bool is_running() const;
         void run();
         void shutdown();
+
+        template<typename T, typename ... Args>
+        void set_state(Args&& ... args) {
+            current_state_ = std::make_unique<T>(std::forward<Args>(args)...);
+        }
     };
 }
 

@@ -2,7 +2,8 @@
 
 namespace netcom_impl {
     shared_collection_base::shared_collection_base(shared_collection_factory& factory, netcom_base& net,
-        shared_collection_id_t id) : factory_(factory), net_(net), id(id) {}
+        const std::string& name, shared_collection_id_t id) :
+        factory_(factory), net_(net), id(id), name(name) {}
 
     shared_collection_base::~shared_collection_base() {
         disconnect();
@@ -29,6 +30,7 @@ namespace netcom_impl {
 
     void shared_collection_base::register_client(observe_request&& req) {
         if (connected_) {
+            // TODO: remove the rvalue ref, they are misleading here
             register_and_send_collection_(std::move(req));
             if (!req.failed()) {
                 clients_.insert(req.packet.from);
@@ -49,6 +51,19 @@ void shared_collection_factory::destroy_(shared_collection_id_t id) {
 }
 
 shared_collection_factory::shared_collection_factory(netcom_base& net) : net_(net) {
+    pool_ << net_.watch_request(
+        [this](netcom_base::request_t<request::get_shared_collection_id>&& req) {
+            for (auto& c : collections_) {
+                if (c->name == req.arg.name) {
+                    req.answer(c->id);
+                    return;
+                }
+            }
+
+            req.fail(request::get_shared_collection_id::failure::reason::no_such_collection);
+        }
+    );
+
     pool_ << net_.watch_request(
         [this](netcom_base::request_t<request::observe_shared_collection>&& req) {
             auto iter = collections_.find(req.arg.id);

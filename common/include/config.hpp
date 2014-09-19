@@ -60,19 +60,23 @@ namespace config {
         state& operator= (const state&) = delete;
         state& operator= (state&&) = default;
 
+        signal_t<void(const std::string&, const std::string&)> on_value_changed;
+
         /// Read a plain text configuration file and load its values.
         /** The configuration file is a succession of lines, each containing a single configuration
             value. A line is made of:
              - the name of the parameter (ex: "graphics.resolution")
              - the value of the parameter enclosed in parenthesis (ex: "(800, 600)")
         **/
-        void parse(const std::string& file);
+        void parse(std::istream& flux);
+        void parse_from_file(const std::string& file);
 
         /// Save the current configuration in a plain text file.
         /** If any, all the content of this file is erased before the new configuration is written.
             For more information on the file format, see parse().
         **/
-        void save(const std::string& file) const;
+        void save(std::ostream& flux) const;
+        void save_to_file(const std::string& file) const;
 
         /// Remove all configuration items and bonds.
         void clear();
@@ -90,17 +94,44 @@ namespace config {
                 std::string old_value = node.value;
                 string::stringify<T>::serialize(value, node.value);
                 if (node.value != old_value) {
+                    on_value_changed.dispatch(name, node.value);
                     node.signal.dispatch(node.value);
                     dirty_ = true;
                 }
             } else {
                 string::stringify<T>::serialize(value, node.value);
+                on_value_changed.dispatch(name, node.value);
                 node.is_empty = false;
                 dirty_ = true;
             }
         }
 
-        /// Retrieve a the value from this configuration state.
+        /// Set the value of a parameter as a string.
+        /** If the parameter already exists, then its value is updated and all bound objects are
+            notified of the change (only if the value is different than the previous one). Else, the
+            parameter is created. This function will throw if the current tree structure is not
+            compatible with the provided parameter name.
+            Compared to set_value(), this version takes directly a string for the new value of the
+            parameter, which is stored untouched into the configuration tree.
+        **/
+        void set_raw_value(const std::string& name, std::string value) {
+            config_node& node = tree_.reach(name);
+            if (!node.is_empty) {
+                if (node.value != value) {
+                    node.value = std::move(value);
+                    on_value_changed.dispatch(name, node.value);
+                    node.signal.dispatch(node.value);
+                    dirty_ = true;
+                }
+            } else {
+                node.value = std::move(value);
+                on_value_changed.dispatch(name, node.value);
+                node.is_empty = false;
+                dirty_ = true;
+            }
+        }
+
+        /// Retrieve the value of a parameter from this configuration state.
         /** If the parameter exists, then its value is written in "value", and 'true' is returned.
             Else 'false' is returned.
         **/
@@ -112,6 +143,23 @@ namespace config {
             }
 
             return string::stringify<T>::parse(value, node->value);
+        }
+
+        /// Retrieve the value of a parameter from this configuration state as a string.
+        /** If the parameter exists, then its value is written in "value", and 'true' is returned.
+            Else 'false' is returned.
+            Compared to get_value(), this version will write the value as a string, whatever the
+            real underlying type is.
+        **/
+        template<typename T>
+        bool get_raw_value(const std::string& name, std::string& value) const {
+            const config_node* node = tree_.try_reach(name);
+            if (!node || node->is_empty) {
+                return false;
+            }
+
+            value = node->value;
+            return true;
         }
 
         /// Retrieve a the value from this configuration state with a default value.
@@ -155,6 +203,7 @@ namespace config {
 
             if (node.is_empty) {
                 string::stringify<T>::serialize(var, node.value);
+                on_value_changed.dispatch(name, node.value);
                 node.is_empty = false;
                 dirty_ = true;
             } else {
@@ -221,6 +270,7 @@ namespace config {
 
             if (node.is_empty) {
                 string::stringify<N>::serialize(def, node.value);
+                on_value_changed.dispatch(name, node.value);
                 node.signal.dispatch(node.value);
                 node.is_empty = false;
                 dirty_ = true;
@@ -241,7 +291,7 @@ namespace config {
             signal_t<void(const std::string&)> signal;
         };
 
-        void save_node_(std::ofstream& f, const ctl::string_tree<config_node>::branch& node,
+        void save_node_(std::ostream& f, const ctl::string_tree<config_node>::branch& node,
             const std::string& name) const;
 
         ctl::string_tree<config_node> tree_;

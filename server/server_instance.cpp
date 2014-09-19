@@ -45,15 +45,13 @@ namespace server {
             sf::sleep(sf::milliseconds(5));
 
             if (shutdown_) {
+                current_state_ = nullptr;
                 net_.shutdown();
                 shutdown_ = false;
             }
 
             // Receive and send packets
             net_.process_packets();
-            if (!net_.is_connected()) continue;
-
-            // Update server logic
         }
     }
 }

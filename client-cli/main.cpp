@@ -208,7 +208,7 @@ int main(int argc, const char* argv[]) {
                             }
                         }
                     } else {
-                        cout.note("server will shutdown soon!");
+                        cout.note("asked server to shutdown");
                     }
                 }
             );

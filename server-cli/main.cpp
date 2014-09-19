@@ -1,6 +1,7 @@
-#include "server_instance.hpp"
-#include "log.hpp"
-#include "config.hpp"
+#include <server_instance.hpp>
+#include <server_state_configure.hpp>
+#include <log.hpp>
+#include <config.hpp>
 #include <signal.h>
 
 server::instance* gserv = nullptr;
@@ -16,6 +17,8 @@ int main(int argc, const char* argv[]) {
     while (!stop) {
         config::state conf;
         conf.parse("server.conf");
+        config::state state_conf;
+        state_conf.parse("server_state1.conf");
 
         server::instance serv(conf);
         gserv = &serv;
@@ -31,8 +34,6 @@ int main(int argc, const char* argv[]) {
             sigaction(SIGINT, nullptr, nullptr);
         });
         #endif
-
-        // player_list plist(net, conf);
 
         out.note("starting server");
 
@@ -73,6 +74,18 @@ int main(int argc, const char* argv[]) {
                 out.note("ping client ", req.packet.from);
                 req.answer();
             });
+
+            std::string start_state = "configure";
+            state_conf.get_value("name", start_state, start_state);
+            out.note("switching server to '", start_state, "' state");
+
+            if (start_state == "configure") {
+                serv.set_state<server::state::configure>(
+                    serv.get_netcom(), serv.get_log()
+                );
+            } else {
+                out.error("unknown state '", start_state, "'");
+            }
 
             serv.run();
 

@@ -13,6 +13,18 @@ namespace request {
         struct answer {};
         struct failure {};
     };
+
+    NETCOM_PACKET(get_shared_collection_id) {
+        std::string name;
+        struct answer {
+            shared_collection_id_t id;
+        };
+        struct failure {
+            enum class reason {
+                no_such_collection
+            } rsn;
+        };
+    };
 }
 
 namespace message {
@@ -116,9 +128,10 @@ namespace netcom_impl {
 
     public :
         const shared_collection_id_t id;
+        const std::string            name;
 
         shared_collection_base(shared_collection_factory& factory, netcom_base& net,
-            shared_collection_id_t id);
+            const std::string& name, shared_collection_id_t id);
 
         virtual ~shared_collection_base();
         void destroy();
@@ -165,7 +178,8 @@ namespace netcom_impl {
 
     public :
         shared_collection_impl(shared_collection_factory& factory, netcom_base& net,
-            shared_collection_id_t id) : shared_collection_base(factory, net, id) {}
+            const std::string& name, shared_collection_id_t id) :
+            shared_collection_base(factory, net, name, id) {}
 
         ctl::delegate<bool(const register_collection_packet& reg,
             register_collection_failed_packet& failure)> register_client;
@@ -582,7 +596,7 @@ public :
     explicit shared_collection_factory(netcom_base& net);
 
     template<typename T>
-    shared_collection<T> make_shared_collection() {
+    shared_collection<T> make_shared_collection(const std::string& name) {
         using collection_t = netcom_impl::shared_collection_impl<T>;
 
         shared_collection_id_t id;
@@ -590,9 +604,10 @@ public :
             throw shared_collection_exception::too_many_collections{};
         }
 
-        auto p = std::make_unique<collection_t>(*this, net_, id);
+        auto p = std::make_unique<collection_t>(*this, net_, name, id);
         collection_t* cptr = p.get();
         collections_.insert(std::move(p));
+
         return shared_collection<T>(*cptr);
     }
 
