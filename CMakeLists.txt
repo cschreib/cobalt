@@ -39,6 +39,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     add_definitions(-O2)
     add_definitions(-std=c++11)
     add_definitions(-fmax-errors=5)
+    add_definitions(-Wno-unused-variable)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
   # using Intel C++
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
