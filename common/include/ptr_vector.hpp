@@ -18,10 +18,10 @@ namespace ctl {
         using base_const_reverse_iterator = typename base::const_reverse_iterator;
 
     public :
-        using iterator = ptr_iterator_base<base_iterator, ptr_vector>;
-        using const_iterator = const_ptr_iterator_base<base_const_iterator, ptr_vector>;
-        using reverse_iterator = reverse_ptr_iterator_base<base_reverse_iterator, ptr_vector>;
-        using const_reverse_iterator = const_reverse_ptr_iterator_base<base_const_reverse_iterator, ptr_vector>;
+        using iterator = ptr_iterator_base<base_iterator>;
+        using const_iterator = const_ptr_iterator_base<base_const_iterator>;
+        using reverse_iterator = reverse_ptr_iterator_base<base_reverse_iterator>;
+        using const_reverse_iterator = const_reverse_ptr_iterator_base<base_const_reverse_iterator>;
 
         /// Default constructor.
         /** Creates an empty vector.

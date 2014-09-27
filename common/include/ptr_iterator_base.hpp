@@ -4,82 +4,75 @@
 #include <iterator>
 
 namespace ctl {
-    template<typename T, typename I>
-    class ptr_iterator_base_impl {
-    protected :
-        I i;
+    template<typename ChildIter, typename BaseIter>
+    struct ptr_iterator_base_impl {
+        BaseIter i;
 
-        ptr_iterator_base_impl(const I& j) : i(j) {}
+        ptr_iterator_base_impl(const BaseIter& j) : i(j) {}
 
-    public :
-        T& operator ++ (int) {
-            ++i; return static_cast<T&>(*this);
+        ChildIter operator ++ (int) {
+            ChildIter iter = static_cast<ChildIter&>(*this);
+            ++i; return iter;
         }
 
-        T operator ++ () {
-            ++i; return static_cast<T&>(*this);
+        ChildIter& operator ++ () {
+            ++i; return static_cast<ChildIter&>(*this);
         }
 
-        T& operator -- (int) {
-            --i; return static_cast<T&>(*this);
+        ChildIter operator -- (int) {
+            ChildIter iter = static_cast<ChildIter&>(*this);
+            --i; return iter;
         }
 
-        T operator -- () {
-            --i; return static_cast<T&>(*this);
+        ChildIter& operator -- () {
+            --i; return static_cast<ChildIter&>(*this);
         }
 
         template<typename U>
-        T operator + (U d) const {
+        ChildIter operator + (U d) const {
             return i + d;
         }
 
-        template<typename U, typename V>
-        auto operator - (const ptr_iterator_base_impl<U,V>& iter) const -> decltype(i - iter.i) {
+        auto operator - (const ChildIter& iter) const -> decltype(i - i) {
             return i - iter.i;
         }
 
         template<typename U, typename enable = typename std::enable_if<std::is_arithmetic<U>::value>::type>
-        T operator - (U d) const {
+        ChildIter operator - (U d) const {
             return i - d;
         }
 
         template<typename U, typename enable = typename std::enable_if<std::is_arithmetic<U>::value>::type>
-        T& operator += (U d) {
-            i += d; return static_cast<T&>(*this);
+        ChildIter& operator += (U d) {
+            i += d; return static_cast<ChildIter&>(*this);
         }
 
         template<typename U, typename enable = typename std::enable_if<std::is_arithmetic<U>::value>::type>
-        T& operator -= (U d) {
-            i -= d; return static_cast<T&>(*this);
+        ChildIter& operator -= (U d) {
+            i -= d; return static_cast<ChildIter&>(*this);
         }
 
-        template<typename U, typename V>
-        bool operator == (const ptr_iterator_base_impl<U,V>& iter) const {
+        bool operator == (const ChildIter& iter) const {
             return i == iter.i;
         }
 
-        template<typename U, typename V>
-        bool operator != (const ptr_iterator_base_impl<U,V>& iter) const {
+        bool operator != (const ChildIter& iter) const {
             return i != iter.i;
         }
 
-        template<typename U, typename V>
-        bool operator < (const ptr_iterator_base_impl<U,V>& iter) const {
+        bool operator < (const ChildIter& iter) const {
             return i < iter.i;
         }
 
-        template<typename U, typename V>
-        bool operator <= (const ptr_iterator_base_impl<U,V>& iter) const {
+        bool operator <= (const ChildIter& iter) const {
             return i <= iter.i;
         }
 
-        template<typename U, typename V>
-        bool operator > (const ptr_iterator_base_impl<U,V>& iter) const {
+        bool operator > (const ChildIter& iter) const {
             return i > iter.i;
         }
 
-        template<typename U, typename V>
-        bool operator >= (const ptr_iterator_base_impl<U,V>& iter) const {
+        bool operator >= (const ChildIter& iter) const {
             return i >= iter.i;
         }
 
@@ -91,27 +84,28 @@ namespace ctl {
             return *i;
         }
 
-        I stdbase() const {
+        BaseIter stdbase() const {
             return i;
         }
     };
 
-    template<typename T, typename C>
+    template<typename BaseIter>
     class ptr_iterator_base;
 
-    template<typename T, typename C>
-    class const_ptr_iterator_base : public ptr_iterator_base_impl<const_ptr_iterator_base<T,C>, T> {
-        friend C;
-        template<typename N, typename K>
-        friend class const_reverse_ptr_iterator_base;
-        using impl = ptr_iterator_base_impl<const_ptr_iterator_base, T>;
-        friend impl;
+    template<typename BaseIter>
+    class const_ptr_iterator_base :
+        private ptr_iterator_base_impl<const_ptr_iterator_base<BaseIter>, BaseIter> {
 
-        const_ptr_iterator_base(const T& j) : impl(j) {}
+        template<typename N>
+        friend class const_reverse_ptr_iterator_base;
+
+        using impl = ptr_iterator_base_impl<const_ptr_iterator_base, BaseIter>;
+        friend impl;
 
     public :
         const_ptr_iterator_base() = default;
-        const_ptr_iterator_base(const ptr_iterator_base<T,C>& iter) : impl(iter.i) {}
+        const_ptr_iterator_base(const BaseIter& j) : impl(j) {}
+        const_ptr_iterator_base(const ptr_iterator_base<BaseIter>& iter) : impl(iter.i) {}
         const_ptr_iterator_base(const const_ptr_iterator_base&) = default;
         const_ptr_iterator_base(const_ptr_iterator_base&&) = default;
         const_ptr_iterator_base& operator = (const const_ptr_iterator_base&) = default;
@@ -131,23 +125,24 @@ namespace ctl {
         using impl::operator<=;
         using impl::operator>;
         using impl::operator>=;
+        using impl::stdbase;
     };
 
+    template<typename BaseIter>
+    class ptr_iterator_base :
+        private ptr_iterator_base_impl<ptr_iterator_base<BaseIter>, BaseIter> {
 
-    template<typename T, typename C>
-    class ptr_iterator_base : public ptr_iterator_base_impl<ptr_iterator_base<T,C>, T> {
-        friend C;
-        template<typename N, typename K>
+        template<typename N>
         friend class const_ptr_iterator_base;
-        template<typename N, typename K>
+        template<typename N>
         friend class reverse_ptr_iterator_base;
-        using impl = ptr_iterator_base_impl<ptr_iterator_base, T>;
-        friend impl;
 
-        ptr_iterator_base(const T& j) : impl(j) {}
+        using impl = ptr_iterator_base_impl<ptr_iterator_base, BaseIter>;
+        friend impl;
 
     public :
         ptr_iterator_base() = default;
+        ptr_iterator_base(const BaseIter& j) : impl(j) {}
         ptr_iterator_base(const ptr_iterator_base&) = default;
         ptr_iterator_base(ptr_iterator_base&&) = default;
         ptr_iterator_base& operator = (const ptr_iterator_base&) = default;
@@ -167,22 +162,23 @@ namespace ctl {
         using impl::operator<=;
         using impl::operator>;
         using impl::operator>=;
+        using impl::stdbase;
     };
 
-    template<typename T, typename C>
+    template<typename BaseIter>
     class reverse_ptr_iterator_base;
 
-    template<typename T, typename C>
-    class const_reverse_ptr_iterator_base : public ptr_iterator_base_impl<const_reverse_ptr_iterator_base<T,C>, T> {
-        friend C;
-        using impl = ptr_iterator_base_impl<const_reverse_ptr_iterator_base, T>;
-        friend impl;
+    template<typename BaseIter>
+    class const_reverse_ptr_iterator_base :
+        private ptr_iterator_base_impl<const_reverse_ptr_iterator_base<BaseIter>, BaseIter> {
 
-        const_reverse_ptr_iterator_base(const T& j) : impl(j) {}
+        using impl = ptr_iterator_base_impl<const_reverse_ptr_iterator_base, BaseIter>;
+        friend impl;
 
     public :
         const_reverse_ptr_iterator_base() = default;
-        const_reverse_ptr_iterator_base(const reverse_ptr_iterator_base<T,C>& iter) : impl(iter.i) {}
+        const_reverse_ptr_iterator_base(const BaseIter& j) : impl(j) {}
+        const_reverse_ptr_iterator_base(const reverse_ptr_iterator_base<BaseIter>& iter) : impl(iter.i) {}
         const_reverse_ptr_iterator_base(const const_reverse_ptr_iterator_base&) = default;
         const_reverse_ptr_iterator_base(const_reverse_ptr_iterator_base&&) = default;
         const_reverse_ptr_iterator_base& operator = (const const_reverse_ptr_iterator_base&) = default;
@@ -202,25 +198,27 @@ namespace ctl {
         using impl::operator<=;
         using impl::operator>;
         using impl::operator>=;
+        using impl::stdbase;
 
-        const_ptr_iterator_base<T,C> base() const {
+        const_ptr_iterator_base<BaseIter> base() const {
             return this->i.base();
         }
     };
 
 
-    template<typename T, typename C>
-    class reverse_ptr_iterator_base : public ptr_iterator_base_impl<reverse_ptr_iterator_base<T,C>, T> {
-        friend C;
-        template<typename N, typename K>
-        friend class const_reverse_ptr_iterator_base;
-        using impl = ptr_iterator_base_impl<reverse_ptr_iterator_base, T>;
-        friend impl;
+    template<typename BaseIter>
+    class reverse_ptr_iterator_base :
+        private ptr_iterator_base_impl<reverse_ptr_iterator_base<BaseIter>, BaseIter> {
 
-        reverse_ptr_iterator_base(const T& j) : impl(j) {}
+        template<typename N>
+        friend class const_reverse_ptr_iterator_base;
+
+        using impl = ptr_iterator_base_impl<reverse_ptr_iterator_base, BaseIter>;
+        friend impl;
 
     public :
         reverse_ptr_iterator_base() = default;
+        reverse_ptr_iterator_base(const BaseIter& j) : impl(j) {}
         reverse_ptr_iterator_base(const reverse_ptr_iterator_base&) = default;
         reverse_ptr_iterator_base(reverse_ptr_iterator_base&&) = default;
         reverse_ptr_iterator_base& operator = (const reverse_ptr_iterator_base&) = default;
@@ -240,8 +238,9 @@ namespace ctl {
         using impl::operator<=;
         using impl::operator>;
         using impl::operator>=;
+        using impl::stdbase;
 
-        ptr_iterator_base<T,C> base() const {
+        ptr_iterator_base<BaseIter> base() const {
             return this->i.base();
         }
     };
@@ -261,8 +260,8 @@ namespace ctl {
 }
 
 namespace std {
-    template<typename T, typename C>
-    struct iterator_traits<ctl::ptr_iterator_base<T,C>> {
+    template<typename T>
+    struct iterator_traits<ctl::ptr_iterator_base<T>> {
         using std_iterator = T;
         using raw_value_type = typename iterator_traits<T>::value_type;
         using difference_type = typename iterator_traits<T>::difference_type;
@@ -272,8 +271,8 @@ namespace std {
         using iterator_category = typename iterator_traits<T>::iterator_category;
     };
 
-    template<typename T, typename C>
-    struct iterator_traits<ctl::const_ptr_iterator_base<T,C>> {
+    template<typename T>
+    struct iterator_traits<ctl::const_ptr_iterator_base<T>> {
         using std_iterator = T;
         using raw_value_type = typename iterator_traits<T>::value_type;
         using difference_type = typename iterator_traits<T>::difference_type;
@@ -283,8 +282,8 @@ namespace std {
         using iterator_category = typename iterator_traits<T>::iterator_category;
     };
 
-    template<typename T, typename C>
-    struct iterator_traits<ctl::reverse_ptr_iterator_base<T,C>> {
+    template<typename T>
+    struct iterator_traits<ctl::reverse_ptr_iterator_base<T>> {
         using std_iterator = T;
         using raw_value_type = typename iterator_traits<T>::value_type;
         using difference_type = typename iterator_traits<T>::difference_type;
@@ -294,8 +293,8 @@ namespace std {
         using iterator_category = typename iterator_traits<T>::iterator_category;
     };
 
-    template<typename T, typename C>
-    struct iterator_traits<ctl::const_reverse_ptr_iterator_base<T,C>> {
+    template<typename T>
+    struct iterator_traits<ctl::const_reverse_ptr_iterator_base<T>> {
         using std_iterator = T;
         using raw_value_type = typename iterator_traits<T>::value_type;
         using difference_type = typename iterator_traits<T>::difference_type;
@@ -305,8 +304,8 @@ namespace std {
         using iterator_category = typename iterator_traits<T>::iterator_category;
     };
 
-    template<typename I, typename C, typename F>
-    void sort(const ctl::ptr_iterator_base<I,C>& i1, const ctl::ptr_iterator_base<I,C>& i2, F func) {
+    template<typename I, typename F>
+    void sort(const ctl::ptr_iterator_base<I>& i1, const ctl::ptr_iterator_base<I>& i2, F func) {
         using vtype = typename iterator_traits<I>::value_type;
         return std::sort(i1.stdbase(), i2.stdbase(), [&func](const vtype& v1, const vtype& v2) {
             return func(*v1, *v2);
