@@ -56,11 +56,6 @@ namespace ctl {
         explicit ptr_vector(base&& s) : base(std::move(s)) {}
 
         /// Insert the provided object in the vector.
-        iterator insert(iterator iter, std::unique_ptr<T>&& t) {
-            return base::insert(iter.stdbase(), std::move(t));
-        }
-
-        /// Insert the provided object in the vector.
         template<typename U=T, typename ... Args>
         iterator insert(iterator iter, Args&& ... args) {
             return base::insert(iter.stdbase(), std::unique_ptr<T>(new U(std::forward<Args>(args)...)));
