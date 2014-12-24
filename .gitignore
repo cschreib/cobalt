@@ -5,7 +5,11 @@ server/bak/
 bak/
 bin/server/cobalt-server-cli
 bin/client/cobalt-client-cli
+bin/server/cobalt-server-cli.exe
+bin/client/cobalt-client-cli.exe
 bin/server/*.log
 bin/client/*.log
 bin/server/.gdb_history
 bin/client/.gdb_history
+bin/server/generators/*.so
+bin/server/generators/*.dll

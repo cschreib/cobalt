@@ -82,6 +82,9 @@ add_subdirectory(client)
 add_subdirectory(server-cli)
 add_subdirectory(client-cli)
 
+# build generators
+add_subdirectory(generators/test)
+
 # enable documentation build
 add_custom_target(doxygen COMMAND doxygen doxygen.conf
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/doc)
