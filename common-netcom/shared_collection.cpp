@@ -107,6 +107,14 @@ shared_collection_factory::shared_collection_factory(netcom_base& net) : net_(ne
             (*iter)->remove_item(msg);
         }
     );
+
+    pool_ << net_.watch_message(
+        [this](const netcom_base::message_t<message::shared_collection_clear>& msg) {
+            auto iter = observers_.find(msg.arg.id);
+            if (iter == observers_.end()) return;
+            (*iter)->clear(msg);
+        }
+    );
 }
 
 void shared_collection_factory::clear() {
