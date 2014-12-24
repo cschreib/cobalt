@@ -43,11 +43,11 @@ namespace state {
     void configure::build_generator_list_() {
         available_generators_.clear();
 
-        auto dirs = file::list_directories("generators/");
-        for (auto&& dir : dirs) {
-            if (file::library_exists("generators/"+dir+"/"+dir)) {
-                // TODO: check that the needed functions are available
-                available_generators_.insert(generator_info{dir});
+        auto libs = file::list_files("generators/*."+shared_library::file_extension);
+        for (auto&& lib_file : libs) {
+            shared_library lib("generators/"+lib_file);
+            if (lib.open() && lib.load_symbol("generate_universe") != nullptr) {
+                available_generators_.insert(generator_info{lib_file});
             }
         }
 
@@ -55,6 +55,8 @@ namespace state {
             out_.warning("no universe generator available, using default (empty universe)");
             available_generators_.insert(generator_info{"default"});
         }
+
+        generator_ = available_generators_.front().id;
     }
 
     bool configure::set_generator_(const std::string& id) {
@@ -63,7 +65,7 @@ namespace state {
 
         generator_ = id;
         config_.clear();
-        config_.parse_from_file("generators/"+generator_+"/"+generator_+"_default.conf");
+        config_.parse_from_file("generators/"+generator_+"_default.conf");
 
         return true;
     }
@@ -74,15 +76,24 @@ namespace state {
         config_.save(ss);
 
         if (save_dir_.empty()) {
-            save_dir_ = "saves/"+today_str()+time_of_day_str()+"/";
+            save_dir_ = "saves/"+generator_+"-"+today_str()+time_of_day_str()+"/";
             file::mkdir(save_dir_);
+        }
+
+        shared_library lib("generators/"+generator_);
+        if (!lib.open()) {
+            return;
+        }
+
+        auto* fun = lib.load_function<void(const char*)>("generate_universe");
+        if (!fun) {
+            return;
         }
 
         net_.send_message<message::server::configure_generating>(server::netcom::all_actor_id);
 
-        // TODO: Get 'generate' function inside library
-        // Start a new thread in which 'generate' is called on ss.str().c_str()
-        // and saving in 'save_dir_'.
+        // TODO: run that in a thread
+        (*fun)(ss.str().c_str());
 
         net_.send_message<message::server::configure_generated>(server::netcom::all_actor_id);
     }
