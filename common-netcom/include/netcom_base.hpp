@@ -819,7 +819,7 @@ public :
 
 protected :
     virtual credential_list_t get_missing_credentials_(actor_id_t cid,
-        const constant_credential_list_t& lst) {
+        const constant_credential_list_t& lst) const {
         // Default implementation, does not check credentials
         return credential_list_t{};
     }
