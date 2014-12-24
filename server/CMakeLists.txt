@@ -11,5 +11,6 @@ add_library(cobalt-server STATIC
     server_instance.cpp
     server_netcom.cpp
     server_state_configure.cpp
+    server_state_test.cpp
     server_player_list.cpp
 )
