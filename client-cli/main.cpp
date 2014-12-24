@@ -15,7 +15,7 @@ int main(int argc, const char* argv[]) {
     }
 
     config::state conf;
-    conf.parse(conf_file);
+    conf.parse_from_file(conf_file);
 
     client::netcom net;
     conf.bind("netcom.debug_packets", net.debug_packets);
@@ -217,7 +217,7 @@ int main(int argc, const char* argv[]) {
 
     std::cout << "stopped." << std::endl;
 
-    conf.save(conf_file);
+    conf.save_to_file(conf_file);
 
     return 0;
 }
