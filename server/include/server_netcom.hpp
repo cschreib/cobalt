@@ -75,8 +75,8 @@ namespace server {
         void remove_credentials(actor_id_t cid, const credential_list_t& creds);
 
         template<typename T>
-        shared_collection<T> make_shared_collection() {
-            return sc_factory_.make_shared_collection<T>();
+        shared_collection<T> make_shared_collection(const std::string& name) {
+            return sc_factory_.make_shared_collection<T>(name);
         }
 
         template<typename T>

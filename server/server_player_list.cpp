@@ -6,7 +6,7 @@
 namespace server {
     player_list::player_list(netcom& net, config::state& conf) :
         net_(net), conf_(conf), max_player_(1u),
-        collection_(net.make_shared_collection<player_collection_traits>()) {
+        collection_(net.make_shared_collection<player_collection_traits>("server_player_list")) {
 
         collection_.make_collection_packet([this](packet::player_list& lst) {
             for (auto& p : players_) {
