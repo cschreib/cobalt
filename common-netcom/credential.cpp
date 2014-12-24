@@ -4,22 +4,18 @@
 credential_list_t::credential_list_t(std::initializer_list<credential_t> lst) :
     list_(lst) {}
 
-credential_list_t credential_list_t::find_missing(const constant_credential_list_t& required) {
-    credential_list_t missing;
-
-    for (auto c : required) {
-        if (list_.find(c) == list_.end()) {
-            missing.list_.insert(credential_t{c});
-        }
-    }
-
-    return missing;
+void credential_list_t::grant(const credential_t& granted) {
+    list_.insert(granted);
 }
 
 void credential_list_t::grant(const credential_list_t& granted) {
     for (auto& c : granted.list_) {
         list_.insert(c);
     }
+}
+
+void credential_list_t::remove(const credential_t& removed) {
+    list_.erase(removed);
 }
 
 void credential_list_t::remove(const credential_list_t& removed) {

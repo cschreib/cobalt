@@ -88,6 +88,8 @@ using credential_t = std::string;
 class credential_list_t {
     ctl::sorted_vector<credential_t> list_;
 
+    bool implies_(const credential_t& c1, const credential_t& c2) const;
+
 public :
     credential_list_t() = default;
     credential_list_t(const credential_list_t&) = default;
@@ -97,9 +99,9 @@ public :
     credential_list_t& operator=(const credential_list_t&) = default;
     credential_list_t& operator=(credential_list_t&&) = default;
 
-    credential_list_t find_missing(const constant_credential_list_t& required);
-
+    void grant(const credential_t& granted);
     void grant(const credential_list_t& granted);
+    void remove(const credential_t& removed);
     void remove(const credential_list_t& removed);
     void clear();
     bool empty() const;

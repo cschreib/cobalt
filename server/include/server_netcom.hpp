@@ -110,8 +110,20 @@ namespace server {
         void remove_client_(actor_id_t cid);
         void remove_client_(connected_client_list_t::iterator ic);
 
+        struct credential_link_t {
+            credential_t cred;
+            ctl::sorted_vector<credential_t> links;
+        };
+
+        using credential_links_t = ctl::sorted_vector<credential_link_t,
+            mem_var_comp(&credential_link_t::cred)>;
+
+        credential_links_t credential_links_;
+
+        void read_credential_links_(const std::string& file_name);
+        bool credential_implies_(const credential_t& c1, const credential_t& c2) const;
         credential_list_t get_missing_credentials_(actor_id_t cid,
-            const constant_credential_list_t& lst) override;
+            const constant_credential_list_t& lst) const override;
 
         config::state& conf_;
         scoped_connection_pool pool_;
