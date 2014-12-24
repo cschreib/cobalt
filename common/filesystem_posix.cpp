@@ -240,22 +240,24 @@ namespace file {
     }
 }
 
-dynamic_library::dynamic_library(const std::string& file) {
-    handle_ = dlopen((file+".so").c_str(), RTLD_LAZY);
+shared_library::shared_library(const std::string& file) {
+    handle_ = dlopen(file.c_str(), RTLD_LAZY);
 }
 
-dynamic_library::~dynamic_library() {
+shared_library::~shared_library() {
     dlclose(handle_);
 }
 
-bool dynamic_library::open() const {
+bool shared_library::open() const {
     return handle_ != nullptr;
 }
 
-void* dynamic_library::load_symbol(const std::string& sym) {
+void* shared_library::load_symbol(const std::string& sym) {
     if (handle_) {
         return dlsym(handle_, sym.c_str());
     } else {
         return nullptr;
     }
 }
+
+const std::string shared_library::file_extension = "so";

@@ -119,22 +119,24 @@ namespace file {
     }
 }
 
-dynamic_library::dynamic_library(const std::string& file) {
-    handle_ = LoadLibrary((file+".dll").c_str());
+shared_library::shared_library(const std::string& file) {
+    handle_ = LoadLibrary(file.c_str());
 }
 
-dynamic_library::~dynamic_library() {
+shared_library::~shared_library() {
     FreeLibrary(handle_);
 }
 
-bool dynamic_library::open() const {
+bool shared_library::open() const {
     return handle_ != nullptr;
 }
 
-void* dynamic_library::load_symbol(const std::string& sym) {
+void* shared_library::load_symbol(const std::string& sym) {
     if (handle_) {
         return GetProcAddress(handle_, sym.c_str());
     } else {
         return nullptr;
     }
 }
+
+const std::string shared_library::file_extension = "dll";

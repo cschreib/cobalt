@@ -4,12 +4,12 @@
 #include <string>
 #include <vector>
 
-class dynamic_library {
+class shared_library {
 private :
     void* handle_ = nullptr;
 public :
-    explicit dynamic_library(const std::string& file);
-    ~dynamic_library();
+    explicit shared_library(const std::string& file);
+    ~shared_library();
 
     bool open() const;
     void* load_symbol(const std::string& sym);
@@ -18,6 +18,8 @@ public :
     T* load_function(const std::string& name) {
         return (T*)load_symbol(name);
     }
+
+    static const std::string file_extension;
 };
 
 namespace file {
