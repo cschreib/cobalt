@@ -35,7 +35,7 @@ namespace server {
 
         template<typename T, typename ... Args>
         void set_state(Args&& ... args) {
-            current_state_ = std::make_unique<T>(std::forward<Args>(args)...);
+            current_state_ = std::make_unique<T>(net_, log_, std::forward<Args>(args)...);
         }
     };
 }
