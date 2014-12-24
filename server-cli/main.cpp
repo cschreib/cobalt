@@ -1,5 +1,6 @@
 #include <server_instance.hpp>
 #include <server_state_configure.hpp>
+#include <server_state_test.hpp>
 #include <log.hpp>
 #include <config.hpp>
 #include <signal.h>
@@ -81,13 +82,13 @@ int main(int argc, const char* argv[]) {
             });
 
             std::string start_state = "configure";
-            state_conf.get_value("name", start_state, start_state);
+            state_conf.get_value("state", start_state, start_state);
             out.note("switching server to '", start_state, "' state");
 
             if (start_state == "configure") {
-                serv.set_state<server::state::configure>(
-                    serv.get_netcom(), serv.get_log()
-                );
+                serv.set_state<server::state::configure>();
+            } else if (start_state == "test") {
+                serv.set_state<server::state::test>();
             } else {
                 out.error("unknown state '", start_state, "'");
             }
