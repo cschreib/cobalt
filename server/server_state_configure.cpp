@@ -1,9 +1,12 @@
 #include "server_state_configure.hpp"
 #include <filesystem.hpp>
+#include <time.hpp>
 
 namespace server {
 namespace state {
-    configure::configure(netcom& net, logger& out) : net_(net), out_(out) {
+    configure::configure(netcom& net, logger& out) : net_(net), out_(out),
+        config_(net, "server_state_configure") {
+
         build_generator_list_();
 
         pool_ << net_.watch_request(
@@ -13,7 +16,7 @@ namespace state {
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::configure_get_current_generator>&& req) {
-            req.answer(generator_->id());
+            req.answer(generator_);
         });
 
         pool_ << net_.watch_request(
@@ -59,7 +62,7 @@ namespace state {
         if (iter == available_generators_.end()) return false;
 
         generator_ = id;
-        config_ = config::state();
+        config_.clear();
         config_.parse_from_file("generators/"+generator_+"/"+generator_+"_default.conf");
 
         return true;
@@ -71,17 +74,17 @@ namespace state {
         config_.save(ss);
 
         if (save_dir_.empty()) {
-            save_dir_ = "saves/"+time::today_str()+time::time_of_day_str()+"/";
+            save_dir_ = "saves/"+today_str()+time_of_day_str()+"/";
             file::mkdir(save_dir_);
         }
 
-        net_.send_message<message::server::configure_generating>(all_actor_id);
+        net_.send_message<message::server::configure_generating>(server::netcom::all_actor_id);
 
         // TODO: Get 'generate' function inside library
         // Start a new thread in which 'generate' is called on ss.str().c_str()
         // and saving in 'save_dir_'.
 
-        net_.send_message<message::server::configure_generated>(all_actor_id);
+        net_.send_message<message::server::configure_generated>(server::netcom::all_actor_id);
     }
 }
 }

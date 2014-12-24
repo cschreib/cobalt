@@ -29,6 +29,8 @@ namespace state {
         std::string generator_;
         std::string save_dir_;
 
+        config::shared_state config_;
+
         void build_generator_list_();
         bool set_generator_(const std::string& id);
 
@@ -37,6 +39,16 @@ namespace state {
 
         void generate();
     };
+
+    template<typename O>
+    O& operator << (O& out, const configure::generator_info& i) {
+        return out << i.id;
+    }
+
+    template<typename I>
+    I& operator >> (I& in, configure::generator_info& i) {
+        return in >> i.id;
+    }
 }
 }
 
@@ -91,5 +103,9 @@ namespace server {
     };
 }
 }
+
+#ifndef NO_AUTOGEN
+#include "autogen/packets/server_state_configure.hpp"
+#endif
 
 #endif
