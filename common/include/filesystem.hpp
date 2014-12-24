@@ -4,8 +4,23 @@
 #include <string>
 #include <vector>
 
+class dynamic_library {
+private :
+    void* handle_ = nullptr;
+public :
+    explicit dynamic_library(const std::string& file);
+    ~dynamic_library();
+
+    bool open() const;
+    void* load_symbol(const std::string& sym);
+
+    template<typename T>
+    T* load_function(const std::string& name) {
+        return (T*)load_symbol(name);
+    }
+};
+
 namespace file {
-    bool library_exists(const std::string& file);
     bool exists(const std::string& file);
     std::vector<std::string> list_directories(const std::string& path = "");
     std::vector<std::string> list_files(const std::string& pattern = "*");

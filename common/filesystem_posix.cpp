@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <fnmatch.h>
 #include <ftw.h>
+#include <dlfcn.h>
 #include <cstring>
 #include <cstdio>
 #include <ctime>
@@ -237,13 +238,24 @@ namespace file {
         if (::stat(file2.c_str(), &st2) != 0) return false;
         return std::difftime(st1.st_ctime, st2.st_ctime) < 0.0;
     }
+}
 
-    bool library_exists(const std::string& file) {
-        if (file.empty()) {
-            return false;
-        }
+dynamic_library::dynamic_library(const std::string& file) {
+    handle_ = dlopen((file+".so").c_str(), RTLD_LAZY);
+}
 
-        std::ifstream f((file+".so").c_str());
-        return f.is_open();
+dynamic_library::~dynamic_library() {
+    dlclose(handle_);
+}
+
+bool dynamic_library::open() const {
+    return handle_ != nullptr;
+}
+
+void* dynamic_library::load_symbol(const std::string& sym) {
+    if (handle_) {
+        return dlsym(handle_, sym.c_str());
+    } else {
+        return nullptr;
     }
 }

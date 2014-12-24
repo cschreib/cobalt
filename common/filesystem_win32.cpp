@@ -117,13 +117,24 @@ namespace file {
         GetFileAttributesEx(file2.c_str(), GetFileExInfoStandard, &st2);
         return CompareFileTime(&st1.ftCreationTime, &st2.ftCreationTime) < 0;
     }
+}
 
-    bool library_exists(const std::string& file) {
-        if (file.empty()) {
-            return false;
-        }
+dynamic_library::dynamic_library(const std::string& file) {
+    handle_ = LoadLibrary((file+".dll").c_str());
+}
 
-        std::ifstream f((file+".dll").c_str());
-        return f.is_open();
+dynamic_library::~dynamic_library() {
+    FreeLibrary(handle_);
+}
+
+bool dynamic_library::open() const {
+    return handle_ != nullptr;
+}
+
+void* dynamic_library::load_symbol(const std::string& sym) {
+    if (handle_) {
+        return GetProcAddress(handle_, sym.c_str());
+    } else {
+        return nullptr;
     }
 }
