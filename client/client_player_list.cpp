@@ -42,6 +42,13 @@ namespace client {
                     players_.erase(iter);
                 });
 
+                collection_.on_clear.connect([this](const packet::player_list_cleared& p) {
+                    while (!players_.empty()) {
+                        on_player_disconnected.dispatch(players_.back());
+                        players_.pop_back();
+                    }
+                });
+
                 collection_.on_register_unhandled.connect([this]() {
                     on_connect_fail.dispatch();
                 });
