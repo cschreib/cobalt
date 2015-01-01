@@ -7,7 +7,7 @@ namespace state {
     configure::configure(netcom& net, logger& out) : net_(net), out_(out),
         config_(net, "server_state_configure") {
 
-        build_generator_list_();
+        update_generator_list();
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::configure_list_generators>&& req) {
@@ -21,7 +21,7 @@ namespace state {
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::configure_set_current_generator>&& req) {
-            if (set_generator_(req.arg.gen)) {
+            if (set_generator(req.arg.gen)) {
                 req.answer();
             } else {
                 using failure_t = request::server::configure_set_current_generator::failure;
@@ -31,16 +31,18 @@ namespace state {
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::configure_generate>&& req) {
-            if (!generator_.empty()) {
+            try {
                 generate();
                 req.answer();
-            } else {
-                req.fail(request::server::configure_generate::failure::reason::no_generator_set);
+            } catch (request::server::configure_generate::failure::reason rsn) {
+                req.fail(rsn);
+            } catch (...) {
+                throw;
             }
         });
     }
 
-    void configure::build_generator_list_() {
+    void configure::update_generator_list() {
         available_generators_.clear();
 
         auto libs = file::list_files("generators/*."+shared_library::file_extension);
@@ -59,7 +61,7 @@ namespace state {
         generator_ = available_generators_.front().id;
     }
 
-    bool configure::set_generator_(const std::string& id) {
+    bool configure::set_generator(const std::string& id) {
         auto iter = available_generators_.find(id);
         if (iter == available_generators_.end()) return false;
 
@@ -71,6 +73,16 @@ namespace state {
     }
 
     void configure::generate() {
+        using failure = request::server::configure_generate::failure::reason;
+
+        if (generating_) {
+            throw failure::already_generating;
+        }
+
+        if (generator_.empty()) {
+            throw failure::no_generator_set;
+        }
+
         // Serialize config
         std::ostringstream ss;
         config_.save(ss);
@@ -82,18 +94,20 @@ namespace state {
 
         shared_library lib("generators/"+generator_);
         if (!lib.open()) {
-            return;
+            throw failure::invalid_generator;
         }
 
         auto* fun = lib.load_function<void(const char*)>("generate_universe");
         if (!fun) {
-            return;
+            throw failure::invalid_generator;
         }
 
         net_.send_message<message::server::configure_generating>(server::netcom::all_actor_id);
+        generating_ = true;
 
         // TODO: run that in a thread
         (*fun)(ss.str().c_str());
+        generating_ = false;
 
         net_.send_message<message::server::configure_generated>(server::netcom::all_actor_id);
     }

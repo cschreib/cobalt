@@ -26,17 +26,17 @@ namespace state {
 
         generator_list_t available_generators_;
 
+        bool generating_ = false;
         std::string generator_;
         std::string save_dir_;
 
         config::shared_state config_;
 
-        void build_generator_list_();
-        bool set_generator_(const std::string& id);
-
     public :
         configure(netcom& net, logger& out);
 
+        void update_generator_list();
+        bool set_generator(const std::string& id);
         void generate();
     };
 
@@ -87,7 +87,9 @@ namespace server {
         struct answer {};
         struct failure {
             enum class reason {
-                no_generator_set
+                no_generator_set,
+                invalid_generator,
+                already_generating
             } rsn;
         };
     };
