@@ -180,12 +180,16 @@ std::string uchar_to_hex(std::uint8_t i) {
     return res;
 }
 
-std::ostream& operator << (std::ostream& s, const color32& c) {
-    s << "#" << uchar_to_hex(c.r) << uchar_to_hex(c.g) << uchar_to_hex(c.b);
+std::string to_string(const color32& c) {
+    std::string str = "#" + uchar_to_hex(c.r) + uchar_to_hex(c.g) + uchar_to_hex(c.b);
     if (c.a != 255u) {
-        s << uchar_to_hex(c.a);
+        str += uchar_to_hex(c.a);
     }
+    return str;
+}
 
+std::ostream& operator << (std::ostream& s, const color32& c) {
+    s << to_string(c);
     return s;
 }
 

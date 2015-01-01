@@ -2,7 +2,12 @@
 
 namespace server {
     instance::instance(config::state& conf) :
-        log_("server", conf), net_(conf, log_), shutdown_(false) {
+        log_([&]() {
+            logger log;
+            log.add_output<file_logger>(conf, "server");
+            log.add_output<cout_logger>(conf);
+            return log;
+        }()), net_(conf, log_), shutdown_(false) {
 
         pool_ << conf.bind("admin.password", admin_password_);
 

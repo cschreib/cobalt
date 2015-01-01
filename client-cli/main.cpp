@@ -17,6 +17,8 @@ int main(int argc, const char* argv[]) {
 
     config::state conf;
     conf.parse_from_file(conf_file);
+    cout.add_output<cout_logger>(conf);
+    // cout.add_output<file_logger>(conf, "client");
 
     client::netcom net;
     conf.bind("netcom.debug_packets", net.debug_packets);

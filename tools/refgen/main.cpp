@@ -523,6 +523,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    config::state conf;
+    conf.set_value("log.cout.color", true);
+    conf.set_value("log.cout.stamp", false);
+    cout.add_output<cout_logger>(conf);
+
     std::string cmd = string::to_lower(argv[1]);
     std::string dir = argv[2];
     dir = string::replace(dir, "\\", "/");

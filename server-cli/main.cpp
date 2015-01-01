@@ -23,6 +23,8 @@ int main(int argc, const char* argv[]) {
     while (!stop) {
         config::state conf;
         conf.parse_from_file("server.conf");
+        cout.add_output<cout_logger>(conf);
+
         config::state state_conf;
         state_conf.parse_from_file(state_conf_file);
 

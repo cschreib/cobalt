@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include "time.hpp"
+#include "scoped_connection_pool.hpp"
 #include "config.hpp"
 
 namespace color {
@@ -27,22 +28,97 @@ namespace color {
     std::ostream& operator << (std::ostream& o, bold_t s);
 }
 
-namespace logger_impl {
-    void print_stamp(std::ostream& o);
-    void print_stamp_colored(std::ostream& o);
-}
-
-template<typename O>
 class logger_base {
-    O    out_;
-    bool stdout_ = false;
-    bool nostamp_ = false;
-    bool nocolor_ = false;
+protected :
+    bool color_ = false;
+    bool stamp_ = false;
+
+    virtual void print_(color::set s)     {}
+    virtual void print_(color::reset_t s) {}
+    virtual void print_(color::bold_t s)  {}
 
 public :
-    logger_base() : stdout_(true), nostamp_(true) {}
+    virtual ~logger_base() = 0;
 
-    explicit logger_base(const std::string& name, config::state& conf) {
+    virtual bool is_open() const = 0;
+
+    void print_stamp() {
+        if (stamp_) {
+            print(color::set(color::normal,true)); print("[");
+            print(color::set(color::cyan,  true)); print(today_str("/"));
+            print(color::set(color::normal,true)); print("|");
+            print(color::set(color::green, true)); print(time_of_day_str(":"));
+            print(color::set(color::normal,true)); print("] ");
+            print(color::set(color::normal,false));
+        }
+    }
+
+    virtual void print(const std::string& s) = 0;
+
+    void print(color::set s) {
+        if (color_) {
+            print_(s);
+        }
+    }
+
+    void print(color::reset_t s) {
+        if (color_) {
+            print_(s);
+        }
+    }
+
+    void print(color::bold_t s) {
+        if (color_) {
+            print_(s);
+        }
+    }
+
+    virtual void endl() = 0;
+};
+
+template<typename O>
+class ostream_logger_base : public logger_base {
+    O& out_;
+
+protected :
+    scoped_connection_pool pool_;
+
+public :
+    ~ostream_logger_base() override {}
+
+    ostream_logger_base(O& o) : out_(o) {}
+
+    void print(const std::string& t) override {
+        out_ << t;
+    }
+
+    void print_(color::set s) override {
+        out_ << s;
+    }
+
+    void print_(color::reset_t s) override {
+        out_ << s;
+    }
+
+    void print_(color::bold_t s) override {
+        out_ << s;
+    }
+
+    void endl() override {
+        out_ << std::endl;
+    }
+};
+
+template<typename O>
+class ostream_logger : public ostream_logger_base<O> {
+    O out_;
+
+public :
+    ~ostream_logger() override {}
+
+    ostream_logger(config::state& conf, const std::string& name) :
+        ostream_logger_base<O>(out_) {
+
         std::string file;
         if (conf.get_value("log."+name+".file", file, "") && !file.empty()) {
             bool append = true;
@@ -52,151 +128,140 @@ public :
             } else {
                 out_.open(file);
             }
-        }
 
-        conf.get_value("log."+name+".stdout", stdout_, stdout_);
-        conf.get_value("log."+name+".nostamp", nostamp_, nostamp_);
+            this->pool_ << conf.bind("log."+name+".color", this->color_);
+            this->pool_ << conf.bind("log."+name+".stamp", this->stamp_);
+        }
     }
+
+    bool is_open() const override {
+        return out_.is_open();
+    }
+};
+
+class cout_logger : public ostream_logger_base<std::ostream> {
+public :
+    ~cout_logger() override {}
+
+    cout_logger(config::state& conf) : ostream_logger_base<std::ostream>(std::cout) {
+        pool_ << conf.bind("log.cout.color", color_);
+        pool_ << conf.bind("log.cout.stamp", stamp_);
+    }
+
+    bool is_open() const override {
+        return true;
+    }
+};
+
+class logger {
+    std::vector<std::unique_ptr<logger_base>> out_;
+
+public :
+    logger() = default;
 
 private :
     template<typename T>
-    void print__(const T& t) {
-        if (out_.is_open()) {
-            out_ << t;
-        }
-        if (stdout_) {
-            std::cout << t;
+    void forward_print_(const T& t) {
+        for (auto& o : out_) {
+            if (o->is_open()) {
+                o->print(t);
+            }
         }
     }
 
+    template<typename T>
+    void print__(const T& t) {
+        using std::to_string;
+        forward_print_(to_string(t));
+    }
+
+    void print__(const std::string& str) {
+        forward_print_(str);
+    }
+
+    void print__(const char* str) {
+        forward_print_(std::string(str));
+    }
+
+    void print__(color::set s) {
+        forward_print_(s);
+    }
+
+    void print__(color::reset_t s) {
+        forward_print_(s);
+    }
+
+    void print__(color::bold_t s) {
+        forward_print_(s);
+    }
+
+private :
     template<typename ... Args>
     void print_(Args&& ... args) {
         int v[] = {(print__(std::forward<Args>(args)), 0)...};
-
-        if (out_.is_open()) {
-            out_ << std::endl;
-        }
-        if (stdout_) {
-            std::cout << std::endl;
-        }
     }
 
     void print_stamp_() {
-        if (!nostamp_) {
-            if (out_.is_open()) {
-                logger_impl::print_stamp(out_);
+        for (auto& o : out_) {
+            if (o->is_open()) {
+                o->print_stamp();
             }
-            if (stdout_) {
-                if (!nocolor_) {
-                    logger_impl::print_stamp_colored(std::cout);
-                } else {
-                    logger_impl::print_stamp(std::cout);
-                }
+        }
+    }
+
+    void endl_() {
+        for (auto& o : out_) {
+            if (o->is_open()) {
+                o->endl();
             }
         }
     }
 
 public :
+    template<typename T, typename ... Args>
+    void add_output(Args&&... args) {
+        out_.emplace_back(new T(std::forward<Args>(args)...));
+    }
+
     template<typename ... Args>
     void print(Args&&... args) {
         print_stamp_();
         print_(std::forward<Args>(args)...);
+        endl_();
+    }
+
+    template<typename ... Args>
+    void print_header(color::color_value v, const std::string hdr, Args&&... args) {
+        print_stamp_();
+        print_(color::set(v, true));
+        print_(hdr+": ");
+        print_(color::reset);
+        print_(std::forward<Args>(args)...);
+        endl_();
     }
 
     template<typename ... Args>
     void error(Args&& ... args) {
-        print_stamp_();
-
-        if (out_.is_open()) {
-            out_ << "error: ";
-        }
-
-        if (stdout_) {
-            if (!nocolor_) {
-                std::cout << color::set(color::red, true);
-            }
-
-            std::cout << "error: ";
-
-            if (!nocolor_) {
-                std::cout << color::reset;
-            }
-        }
-
-        print_(std::forward<Args>(args)...);
+        print_header(color::red, "error", std::forward<Args>(args)...);
     }
 
     template<typename ... Args>
     void warning(Args&& ... args) {
-        print_stamp_();
-
-        if (out_.is_open()) {
-            out_ << "warning: ";
-        }
-
-        if (stdout_) {
-            if (!nocolor_) {
-                std::cout << color::set(color::yellow, true);
-            }
-
-            std::cout << "warning: ";
-
-            if (!nocolor_) {
-                std::cout << color::reset;
-            }
-        }
-
-        print_(std::forward<Args>(args)...);
+        print_header(color::yellow, "warning", std::forward<Args>(args)...);
     }
 
     template<typename ... Args>
     void note(Args&& ... args) {
-        print_stamp_();
-
-        if (out_.is_open()) {
-            out_ << "note: ";
-        }
-
-        if (stdout_) {
-            if (!nocolor_) {
-                std::cout << color::set(color::blue, true);
-            }
-
-            std::cout << "note: ";
-
-            if (!nocolor_) {
-                std::cout << color::reset;
-            }
-        }
-
-        print_(std::forward<Args>(args)...);
+        print_header(color::blue, "note", std::forward<Args>(args)...);
     }
 
     template<typename ... Args>
     void reason(Args&& ... args) {
-        print_stamp_();
-
-        if (out_.is_open()) {
-            out_ << "reason: ";
-        }
-
-        if (stdout_) {
-            if (!nocolor_) {
-                std::cout << color::set(color::blue, true);
-            }
-
-            std::cout << "reason: ";
-
-            if (!nocolor_) {
-                std::cout << color::reset;
-            }
-        }
-
-        print_(std::forward<Args>(args)...);
+        print_header(color::blue, "reason", std::forward<Args>(args)...);
     }
 };
 
-using logger = logger_base<std::ofstream>;
+using file_logger = ostream_logger<std::ofstream>;
 
 extern logger cout;
 
