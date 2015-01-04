@@ -7,7 +7,7 @@
 
 namespace server {
 namespace state {
-    class configure : public server::state::base {
+    class configure : public base_impl<state_id::configure> {
     public :
         struct generator_info {
             std::string id;
@@ -19,25 +19,31 @@ namespace state {
             ctl::sorted_vector<generator_info, mem_var_comp(&generator_info::id)>;
 
     private :
-        netcom& net_;
-        logger& out_;
-
         scoped_connection_pool pool_;
+        scoped_connection_pool rw_pool_;
+
 
         generator_list_t available_generators_;
-
         bool generating_ = false;
         std::string generator_;
         std::string save_dir_;
 
         config::shared_state config_;
 
+        ctl::sorted_vector<std::string> saved_games_;
+        bool loading_ = false;
+
     public :
-        configure(netcom& net, logger& out);
+        explicit configure(server::instance& serv);
 
         void update_generator_list();
         bool set_generator(const std::string& id);
         void generate();
+
+        void update_saved_game_list();
+        void load_saved_game(const std::string& dir, bool just_generated);
+
+        void run_game();
     };
 
     template<typename O>
@@ -89,7 +95,51 @@ namespace server {
             enum class reason {
                 no_generator_set,
                 invalid_generator,
-                already_generating
+                already_generating,
+                cannot_generate_while_loading
+            } rsn;
+        };
+    };
+
+    NETCOM_PACKET(configure_load_game) {
+        NETCOM_REQUIRES("game_configurer");
+
+        std::string save;
+
+        struct answer {};
+        struct failure {
+            enum class reason {
+                no_such_saved_game,
+                invalid_saved_game,
+                already_loading,
+                cannot_load_while_generating
+            } rsn;
+        };
+    };
+
+    NETCOM_PACKET(configure_list_saved_games) {
+        struct answer {
+            ctl::sorted_vector<std::string> saves;
+        };
+        struct failure {};
+    };
+
+    NETCOM_PACKET(configure_is_game_loaded) {
+        struct answer {
+            bool loaded;
+        };
+        struct failure {};
+    };
+
+    NETCOM_PACKET(configure_run_game) {
+        NETCOM_REQUIRES("game_configurer");
+
+        struct answer {};
+        struct failure {
+            enum class reason {
+                cannot_run_while_generating,
+                cannot_run_while_loading,
+                no_game_loaded
             } rsn;
         };
     };
@@ -101,7 +151,16 @@ namespace server {
     NETCOM_PACKET(configure_generating) {};
 
     NETCOM_PACKET(configure_generated) {
-        // Send statistics about generated data
+        // TODO: Send statistics about generated data?
+        bool failed;
+        std::string reason;
+    };
+
+    NETCOM_PACKET(configure_loading) {};
+
+    NETCOM_PACKET(configure_loaded) {
+        bool failed;
+        std::string reason;
     };
 }
 }
