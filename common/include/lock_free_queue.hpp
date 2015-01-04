@@ -6,6 +6,7 @@
 
 namespace ctl {
     /// Thread safe and lock free FIFO queue.
+    /// Single Procuder, Single Consumer (SPSC).
     /** Note: implementation is from:
         http://www.drdobbs.com/parallel/writing-lock-free-code-a-corrected-queue/210604448
     **/
