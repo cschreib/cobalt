@@ -2,7 +2,9 @@
 
 namespace server {
 namespace state {
-    test::test(netcom& net, logger& out) : net_(net), out_(out), shcfg_(net, "test_shared") {
+    test::test(server::instance& serv) : base_impl(serv, "test"),
+        shcfg_(net_, "test_shared") {
+
         shcfg_.parse_from_file("server.conf");
         shcfg_.on_value_changed.connect([&](const std::string& n, const std::string& v) {
             out_.note("value changed: ", n, " = ", v);

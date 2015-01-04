@@ -7,17 +7,12 @@
 
 namespace server {
 namespace state {
-    class test : public server::state::base {
-    public :
-    private :
-        netcom& net_;
-        logger& out_;
-
+    class test : public base_impl<state_id::test> {
         scoped_connection_pool pool_;
         config::shared_state shcfg_;
 
     public :
-        test(netcom& net, logger& out);
+        explicit test(server::instance& serv);
     };
 }
 }
