@@ -13,3 +13,4 @@ bin/server/.gdb_history
 bin/client/.gdb_history
 bin/server/generators/*.so
 bin/server/generators/*.dll
+bin/server/saves/*
