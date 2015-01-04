@@ -16,6 +16,7 @@ public :
 
     template<typename T>
     T* load_function(const std::string& name) {
+        // TODO: find a way to make sure that the signature is right
         return (T*)load_symbol(name);
     }
 
