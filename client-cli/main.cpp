@@ -26,10 +26,10 @@ int main(int argc, const char* argv[]) {
     scoped_connection_pool pool;
 
     pool << net.watch_message([&](const message::unhandled_message& msg) {
-        cout.warning("unhandled message: ", msg.packet_id);
+        cout.warning("unhandled message: ", get_packet_name(msg.packet_id));
     });
     pool << net.watch_message([&](const message::unhandled_request& msg) {
-        cout.warning("unhandled request: ", msg.packet_id);
+        cout.warning("unhandled request: ", get_packet_name(msg.packet_id));
     });
 
     pool << net.watch_message([&](const message::server::connection_failed& msg) {
