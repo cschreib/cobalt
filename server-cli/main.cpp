@@ -14,19 +14,16 @@ void sigint_handler(int) {
 #endif
 
 int main(int argc, const char* argv[]) {
-    std::string state_conf_file = "server.conf";
+    std::string conf_file = "server.conf";
     if (argc > 1) {
-        state_conf_file = argv[1];
+        conf_file = argv[1];
     }
 
     bool stop = false;
     while (!stop) {
         config::state conf;
-        conf.parse_from_file("server.conf");
+        conf.parse_from_file(conf_file);
         cout.add_output<cout_logger>(conf);
-
-        config::state state_conf;
-        state_conf.parse_from_file(state_conf_file);
 
         server::instance serv(conf);
         gserv = &serv;
@@ -84,7 +81,7 @@ int main(int argc, const char* argv[]) {
             });
 
             std::string start_state = "configure";
-            state_conf.get_value("state", start_state, start_state);
+            conf.get_value("state", start_state, start_state);
             out.note("switching server to '", start_state, "' state");
 
             if (start_state == "configure") {
@@ -106,7 +103,7 @@ int main(int argc, const char* argv[]) {
             out.error("unhandled exception");
         }
 
-        conf.save_to_file("server.conf");
+        conf.save_to_file(conf_file);
 
         if (!stop) {
             out.note("restarting server in one second...");
