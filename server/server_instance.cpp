@@ -1,4 +1,5 @@
 #include "server_instance.hpp"
+#include "server_state_iddle.hpp"
 
 namespace server {
     instance::instance(config::state& conf) :
@@ -23,9 +24,11 @@ namespace server {
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::shutdown>&& req) {
-            shutdown();
             req.answer();
+            shutdown();
         });
+
+        set_state<server::state::iddle>();
     }
 
     logger& instance::get_log() {
