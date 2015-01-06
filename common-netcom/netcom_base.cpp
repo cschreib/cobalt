@@ -147,7 +147,7 @@ void netcom_base::process_packets() {
 
     // Process newly arrived packets
     in_packet_t p;
-    while (input_.pop(p)) {
+    while (input_.try_pop(p)) {
         netcom_impl::packet_type t;
         p >> t;
 

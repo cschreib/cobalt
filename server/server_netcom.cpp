@@ -268,7 +268,7 @@ namespace server {
 
             // Send packets to clients
             out_packet_t op;
-            while (output_.pop(op)) {
+            while (output_.try_pop(op)) {
                 if (op.to == all_actor_id) {
                     // Send to all clients
                     for (auto& c : connected_clients_) {

@@ -149,7 +149,7 @@ namespace client {
             // Send outgoing packets
             socket.setBlocking(true);
             out_packet_t op;
-            while (output_.pop(op)) {
+            while (output_.try_pop(op)) {
                 if (op.to == server_actor_id) {
                     switch (socket.send(op.impl)) {
                     case sf::Socket::Done : break;

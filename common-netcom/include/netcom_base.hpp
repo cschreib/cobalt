@@ -3,7 +3,7 @@
 
 #include <stdexcept>
 #include <variadic.hpp>
-#include <lock_free_queue.hpp>
+#include <tbb/concurrent_queue.h>
 #include <member_comparator.hpp>
 #include <sorted_vector.hpp>
 #include <unique_id_provider.hpp>
@@ -476,7 +476,10 @@ namespace watch_policy {
     not guaranteed to be thread safe, and doesn't use any thread.
     In particular, this is true for all the callback functions that are registered to requests,
     their answers or simple messages. These are called sequentially in process_packets(), in a
-    synchronous way.
+    synchronous way. Therefore, the code is thread safe either if 1) the callback is registerd by
+    the same thread that calls process_packets(); or 2) if the code in the callback is itself
+    thread safe.
+    Note however that it is perfectly safe to send messages from multiple threads.
 **/
 class netcom_base {
 public :
@@ -514,16 +517,25 @@ protected :
     logger& out_;
 
     /// Packet input queue
-    /** Filled by derivate when recieved from the network, consumed by netcom_base
-        (process_packets()).
+    /** Filled by derivate when received from the network, consumed by netcom_base
+        (process_packets()). Here we use the tbb::concurrent_queue, which is a multiple producer
+        multiple consumer (MPMC) queue. We do not need this property, as by design this queue
+        is filled and consumed by only two distinct threads, so a single producer single consumer
+        (SPSC) queue would work as well. We could use e.g. ctl::lock_free_queue, which is an SPSC
+        queue. Here however we stick to tbb::concurrent_queue because it is probably more robustly
+        tested. If ever it is found that important performance loss originates from this choice,
+        it will have to be reconsidered.
     **/
-    ctl::lock_free_queue<in_packet_t>  input_;
+    tbb::concurrent_queue<in_packet_t>  input_;
 
     /// Packet output queue
     /** Filled by netcom_base (send_message(), send_request()), consumed by derivate to send them
-        over the network.
+        over the network. Here we need the tbb::concurrent_queue, which is a multiple producer
+        multiple consumer (MPMC) queue, since multiple threads can send messages, etc., therefore
+        we do have multiple producers. We only have a single consumer though, but the tbb library
+        has no single consumer (MPSC) queue.
     **/
-    ctl::lock_free_queue<out_packet_t> output_;
+    tbb::concurrent_queue<out_packet_t> output_;
 
 private :
     using message_signal_t = netcom_impl::message_signal_t;

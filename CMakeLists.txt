@@ -62,6 +62,7 @@ set(BINARY_DIR "${PROJECT_SOURCE_DIR}/bin")
 find_package(SFML 2 COMPONENTS system network)
 find_package(LibClang 3)
 find_package(lxgui 1)
+find_package(TBB 4)
 
 if (UNIX)
     find_package(LibDL)
