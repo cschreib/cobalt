@@ -63,12 +63,14 @@ namespace packet {
             auto_kicked
         } rsn;
     };
+    NETCOM_PACKET(player_list_cleared) {};
 }
 
 struct player_collection_traits {
     using full_packet   = packet::player_list;
     using add_packet    = packet::player_connected;
     using remove_packet = packet::player_disconnected;
+    using clear_packet  = packet::player_list_cleared;
 };
 
 namespace server {

@@ -2,6 +2,8 @@
 #include <server_netcom.hpp>
 #include "client_player_list.hpp"
 #include <server_player_list.hpp>
+#include <server_state_test.hpp>
+#include <server_state_configure.hpp>
 #include <server_instance.hpp>
 #include <time.hpp>
 #include <log.hpp>
@@ -15,7 +17,9 @@ int main(int argc, const char* argv[]) {
     }
 
     config::state conf;
-    conf.parse(conf_file);
+    conf.parse_from_file(conf_file);
+    cout.add_output<cout_logger>(conf);
+    // cout.add_output<file_logger>(conf, "client");
 
     client::netcom net;
     conf.bind("netcom.debug_packets", net.debug_packets);
@@ -23,10 +27,10 @@ int main(int argc, const char* argv[]) {
     scoped_connection_pool pool;
 
     pool << net.watch_message([&](const message::unhandled_message& msg) {
-        cout.warning("unhandled message: ", msg.packet_id);
+        cout.warning("unhandled message: ", get_packet_name(msg.packet_id));
     });
     pool << net.watch_message([&](const message::unhandled_request& msg) {
-        cout.warning("unhandled request: ", msg.packet_id);
+        cout.warning("unhandled request: ", get_packet_name(msg.packet_id));
     });
 
     pool << net.watch_message([&](const message::server::connection_failed& msg) {
@@ -161,6 +165,7 @@ int main(int argc, const char* argv[]) {
     double start = now();
     double last = start;
     bool end = false;
+    bool done = false;
     while (net.is_running()) {
         sf::sleep(sf::milliseconds(5));
         net.process_packets();
@@ -192,32 +197,40 @@ int main(int argc, const char* argv[]) {
             });
         }
 
-        if (n - start > 3 && !end && behavior == "admin") {
-            end = true;
+        if (n - start > 3 && !done && behavior == "admin") {
+            done = true;
             pool << net.send_request(client::netcom::server_actor_id,
-                request::server::shutdown{},
-                [&](const client::netcom::request_answer_t<request::server::shutdown>& msg) {
-                    if (msg.failed) {
-                        if (msg.missing_credentials.empty()) {
-                            cout.error("server will not shutdown");
-                        } else {
-                            cout.error("insufficient credentials to shutdown server");
-                            cout.note("missing:");
-                            for (auto& c : msg.missing_credentials) {
-                                cout.note(" - ", c);
-                            }
-                        }
-                    } else {
-                        cout.note("server will shutdown soon!");
-                    }
-                }
+                request::server::configure_generate{},
+                [&](const client::netcom::request_answer_t<request::server::configure_generate>& msg) {}
             );
         }
+
+        // if (n - start > 3 && !end && behavior == "admin") {
+            // end = true;
+            // pool << net.send_request(client::netcom::server_actor_id,
+            //     request::server::shutdown{},
+            //     [&](const client::netcom::request_answer_t<request::server::shutdown>& msg) {
+            //         if (msg.failed) {
+            //             if (msg.missing_credentials.empty()) {
+            //                 cout.error("server will not shutdown");
+            //             } else {
+            //                 cout.error("insufficient credentials to shutdown server");
+            //                 cout.note("missing:");
+            //                 for (auto& c : msg.missing_credentials) {
+            //                     cout.note(" - ", c);
+            //                 }
+            //             }
+            //         } else {
+            //             cout.note("asked server to shutdown");
+            //         }
+            //     }
+            // );
+        // }s
     }
 
     std::cout << "stopped." << std::endl;
 
-    conf.save(conf_file);
+    conf.save_to_file(conf_file);
 
     return 0;
 }

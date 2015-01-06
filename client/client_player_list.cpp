@@ -42,6 +42,13 @@ namespace client {
                     players_.erase(iter);
                 });
 
+                collection_.on_clear.connect([this](const packet::player_list_cleared& p) {
+                    while (!players_.empty()) {
+                        on_player_disconnected.dispatch(players_.back());
+                        players_.pop_back();
+                    }
+                });
+
                 collection_.on_register_unhandled.connect([this]() {
                     on_connect_fail.dispatch();
                 });
@@ -81,6 +88,8 @@ namespace client {
     }
 
     void player_list::join_as(const std::string& name, const color32& col, bool as_ai) {
+        if (self_ != nullptr) return;
+
         if (collection_.is_connected()) {
             request_join_(name, col, as_ai);
         } else {
@@ -93,6 +102,8 @@ namespace client {
     }
 
     void player_list::leave() {
+        if (self_ == nullptr) return;
+
         pool_ << net_.send_request(client::netcom::server_actor_id,
             make_packet<request::client::leave_players>(),
             [this](const netcom::request_answer_t<request::client::leave_players>& msg) {

@@ -53,6 +53,7 @@ color32 operator * (const color32& c1, const color32& c2);
 color32 operator * (const color32& c1, float f);
 color32 operator * (float f, const color32& c2);
 
+std::string to_string(const color32& c);
 std::ostream& operator << (std::ostream& s, const color32& c);
 std::istream& operator >> (std::istream& s, color32& c);
 

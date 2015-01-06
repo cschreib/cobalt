@@ -13,6 +13,18 @@ namespace request {
         struct answer {};
         struct failure {};
     };
+
+    NETCOM_PACKET(get_shared_collection_id) {
+        std::string name;
+        struct answer {
+            shared_collection_id_t id;
+        };
+        struct failure {
+            enum class reason {
+                no_such_collection
+            } rsn;
+        };
+    };
 }
 
 namespace message {
@@ -23,6 +35,9 @@ namespace message {
         shared_collection_id_t id;
     };
     NETCOM_PACKET(shared_collection_remove) {
+        shared_collection_id_t id;
+    };
+    NETCOM_PACKET(shared_collection_clear) {
         shared_collection_id_t id;
     };
 }
@@ -98,6 +113,8 @@ namespace netcom_impl {
         using add_packet = typename T::add_packet;
         /// Message sent when an object is removed
         using remove_packet = typename T::remove_packet;
+        /// Message sent when the collection is cleared
+        using clear_packet = typename T::clear_packet;
     };
 
     class shared_collection_base {
@@ -116,9 +133,10 @@ namespace netcom_impl {
 
     public :
         const shared_collection_id_t id;
+        const std::string            name;
 
         shared_collection_base(shared_collection_factory& factory, netcom_base& net,
-            shared_collection_id_t id);
+            const std::string& name, shared_collection_id_t id);
 
         virtual ~shared_collection_base();
         void destroy();
@@ -143,6 +161,8 @@ namespace netcom_impl {
         using add_collection_element_packet = typename proxy::add_packet;
         /// Message sent when an object is removed
         using remove_collection_element_packet = typename proxy::remove_packet;
+        /// Message sent when the whole collection is cleared
+        using clear_collection_packet = typename proxy::clear_packet;
 
         void register_and_send_collection_(observe_request&& req) const override {
             register_collection_packet r;
@@ -165,7 +185,8 @@ namespace netcom_impl {
 
     public :
         shared_collection_impl(shared_collection_factory& factory, netcom_base& net,
-            shared_collection_id_t id) : shared_collection_base(factory, net, id) {}
+            const std::string& name, shared_collection_id_t id) :
+            shared_collection_base(factory, net, name, id) {}
 
         ctl::delegate<bool(const register_collection_packet& reg,
             register_collection_failed_packet& failure)> register_client;
@@ -196,12 +217,25 @@ namespace netcom_impl {
                 net_.send(p);
             }
         }
+
+        void clear() const {
+            if (!connected_) return;
+            auto p = net_.create_custom_message<message::shared_collection_remove>(
+                id, make_packet<clear_collection_packet>()
+            );
+
+            for (auto cid : clients_) {
+                p.to = cid;
+                net_.send(p);
+            }
+        }
     };
 
     class shared_collection_observer_dispatcher_base {
     protected :
         using add_message    = netcom_base::message_t<message::shared_collection_add>;
         using remove_message = netcom_base::message_t<message::shared_collection_remove>;
+        using clear_message  = netcom_base::message_t<message::shared_collection_clear>;
 
         netcom_base& net_;
 
@@ -215,6 +249,7 @@ namespace netcom_impl {
 
         virtual void add_item(const add_message& msg) = 0;
         virtual void remove_item(const remove_message& msg) = 0;
+        virtual void clear(const clear_message& msg) = 0;
     };
 
     template<typename ElementTraits>
@@ -225,11 +260,14 @@ namespace netcom_impl {
         using add_collection_element_packet = typename proxy::add_packet;
         /// Message sent when an object is removed
         using remove_collection_element_packet = typename proxy::remove_packet;
+        /// Message sent when an object is removed
+        using clear_collection_packet = typename proxy::clear_packet;
 
         friend class shared_collection_observer<ElementTraits>;
 
         signal_t<void(const add_collection_element_packet&)>    add_signal_;
         signal_t<void(const remove_collection_element_packet&)> remove_signal_;
+        signal_t<void(const clear_collection_packet&)>          clear_signal_;
 
     public :
         shared_collection_observer_dispatcher(netcom_base& net, shared_collection_id_t id) :
@@ -245,6 +283,12 @@ namespace netcom_impl {
             remove_collection_element_packet rem;
             msg.packet.view() >> rem;
             remove_signal_.dispatch(rem);
+        }
+
+        void clear(const clear_message& msg) override {
+            clear_collection_packet clr;
+            msg.packet.view() >> clr;
+            clear_signal_.dispatch(clr);
         }
 
         shared_collection_observer<ElementTraits> create_observer() {
@@ -416,6 +460,11 @@ public :
         check_();
         impl_->remove_item(std::forward<Args>(args)...);
     }
+
+    void clear() const {
+        check_();
+        impl_->clear();
+    }
 };
 
 template<typename ElementTraits>
@@ -426,6 +475,7 @@ class shared_collection_observer {
     using full_collection_packet = typename proxy::full_packet;
     using add_collection_element_packet = typename proxy::add_packet;
     using remove_collection_element_packet = typename proxy::remove_packet;
+    using clear_collection_packet = typename proxy::clear_packet;
 
     using observe_answer = netcom_base::request_answer_t<request::observe_shared_collection>;
 
@@ -486,6 +536,9 @@ public :
     /// Triggered when an item is removed from the collection.
     signal_t<void(const remove_collection_element_packet&)> on_remove_item;
 
+    /// Triggered when the collection is cleared.
+    signal_t<void(const clear_collection_packet&)> on_clear;
+
     template<typename T = register_collection_packet>
     void connect(actor_id_t aid, T&& arg = register_collection_packet()) {
         using ArgType = typename std::decay<T>::type;
@@ -527,6 +580,12 @@ public :
                     pool_ << dispatcher_->remove_signal_.connect(
                         [this](const remove_collection_element_packet& p) {
                             on_remove_item.dispatch(p);
+                        }
+                    );
+
+                    pool_ << dispatcher_->clear_signal_.connect(
+                        [this](const clear_collection_packet& p) {
+                            on_clear.dispatch(p);
                         }
                     );
 
@@ -582,7 +641,7 @@ public :
     explicit shared_collection_factory(netcom_base& net);
 
     template<typename T>
-    shared_collection<T> make_shared_collection() {
+    shared_collection<T> make_shared_collection(const std::string& name) {
         using collection_t = netcom_impl::shared_collection_impl<T>;
 
         shared_collection_id_t id;
@@ -590,9 +649,10 @@ public :
             throw shared_collection_exception::too_many_collections{};
         }
 
-        auto p = std::make_unique<collection_t>(*this, net_, id);
+        auto p = std::make_unique<collection_t>(*this, net_, name, id);
         collection_t* cptr = p.get();
         collections_.insert(std::move(p));
+
         return shared_collection<T>(*cptr);
     }
 

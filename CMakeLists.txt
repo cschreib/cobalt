@@ -61,6 +61,11 @@ set(BINARY_DIR "${PROJECT_SOURCE_DIR}/bin")
 
 find_package(SFML 2 COMPONENTS system network)
 find_package(LibClang 3)
+find_package(lxgui 1)
+
+if (UNIX)
+    find_package(LibDL)
+endif()
 
 # build the common library
 add_subdirectory(common)
@@ -78,6 +83,9 @@ add_subdirectory(client)
 # build server & client frontends
 add_subdirectory(server-cli)
 add_subdirectory(client-cli)
+
+# build generators
+add_subdirectory(generators/test)
 
 # enable documentation build
 add_custom_target(doxygen COMMAND doxygen doxygen.conf

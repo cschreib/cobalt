@@ -1,6 +1,7 @@
 #include "server_netcom.hpp"
 #include <config.hpp>
 #include <time.hpp>
+#include <string.hpp>
 
 namespace server {
     netcom::connected_client_t::connected_client_t(std::unique_ptr<sf::TcpSocket> s, actor_id_t i) :
@@ -33,6 +34,10 @@ namespace server {
         watch_message([this](const message::client_disconnected& msg) {
             clients_.erase(msg.id);
         });
+
+        std::string credential_link_file = "cred_links.conf";
+        conf.get_value("credential.links", credential_link_file, credential_link_file);
+        read_credential_links_(credential_link_file);
     }
 
     netcom::~netcom() {
@@ -361,14 +366,75 @@ namespace server {
         connected_clients_.erase(ic);
     }
 
-    credential_list_t netcom::get_missing_credentials_(actor_id_t cid,
-        const constant_credential_list_t& lst) {
+    void netcom::read_credential_links_(const std::string& file_name) {
+        std::ifstream file(file_name);
 
-        auto iter = clients_.find(cid);
-        if (iter == clients_.end()) {
-            throw netcom_exception::invalid_actor{};
+        std::string line;
+        std::size_t l = 0;
+        while (std::getline(file, line)) {
+            ++l;
+
+            line = string::trim(line);
+            if (line.empty() || line[0] == '#') continue;
+
+            auto spl = string::split(line, "->");
+            if (spl.size() != 2) {
+                out_.warning("ill-formed line is ignored in '", file_name, ":", l, "'");
+                out_.note(line);
+                continue;
+            }
+
+            credential_t c1 = string::trim(spl[0]);
+            auto iter = credential_links_.find(c1);
+            if (iter == credential_links_.end()) {
+                iter = credential_links_.insert({c1, {}});
+            }
+
+            credential_t c2 = string::trim(spl[1]);
+            iter->links.insert(c2);
+        }
+    }
+
+    bool netcom::credential_implies_(const credential_t& c1, const credential_t& c2) const {
+        if (c1 == c2) {
+            return true;
         }
 
-        return iter->cred.find_missing(lst);
+        auto iter = credential_links_.find(c1);
+        if (iter == credential_links_.end()) {
+            return false;
+        }
+
+        return iter->links.find(c2) != iter->links.end();
+    }
+
+    credential_list_t netcom::get_missing_credentials_(actor_id_t cid,
+        const constant_credential_list_t& lst) const {
+
+        const client_t& client = [&]() {
+            auto iter = clients_.find(cid);
+            if (iter == clients_.end()) {
+                throw netcom_exception::invalid_actor{};
+            }
+
+            return *iter;
+        }();
+
+        credential_list_t missing;
+
+        for (auto cc : lst) {
+            credential_t c = cc;
+
+            auto iter = std::find_if(client.cred.begin(), client.cred.end(),
+                [this,c](const credential_t& ic) {
+                return credential_implies_(ic, c);
+            });
+
+            if (iter == client.cred.end()) {
+                missing.grant(c);
+            }
+        }
+
+        return missing;
     }
 }

@@ -1,6 +1,8 @@
-#include "server_instance.hpp"
-#include "log.hpp"
-#include "config.hpp"
+#include <server_instance.hpp>
+#include <server_state_configure.hpp>
+#include <server_state_test.hpp>
+#include <log.hpp>
+#include <config.hpp>
 #include <signal.h>
 
 server::instance* gserv = nullptr;
@@ -12,10 +14,16 @@ void sigint_handler(int) {
 #endif
 
 int main(int argc, const char* argv[]) {
+    std::string conf_file = "server.conf";
+    if (argc > 1) {
+        conf_file = argv[1];
+    }
+
     bool stop = false;
     while (!stop) {
         config::state conf;
-        conf.parse("server.conf");
+        conf.parse_from_file(conf_file);
+        cout.add_output<cout_logger>(conf);
 
         server::instance serv(conf);
         gserv = &serv;
@@ -31,8 +39,6 @@ int main(int argc, const char* argv[]) {
             sigaction(SIGINT, nullptr, nullptr);
         });
         #endif
-
-        // player_list plist(net, conf);
 
         out.note("starting server");
 
@@ -74,6 +80,18 @@ int main(int argc, const char* argv[]) {
                 req.answer();
             });
 
+            std::string start_state = "configure";
+            conf.get_value("state", start_state, start_state);
+            out.note("switching server to '", start_state, "' state");
+
+            if (start_state == "configure") {
+                serv.set_state<server::state::configure>();
+            } else if (start_state == "test") {
+                serv.set_state<server::state::test>();
+            } else {
+                out.error("unknown state '", start_state, "'");
+            }
+
             serv.run();
 
             out.note("server stopped");
@@ -85,7 +103,7 @@ int main(int argc, const char* argv[]) {
             out.error("unhandled exception");
         }
 
-        conf.save("server.conf");
+        conf.save_to_file(conf_file);
 
         if (!stop) {
             out.note("restarting server in one second...");

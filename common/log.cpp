@@ -72,17 +72,4 @@ namespace color {
 
 #endif
 
-namespace logger_impl {
-    void print_stamp(std::ostream& o) {
-        o << "["+today_str("/")+"|"+time_of_day_str(":")+"] ";
-    }
-
-    void print_stamp_colored(std::ostream& o) {
-        o << color::set(color::normal,true) << "["
-            << color::set(color::cyan,true) << today_str("/")
-            << color::set(color::normal,true) << "|"
-            << color::set(color::green,true) << time_of_day_str(":")
-            << color::set(color::normal,true) << "] "
-            << color::set(color::normal,false);
-    }
-}
+logger_base::~logger_base() {}

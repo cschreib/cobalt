@@ -19,3 +19,7 @@ target_link_libraries(cobalt-server-cli cobalt-common-netcom)
 target_link_libraries(cobalt-server-cli cobalt-common)
 target_link_libraries(cobalt-server-cli ${SFML_NETWORK_LIBRARY})
 target_link_libraries(cobalt-server-cli ${SFML_SYSTEM_LIBRARY})
+
+if (UNIX)
+    target_link_libraries(cobalt-server-cli ${LIBDL_LIBRARY})
+endif()

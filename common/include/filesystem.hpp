@@ -4,8 +4,26 @@
 #include <string>
 #include <vector>
 
+class shared_library {
+private :
+    void* handle_ = nullptr;
+public :
+    explicit shared_library(const std::string& file);
+    ~shared_library();
+
+    bool open() const;
+    void* load_symbol(const std::string& sym);
+
+    template<typename T>
+    T* load_function(const std::string& name) {
+        // TODO: find a way to make sure that the signature is right
+        return (T*)load_symbol(name);
+    }
+
+    static const std::string file_extension;
+};
+
 namespace file {
-    bool library_exists(const std::string& file);
     bool exists(const std::string& file);
     std::vector<std::string> list_directories(const std::string& path = "");
     std::vector<std::string> list_files(const std::string& pattern = "*");

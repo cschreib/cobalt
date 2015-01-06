@@ -1,8 +1,14 @@
 #include "server_instance.hpp"
+#include "server_state_iddle.hpp"
 
 namespace server {
     instance::instance(config::state& conf) :
-        log_("server", conf), net_(conf, log_), shutdown_(false) {
+        log_([&]() {
+            logger log;
+            log.add_output<file_logger>(conf, "server");
+            log.add_output<cout_logger>(conf);
+            return log;
+        }()), net_(conf, log_), shutdown_(false) {
 
         pool_ << conf.bind("admin.password", admin_password_);
 
@@ -18,9 +24,11 @@ namespace server {
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::shutdown>&& req) {
-            shutdown();
             req.answer();
+            shutdown();
         });
+
+        set_state<server::state::iddle>();
     }
 
     logger& instance::get_log() {
@@ -45,15 +53,13 @@ namespace server {
             sf::sleep(sf::milliseconds(5));
 
             if (shutdown_) {
+                current_state_ = nullptr;
                 net_.shutdown();
                 shutdown_ = false;
             }
 
             // Receive and send packets
             net_.process_packets();
-            if (!net_.is_connected()) continue;
-
-            // Update server logic
         }
     }
 }
