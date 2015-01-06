@@ -38,7 +38,7 @@ namespace ctl {
         /** It derives from std::exception : use what() to have the error message.
         */
         struct wrong_structure_exception : public std::exception {
-            wrong_structure_exception(const std::string& message) : message(message) {}
+            explicit wrong_structure_exception(const std::string& message) : message(message) {}
             wrong_structure_exception(const wrong_structure_exception&) = default;
             wrong_structure_exception(wrong_structure_exception&&) = default;
             virtual ~wrong_structure_exception() noexcept {}
@@ -47,12 +47,12 @@ namespace ctl {
         };
 
         struct expecting_branch_exception : public wrong_structure_exception {
-            expecting_branch_exception(const std::string& where) :
+            explicit expecting_branch_exception(const std::string& where) :
                 wrong_structure_exception("expecting '"+where+"' to be a branch") {}
         };
 
         struct expecting_leaf_exception : public wrong_structure_exception {
-            expecting_leaf_exception(const std::string& where) :
+            explicit expecting_leaf_exception(const std::string& where) :
                 wrong_structure_exception("expecting '"+where+"' to be a leaf") {}
         };
 
