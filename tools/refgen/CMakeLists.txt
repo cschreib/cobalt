@@ -17,6 +17,10 @@ target_link_libraries(refgen ${CLANG_LIBS})
 target_link_libraries(refgen ${SFML_NETWORK_LIBRARY})
 target_link_libraries(refgen ${SFML_SYSTEM_LIBRARY})
 
+if (UNIX)
+    target_link_libraries(refgen ${LIBDL_LIBRARY})
+endif()
+
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     set(REFGEN_BUILD_TYPE "debug")
 else()
