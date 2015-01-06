@@ -19,6 +19,8 @@ namespace space {
         struct base : public std::runtime_error {
             explicit base(const std::string& s);
             explicit base(const char* s);
+            base(const base& b) = default;
+            base(base&& b) = default;
             virtual ~base() noexcept;
         };
 
