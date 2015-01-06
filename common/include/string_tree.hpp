@@ -39,8 +39,10 @@ namespace ctl {
         */
         struct wrong_structure_exception : public std::exception {
             wrong_structure_exception(const std::string& message) : message(message) {}
-            virtual ~wrong_structure_exception() throw() {}
-            const char* what() const throw() override { return message.c_str(); }
+            wrong_structure_exception(const wrong_structure_exception&) = default;
+            wrong_structure_exception(wrong_structure_exception&&) = default;
+            virtual ~wrong_structure_exception() noexcept {}
+            const char* what() const noexcept override { return message.c_str(); }
             std::string message;
         };
 

@@ -71,6 +71,8 @@ namespace netcom_exception {
     struct base : public std::runtime_error {
         explicit base(const std::string& s);
         explicit base(const char* s);
+        explicit base(const base& b) = default;
+        explicit base(base&& b) = default;
         virtual ~base() noexcept;
     };
 
