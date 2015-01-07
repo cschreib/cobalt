@@ -4,6 +4,7 @@
 #include "server_netcom.hpp"
 #include "server_state.hpp"
 #include "config_shared_state.hpp"
+#include <thread>
 
 namespace server {
 namespace state {
@@ -22,6 +23,7 @@ namespace state {
         scoped_connection_pool pool_;
         scoped_connection_pool rw_pool_;
 
+        std::thread thread_;
 
         generator_list_t available_generators_;
         bool generating_ = false;
@@ -35,6 +37,7 @@ namespace state {
 
     public :
         explicit configure(server::instance& serv);
+        ~configure();
 
         void update_generator_list();
         bool set_generator(const std::string& id);

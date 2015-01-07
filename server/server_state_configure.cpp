@@ -39,6 +39,7 @@ namespace state {
             } catch (request::server::configure_generate::failure::reason rsn) {
                 req.fail(rsn);
             } catch (...) {
+                out_.error("unexpected exception in configure::generate()");
                 throw;
             }
         });
@@ -62,6 +63,7 @@ namespace state {
             } catch (request::server::configure_load_game::failure::reason rsn) {
                 req.fail(rsn);
             } catch (...) {
+                out_.error("unexpected exception in configure::load_saved_game()");
                 throw;
             }
         });
@@ -74,9 +76,14 @@ namespace state {
             } catch (request::server::configure_run_game::failure::reason rsn) {
                 req.fail(rsn);
             } catch (...) {
+                out_.error("unexpected exception in configure::run_game()");
                 throw;
             }
         });
+    }
+
+    configure::~configure() {
+        if (thread_.joinable()) thread_.join();
     }
 
     void configure::update_saved_game_list() {
@@ -158,8 +165,9 @@ namespace state {
             throw failure::invalid_generator;
         }
 
-        auto* fun = lib.load_function<bool(const char*, char**)>("generate_universe");
-        if (!fun) {
+        auto* generate_universe = lib.load_function<bool(const char*, char**)>("generate_universe");
+        auto* free_error = lib.load_function<void(char*)>("free_error");
+        if (!generate_universe || !free_error) {
             throw failure::invalid_generator;
         }
 
@@ -189,6 +197,7 @@ namespace state {
 
         pool_ << net_.watch_message<watch_policy::once>(
             [this](message::server::configure_generated msg) {
+            out_.print("ok");
             generating_ = false;
 
             if (msg.failed) {
@@ -207,9 +216,10 @@ namespace state {
             }
         });
 
-        // TODO: run that in a thread
-        // TODO: Modify net_.output_ to be a MPSC queue instead of SPSC
-        {
+        out_.print("hum?!");
+        if (thread_.joinable()) thread_.join();
+        out_.print("hum?!");
+        thread_ = std::thread([this, serialized_config, generate_universe, free_error](shared_library) {
             char* errmsg = nullptr;
             bool ret = false;
 
@@ -228,15 +238,12 @@ namespace state {
                 net_.send_message(server::netcom::all_actor_id, msg);
 
                 if (errmsg != nullptr) {
-                    free(errmsg);
+                    (*free_error)(errmsg);
                 }
             });
 
-            // TODO: find out how to make this safer
-            // I.e. what happens if this function crashes?
-            // Try to make it thow an exception of some sort
-            ret = (*fun)(serialized_config.c_str(), &errmsg);
-        }
+            ret = (*generate_universe)(serialized_config.c_str(), &errmsg);
+        }, std::move(lib));
     }
 
     void configure::load_saved_game(const std::string& dir, bool just_generated) {
@@ -265,9 +272,8 @@ namespace state {
             rw_pool_.unblock_all();
         });
 
-        // TODO: run that in a thread
-        // TODO: Modify net_.output_ to be a MPSC queue instead of SPSC
-        {
+        if (thread_.joinable()) thread_.join();
+        thread_ = std::thread([this, dir]() {
             // Use a scoped lambda to make this exception safe
             auto scoped = ctl::make_scoped([&]() {
                 message::server::configure_loaded msg;
@@ -276,7 +282,7 @@ namespace state {
 
             // TODO: implement this
             // Read data from directory, load game into memory
-        }
+        });
     }
 
     void configure::run_game() {
