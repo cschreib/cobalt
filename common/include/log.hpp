@@ -193,21 +193,27 @@ private :
     }
 
     template<typename T>
-    void do_print__(const T& t, std::true_type) {
+    void do_print__(const T& t, std::true_type, std::false_type) {
         using std::to_string;
         forward_print_(to_string(t));
     }
 
     template<typename T>
-    void do_print__(const T& t, std::false_type) {
+    void do_print__(const T& t, std::false_type, std::false_type) {
         std::ostringstream ss;
         ss << t;
         forward_print_(ss.str());
     }
 
+    template<typename T, typename TS>
+    void do_print__(const T& t, TS, std::true_type) {
+        using std::to_string;
+        forward_print_(to_string(static_cast<typename std::underlying_type<T>::type>(t)));
+    }
+
     template<typename T>
     void print__(const T& t) {
-        do_print__(t, logger_impl::has_to_string<T>{});
+        do_print__(t, logger_impl::has_to_string<T>{}, std::is_enum<T>{});
     }
 
     void print__(const std::string& str) {
