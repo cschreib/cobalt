@@ -197,7 +197,6 @@ namespace state {
 
         pool_ << net_.watch_message<watch_policy::once>(
             [this](message::server::configure_generated msg) {
-            out_.print("ok");
             generating_ = false;
 
             if (msg.failed) {
@@ -216,9 +215,7 @@ namespace state {
             }
         });
 
-        out_.print("hum?!");
         if (thread_.joinable()) thread_.join();
-        out_.print("hum?!");
         thread_ = std::thread([this, serialized_config, generate_universe, free_error](shared_library) {
             char* errmsg = nullptr;
             bool ret = false;
