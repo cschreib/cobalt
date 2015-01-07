@@ -3,6 +3,7 @@
 
 #include <string>
 #include <fstream>
+#include <sstream>
 #include <iostream>
 #include "time.hpp"
 #include "scoped_connection_pool.hpp"
@@ -153,6 +154,28 @@ public :
     }
 };
 
+namespace logger_impl {
+    template<typename T>
+    struct has_std_to_string_t {
+        template <typename U> static std::true_type  dummy(typename std::decay<
+            decltype(std::to_string(std::declval<U>()))>::type*);
+        template <typename U> static std::false_type dummy(...);
+        using type = decltype(dummy<T>(0));
+    };
+
+    template<typename T>
+    struct has_adl_to_string_t {
+        template <typename U> static std::true_type  dummy(typename std::decay<
+            decltype(to_string(std::declval<U>()))>::type*);
+        template <typename U> static std::false_type dummy(...);
+        using type = decltype(dummy<T>(0));
+    };
+
+    template<typename T>
+    using has_to_string = std::integral_constant<bool, has_std_to_string_t<T>::type::value ||
+                                                       has_adl_to_string_t<T>::type::value>;
+}
+
 class logger {
     std::vector<std::unique_ptr<logger_base>> out_;
 
@@ -170,9 +193,21 @@ private :
     }
 
     template<typename T>
-    void print__(const T& t) {
+    void do_print__(const T& t, std::true_type) {
         using std::to_string;
         forward_print_(to_string(t));
+    }
+
+    template<typename T>
+    void do_print__(const T& t, std::false_type) {
+        std::ostringstream ss;
+        ss << t;
+        forward_print_(ss.str());
+    }
+
+    template<typename T>
+    void print__(const T& t) {
+        do_print__(t, logger_impl::has_to_string<T>{});
     }
 
     void print__(const std::string& str) {
