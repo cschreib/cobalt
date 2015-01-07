@@ -8,8 +8,15 @@ class shared_library {
 private :
     void* handle_ = nullptr;
 public :
+    shared_library() = default;
     explicit shared_library(const std::string& file);
     ~shared_library();
+
+    shared_library(const shared_library&) = delete;
+    shared_library& operator=(const shared_library&) = delete;
+
+    shared_library(shared_library&&);
+    shared_library& operator=(shared_library&&);
 
     bool open() const;
     void* load_symbol(const std::string& sym);

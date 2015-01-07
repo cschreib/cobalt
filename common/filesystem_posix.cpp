@@ -245,7 +245,19 @@ shared_library::shared_library(const std::string& file) {
 }
 
 shared_library::~shared_library() {
-    dlclose(handle_);
+    if (handle_) {
+        dlclose(handle_);
+    }
+}
+
+shared_library::shared_library(shared_library&& s) : handle_(s.handle_) {
+    s.handle_ = nullptr;
+}
+
+shared_library& shared_library::operator=(shared_library&& s) {
+    handle_ = s.handle_;
+    s.handle_ = nullptr;
+    return *this;
 }
 
 bool shared_library::open() const {
