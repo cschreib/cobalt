@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.6)
 project(generator-test)
 
-include_directories(${PROJECT_SOURCE_DIR}/..)
+include_directories(${PROJECT_SOURCE_DIR}/../include)
 include_directories(${PROJECT_SOURCE_DIR}/../../common/include)
 include_directories(${PROJECT_SOURCE_DIR}/../../common-netcom/include)
 include_directories(${PROJECT_SOURCE_DIR}/../../server/include)
