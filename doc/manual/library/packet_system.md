@@ -20,11 +20,11 @@
 
 ## Forewords
 
-For network communication, _cobalt_ uses the TCP protocol and a packet based system. The interface is client/server agnostic, i.e. it does not rely on the existence of a "server" and a "client", and more generically considers the interactions between different _actors_, each identified by its _actor ID_. However, for the sake of clarity and because _cobalt_ uses a client/server architecture, we will most of the time give examples with two actors named "client" and "server" in what follows.
+For network communication, _cobalt_ uses the TCP protocol and a packet based system. The network interface is client/server agnostic, i.e. it does not rely on the existence of a "server" and a "client", and more generically considers the interactions between different _actors_, each identified by its _actor ID_. However, for the sake of clarity and because _cobalt_ uses a client/server architecture, we will most of the time give examples with two actors named "client" and "server" in what follows.
 
 ## The `netcom_base` class
 
-To communicate over the network, all actors use the `netcom_base` class. This is an abstract class that only provides the communication interface: the actual connection to the network and sending of data is handled by a implementation class derived from `netcom_base`, and which may be specific to the actor. For example, the implementation is different between the server and the clients: the server accepts multiple incoming connections from different clients, while clients are simply connected to the server and will therefore only communicate with it directly. In the examples that follow, we will consider that each actor has its own instance of `netcom_base`, and we will refer to it as the `net` object.
+To communicate over the network, all actors use the `netcom_base` class. This is an abstract class that only provides the communication interface: the actual connection to the network and sending of data is handled by an implementation class derived from `netcom_base`, and which may be specific to the actor. For example, the implementation is different between the server and the clients: the server accepts multiple incoming connections from different clients, while clients are simply connected to the server and will therefore only communicate with it directly. In the examples that follow, we will consider that each actor has its own instance of `netcom_base`, and we will refer to it as the `net` object.
 
 ## Messages
 
@@ -45,9 +45,9 @@ You may refer to the [SFML documentation](http://sfml-dev.org/documentation/2.0/
 
 However, when a packet is sent this way from one actor to another, the recipient needs to know how to interpret the received data: is this a chat message, the username and password of a client, or something else?
 
-To disentangle between all the possibilities, we need to append at the beginning of each packet an integer that uniquely identifies the packet type. This number is called the _packet ID_. For example, all packets containing a message to be displayed in the chat would have ID `0`, while all packets containing a client's credentials would have ID `1`, and so on and so forth. Therefore, when the server receives a packet from a client, it first reads the packet ID from the received packet, and it can then forward the handling of this packet to the corresponding function.
+To disentangle between all the possibilities, we need to append at the beginning of each packet an integer that uniquely identifies the packet type. This number is called the _packet ID_. For example, all packets containing a message to be displayed in the chat would have ID `0`, while all packets containing a client's credentials would have ID `1`, and so on and so forth. Therefore, when the server receives a packet from a client, it first reads the packet ID from the received packet, and it can then forward the handling of this packet to the proper callback function.
 
-Let's consider a simple example. A client wants to send a packet to the server to display a simple text message in the chat. We will call this packet `send_chat_message`. In practice, one first needs to define the packet type. It is mandatory to put it inside the `message` namespace (it is allowed to used nested namespaces as well, e.g. `message::chat` if you wish). This is done with the macro `NETCOM_PACKET`:
+Let's consider a simple example. A client wants to send a packet to the server to display a simple text message in the chat. The chat system has various "channels" that are used to group discussions, so the packet will also contain the ID of the channel the message has to be sent to. We will call this packet `send_chat_message`. In practice, one first needs to define the packet type. It is mandatory to put it inside the `message` namespace (it is allowed to used nested namespaces as well, e.g. `message::chat` if you wish). This is done with the macro `NETCOM_PACKET`:
 
 ```c++
 namespace message {
@@ -69,7 +69,7 @@ net.send_message(
 );
 ```
 
-Here we are sending the text "hello world!!!" on the 3rd chat channel. On the other side, the server has to react when it receives such a packet. To do so, we register a handling function using the `netcom_base::watch_message(F&&)`:
+Here we are sending the text "hello world!!!" on the 3rd chat channel. On the other side, the server has to react when it receives such a packet. To do so, we register a callback function using the `netcom_base::watch_message(F&&)`:
 
 ```c++
 net.watch_message(
@@ -83,7 +83,7 @@ net.watch_message(
 );
 ```
 
-The above code is fine, but may introduce some bugs if, for some reason, the object pointed by `this` is destroyed. In this case, and if the `netcom_base` class receives a new packet, it will try to invoke the above function, and the program will crash because `this` does not exist anymore. To prevent this, the `watch_message` function returns a _connection object_ (see the signal/slot manual), that can be stored inside a `scoped_connection_pool`:
+The above code is fine, but may introduce some bugs if, for some reason, the object pointed by `this` is destroyed. In this case, and if the `netcom_base` class receives a new packet, it will try to invoke the above function, and the program will crash because `this` does not exist anymore. To prevent this, the `watch_message` function returns a _connection object_ (see the signal/slot manual), that can be used to control the lifetime of this callback function. For example, it can be stored inside a `scoped_connection_pool`:
 
 ```c++
 class channel_manager {
@@ -91,7 +91,7 @@ class channel_manager {
 
     channel& get_chat_channel(std::uint8_t id);
 
-public :
+public:
     channel_manager(netcom_base& net) {
         pool << net.watch_message([this](const message::send_chat_message& msg) {
             channel& c = this->get_chat_channel(msg.channel);
@@ -101,7 +101,7 @@ public :
 };
 ```
 
-On some occasions, it may be useful to know which actor the message came from. In our example, we may want to append the username of the client to the chat message. This is done by modifying the argument of the handling lambda function and wrapping the packet_type inside a `netcom_base::message_t<T>` that gives you access to the underlying `netcom_base::in_packet_t`:
+On some occasions, it may be useful to know which actor the message came from. In our example, we may want to append the username of the client to the chat message. We can get this information simply by modifying the argument of the handling lambda function, wrapping the type of the packet inside a `netcom_base::message_t<...>`. This gives us access to the raw `netcom_base::in_packet_t` that was received:
 
 ```c++
 pool << net.watch_message([this](const netcom_base::message_t<message::send_chat_message>& msg) {
@@ -114,7 +114,7 @@ pool << net.watch_message([this](const netcom_base::message_t<message::send_chat
 });
 ```
 
-With this alternative syntax, the packet data is available in `msg.arg`. Not only does this allow you to get the actor ID of the sender (`msg.packet.from`), but it allows you to perform additional read operations on the received packet (`msg.packet`). This is useful if you happen to need a packet that has no fixed structure, and that has to be read dynamically. Because it is less efficient and more error prone, this should be avoided as much as possible, but there are some cases where it might be the best available solution.
+With this alternative syntax, the deserialized packet data is available in `msg.arg`, and the raw packet is exposed as `msg.packet`. Not only does this allow us to get the actor ID of the sender (`msg.packet.from`), but it also allows us to perform additional read operations on the raw packet. This is useful if one happens to need a packet that has no fixed structure, and that has to be read dynamically. Because it is less efficient and more error prone, this should be avoided as much as possible, but there are some cases where it might be the best available solution.
 
 Lastly, there are different _watch policies_. The default is `watch_policy::none`, and it implies that the registered handling function will be called as long as the connection object is alive (i.e. in our example as long as the `channel_manager` is alive). Sometimes this is not a desirable behavior. Let us consider another example where the client just connected to the server, and awaits the greeting message:
 
@@ -141,7 +141,7 @@ This way, the function will be called at most once, and then it will be removed 
 
 This is the simplest form of communication that is exposed through the _cobalt_ interface: one actor sending some information to another. Packets sent this way are called _messages_. When an actor sends a message to another, it does not care whether the other actor has properly received it or not, nor does it expect any answer: the packet just carries an information, and it's totally up to the receiver to decide what to do with it.
 
-Therefore, it is possible for the receiver to register multiple functions to call when receiving a given message. They will just be called sequentially.
+Therefore, it is possible for the receiver to register multiple functions to call when receiving a given message. They will just be called sequentially, following the order in which they were registered.
 
 ## Requests
 
@@ -154,9 +154,9 @@ When a request is issued, the sender expects to receive some other packet in ret
 3. _Failed request_: the receiver could not issue this request because of some other reason. For example, a client asks the server to move a ship to an invalid position.
 4. _The actual answer_.
 
-As for messages, requests are identified using a unique packet ID. However, when the return packet is received, the sender may have already issued several other requests, so there must be a way to unambiguously match the return packet to the corresponding handling code. To do so, the sender assigns a _request ID_ to his original request, that the receiver will also attach to the return packet. This ID is unique from the point of view of the sender only, and it completely orthogonal to the packet ID. For example, if the sender sends two requests to move two ships, the packet ID will be the same, but each will have a different request ID. A consequence of this system is that the receiver may only register _one_ function to handle all given requests of the same type, else the sender would receive multiple answers without knowing which is the right one.
+As for messages, requests are identified using a unique packet ID. To send a request, one also has to register a callback function, that will be called when the answer to this request is received. However, when this happens, the sender may have issued several other similar requests in the mean time, so there must be a way to unambiguously match this return packet to the exact callback function that was registered with this request. To do so, the sender assigns a _request ID_ to his original request, that the receiver will also attach to the return packet. This ID is unique from the point of view of the sender only, and has nothing to do with the packet ID. For example, if the sender sends two requests to move two ships, the packet ID will be the same, but each will have a different request ID. A consequence of this system is that the receiver may only register _one_ function to handle all given requests of the same type, else the sender would receive multiple answers without knowing which one to pick.
 
-Again, let us consider an example where a client wants the server to send him the list of ships that are located at a given position.
+Again, let us consider an example. A client wants the server to send him the list of all ships that are located at a given position.
 
 Declaring a request packet is similar to a message packet, the only differences being that requests may have credential requirements, and that they also need to define the packet structure of the possible answers. In our example, we will call the request packet `send_object_list_at_position`. Here also, it is mandatory to put the packet declaration inside the `request` namespace, and the declaration is made using the `NETCOM_PACKET` macro:
 
@@ -238,7 +238,7 @@ pool << net.send_request(
 );
 ```
 
-Here we may have the same problem as when receiving messages, that the `this` pointer may not point to valid memory when the answer is received. Again, this is solved by returning a connection object that can be stored inside a `scoped_connection_pool` (see the previous section).
+Here we may have the same problem as when receiving messages, that the `this` pointer may not point to valid memory when the answer is received. Similarly, this is solved by using the connection object returned by `send_request`, for example by storing it in a `scoped_connection_pool` (see the previous section).
 
 The server must then register the corresponding handling code using `netcom_base::watch_request`:
 
@@ -261,9 +261,9 @@ pool << net.watch_request(
 );
 ```
 
-The handling code has to answer the request. Either by calling `request_t::answer()` with the answer data in argument, or by calling `request_t::fail()` to inform the sender that the request could not be issued. These functions will take care of sending back the appropriate packets.
+The handling code _has_ to answer the request somehow. Either by calling `request_t::answer()` with the answer data in argument, or by calling `request_t::fail()` to inform the sender that the request could not be issued. These functions will take care of sending back the appropriate packets.
 
-In this case, the request did not declare any necessary credentials, so any client can issue it and, if the server can, it will answer. Now we will consider another example of a request with required credentials: a client requesting the server to shutdown, and this is only allowed for administrators. Credentials are specified as simple strings. In this case, the _administrator_ credential is called `"admin"`. The only thing to do is to use the `NETCOM_REQUIRES` macro to list the required credentials:
+In this case, the request did not declare any necessary credentials, so any client can issue it and, if the server can, it will answer. To illustrate the credentials system, we will consider another example: a request to shutdown the server, which is only available to administrators. Credentials are specified as simple strings. In this case, the _administrator_ credential is called `"admin"`. The only thing to do is to use the `NETCOM_REQUIRES` macro to list the required credentials:
 
 ```c++
 namespace request {
