@@ -327,7 +327,7 @@ The output queue is filled by the `netcom_base` class itself when sending messag
 
 On the other hand, the input queue is consumed by the `netcom_base` class inside the `netcom_base::process_packets()` function, and is filled by the implementation whenever a packet is received from the network.
 
-Because both queues are declared as `ctl::lock_free_queue<>`, they can be manipulated in a thread safe way. Therefore, all the "true" network communication (i.e. physical sending and receiving of packets) can be done in a separate thread within the implementation class, in order not to block the whole program if the internet is slow.
+Both queues are declared as `tbb::concurrent_queue<...>`, so that they can be manipulated in a thread safe way. Therefore, all the "true" network communication (i.e. "physical" sending and receiving of packets) can be done in a separate thread within the implementation class, in order not to block the whole program if the network is slow. A nice side effect is that it is perfectly safe to send messages from multiple threads, but note however that this is the _only_ thread safe operation in the public API of `netcom_base`: sending requests, or registering message callbacks, is currently _not_ thread safe, and can only be done by the thread that owns the `netcom_base` instance.
 
 ## Packets
 
