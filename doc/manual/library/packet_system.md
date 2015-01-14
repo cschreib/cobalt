@@ -1,17 +1,17 @@
 # Table of content
 
-<!-- MarkdownTOC autolink=true -->
+<!-- MarkdownTOC autolink=true bracket=round -->
 
-- [The interface][the-interface]
-    - [Forewords][forewords]
-    - [The `netcom_base` class][the-netcom_base-class]
-    - [Messages][messages]
-    - [Requests][requests]
-- [The implementation][the-implementation]
-    - [The `netcom_base` class][the-netcom_base-class-1]
-    - [Packets][packets]
-    - [Messages][messages-1]
-    - [Requests][requests-1]
+- [The interface](#the-interface)
+    - [Forewords](#forewords)
+    - [The `netcom_base` class](#the-netcom_base-class)
+    - [Messages](#messages)
+    - [Requests](#requests)
+- [The implementation](#the-implementation)
+    - [The `netcom_base` class](#the-netcom_base-class-1)
+    - [Packets](#packets)
+    - [Messages](#messages-1)
+    - [Requests](#requests-1)
 
 <!-- /MarkdownTOC -->
 
