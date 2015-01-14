@@ -128,7 +128,7 @@ namespace netcom_impl {
         ctl::sorted_vector<actor_id_t> clients_;
         bool connected_ = false;
 
-        virtual void register_and_send_collection_(observe_request&& req) const = 0;
+        virtual void register_and_send_collection_(observe_request& req) const = 0;
         virtual void check_valid_() const = 0;
 
     public :
@@ -143,7 +143,7 @@ namespace netcom_impl {
         void connect();
         void disconnect();
         bool is_connected() const;
-        void register_client(observe_request&& req);
+        void register_client(observe_request& req);
         void unregister_client(actor_id_t cid);
     };
 
@@ -164,7 +164,7 @@ namespace netcom_impl {
         /// Message sent when the whole collection is cleared
         using clear_collection_packet = typename proxy::clear_packet;
 
-        void register_and_send_collection_(observe_request&& req) const override {
+        void register_and_send_collection_(observe_request& req) const override {
             register_collection_packet r;
             register_collection_failed_packet rf;
             req.packet >> r;

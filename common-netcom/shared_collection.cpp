@@ -28,10 +28,9 @@ namespace netcom_impl {
         return connected_;
     }
 
-    void shared_collection_base::register_client(observe_request&& req) {
+    void shared_collection_base::register_client(observe_request& req) {
         if (connected_) {
-            // TODO: remove the rvalue ref, they are misleading here
-            register_and_send_collection_(std::move(req));
+            register_and_send_collection_(req);
             if (!req.failed()) {
                 clients_.insert(req.packet.from);
             }
@@ -68,7 +67,7 @@ shared_collection_factory::shared_collection_factory(netcom_base& net) : net_(ne
         [this](netcom_base::request_t<request::observe_shared_collection>&& req) {
             auto iter = collections_.find(req.arg.id);
             if (iter != collections_.end()) {
-                (*iter)->register_client(std::move(req));
+                (*iter)->register_client(req);
             } else {
                 req.unhandle();
             }
