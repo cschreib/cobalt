@@ -1,1 +1,11 @@
-* text=auto
+*        -text
+
+LICENSE   text
+README    text
+*.txt     text
+*.cpp     text
+*.hpp     text
+*.xml     text
+*.lua     text
+*.conf    text
+*.cmake   text
