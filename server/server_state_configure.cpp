@@ -36,8 +36,8 @@ namespace state {
             try {
                 generate();
                 req.answer();
-            } catch (request::server::configure_generate::failure::reason rsn) {
-                req.fail(rsn);
+            } catch (request::server::configure_generate::failure& fail) {
+                req.fail(std::move(fail));
             } catch (...) {
                 out_.error("unexpected exception in configure::generate()");
                 throw;
@@ -60,8 +60,8 @@ namespace state {
             try {
                 load_saved_game(req.arg.save, false);
                 req.answer();
-            } catch (request::server::configure_load_game::failure::reason rsn) {
-                req.fail(rsn);
+            } catch (request::server::configure_load_game::failure& fail) {
+                req.fail(std::move(fail));
             } catch (...) {
                 out_.error("unexpected exception in configure::load_saved_game()");
                 throw;
@@ -73,8 +73,8 @@ namespace state {
             try {
                 run_game();
                 req.answer();
-            } catch (request::server::configure_run_game::failure::reason rsn) {
-                req.fail(rsn);
+            } catch (request::server::configure_run_game::failure& fail) {
+                req.fail(std::move(fail));
             } catch (...) {
                 out_.error("unexpected exception in configure::run_game()");
                 throw;
@@ -86,13 +86,13 @@ namespace state {
         if (thread_.joinable()) thread_.join();
     }
 
+    bool configure::is_saved_game_(const std::string& file) const {
+        // TODO: do that
+        return true;
+    }
+
     void configure::update_saved_game_list() {
         saved_games_.clear();
-
-        auto is_save = [](const std::string& save) {
-            // TODO: do that
-            return true;
-        };
 
         auto saves = file::list_directories("saves/");
         auto iter = std::find(saves.begin(), saves.end(), "generated");
@@ -100,14 +100,14 @@ namespace state {
             saves.erase(iter);
             auto gens = file::list_directories("saves/generated/");
             for (auto& s : gens) {
-                if (is_save("saves/generated/"+s)) {
+                if (is_saved_game_("saves/generated/"+s)) {
                     saved_games_.insert("generated/"+s);
                 }
             }
         }
 
         for (auto& s : saves) {
-            if (is_save("saves/"+s)) {
+            if (is_saved_game_("saves/"+s)) {
                 saved_games_.insert(s);
             }
         }
@@ -145,30 +145,44 @@ namespace state {
     }
 
     void configure::generate() {
-        using failure = request::server::configure_generate::failure::reason;
+        using failure = request::server::configure_generate::failure;
 
         if (generating_) {
-            throw failure::already_generating;
+            throw failure{failure::reason::already_generating, ""};
         }
 
         if (loading_) {
-            throw failure::cannot_generate_while_loading;
+            throw failure{failure::reason::cannot_generate_while_loading, ""};
         }
 
         if (generator_.empty()) {
-            throw failure::no_generator_set;
+            throw failure{failure::reason::no_generator_set, ""};
         }
 
         // Load generator
-        shared_library lib("generators/"+generator_);
+        std::string lib_file = "generators/"+generator_;
+        if (!file::exists(lib_file)) {
+            throw failure{failure::reason::invalid_generator,
+                "file could not be found"};
+        }
+
+        shared_library lib(lib_file);
         if (!lib.open()) {
-            throw failure::invalid_generator;
+            throw failure{failure::reason::invalid_generator,
+                "file is not a dynamic library"};
         }
 
         auto* generate_universe = lib.load_function<bool(const char*, char**)>("generate_universe");
+        if (!generate_universe) {
+            throw failure{failure::reason::invalid_generator,
+                "library does not contain the 'generate_universe' function"};
+        }
+
+
         auto* free_error = lib.load_function<void(char*)>("free_error");
-        if (!generate_universe || !free_error) {
-            throw failure::invalid_generator;
+        if (!free_error) {
+            throw failure{failure::reason::invalid_generator,
+                "library does not contain the 'free_error' function"};
         }
 
         // Serialize config
@@ -196,17 +210,40 @@ namespace state {
         generating_ = true;
 
         pool_ << net_.watch_message<watch_policy::once>(
-            [this](message::server::configure_generated msg) {
+            [this](message::server::configure_generated_internal msg) {
+
             generating_ = false;
 
             if (msg.failed) {
+                message::server::configure_generated out_msg;
+                out_msg.failed = true; out_msg.reason = msg.reason;
+                net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
                 rw_pool_.unblock_all();
             } else {
+                using failure = request::server::configure_load_game::failure;
+
                 // When done, load it
                 try {
                     load_saved_game(save_dir_, true);
-                } catch (request::server::configure_load_game::failure::reason rsn) {
-                    // TODO: notify others somehow
+                    message::server::configure_generated out_msg;
+                    out_msg.failed = false;
+                    net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
+                } catch (failure& fail) {
+                    message::server::configure_generated out_msg;
+                    out_msg.failed = true;
+                    switch (fail.rsn) {
+                        case failure::reason::invalid_saved_game :
+                            out_msg.reason = "the generated save file is invalid"; break;
+                        case failure::reason::no_such_saved_game :
+                        case failure::reason::already_loading :
+                        case failure::reason::cannot_load_while_generating :
+                            // Will never happen
+                            out_msg.reason = "unexpected code path: logic error while calling "
+                                "load_saved_game inside generate";
+                            out_.error(out_msg.reason);
+                            break;
+                    }
+                    net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
                     rw_pool_.unblock_all();
                 } catch (...) {
                     rw_pool_.unblock_all();
@@ -222,7 +259,7 @@ namespace state {
 
             // Use a scoped lambda to make this exception safe
             auto scoped = ctl::make_scoped([&]() {
-                message::server::configure_generated msg;
+                message::server::configure_generated_internal msg;
                 msg.failed = !ret;
                 if (!ret) {
                     if (errmsg != nullptr) {
@@ -244,27 +281,40 @@ namespace state {
     }
 
     void configure::load_saved_game(const std::string& dir, bool just_generated) {
+        using failure = request::server::configure_load_game::failure;
+
         if (loading_) {
-            throw request::server::configure_load_game::failure::reason::already_loading;
+            throw failure{failure::reason::already_loading, ""};
         }
 
         if (generating_) {
-            throw request::server::configure_load_game::failure::reason::cannot_load_while_generating;
+            throw failure{failure::reason::cannot_load_while_generating, ""};
+        }
+
+        if (!file::exist(dir)) {
+            throw failure{failure::reason::no_such_saved_game, ""};
+        }
+
+        if (!is_saved_game_(dir)) {
+            throw failure{failure::reason::invalid_saved_game, ""};
         }
 
         rw_pool_.block_all();
 
         if (!just_generated) {
+            // Import the configuration of this previously saved game.
+            // This is not needed if this function is called by generate()
+            // since the corresponding configuration is already loaded.
             config_.clear();
             config_.parse_from_file(dir+"generator.conf");
             config_.get_value("generator", generator_);
         }
 
-        net_.send_message<message::server::configure_loading>(server::netcom::all_actor_id);
         loading_ = true;
+        net_.send_message<message::server::configure_loading>(server::netcom::all_actor_id);
 
         pool_ << net_.watch_message<watch_policy::once>(
-            [this](message::server::configure_loaded msg) {
+            [this](const message::server::configure_loaded& msg) {
             loading_ = false;
             rw_pool_.unblock_all();
         });
@@ -283,17 +333,19 @@ namespace state {
     }
 
     void configure::run_game() {
+        using failure = request::server::configure_run_game::failure;
+
         if (generating_) {
-            throw request::server::configure_run_game::failure::reason::cannot_run_while_generating;
+            throw failure{failure::reason::cannot_run_while_generating, ""};
         }
 
         if (loading_) {
-            throw request::server::configure_run_game::failure::reason::cannot_run_while_loading;
+            throw failure{failure::reason::cannot_run_while_loading, ""};
         }
 
         if (false) {
             // TODO: do that ^
-            throw request::server::configure_run_game::failure::reason::no_game_loaded;
+            throw failure{failure::reason::no_game_loaded, ""};
         }
 
         // TODO: feed the currently loaded game state to the state::game

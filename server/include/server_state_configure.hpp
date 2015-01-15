@@ -35,6 +35,8 @@ namespace state {
         ctl::sorted_vector<std::string> saved_games_;
         bool loading_ = false;
 
+        bool is_saved_game_(const std::string& file) const;
+
     public :
         explicit configure(server::instance& serv);
         ~configure();
@@ -101,6 +103,8 @@ namespace server {
                 already_generating,
                 cannot_generate_while_loading
             } rsn;
+
+            std::string details;
         };
     };
 
@@ -117,6 +121,8 @@ namespace server {
                 already_loading,
                 cannot_load_while_generating
             } rsn;
+
+            std::string details;
         };
     };
 
@@ -144,6 +150,8 @@ namespace server {
                 cannot_run_while_loading,
                 no_game_loaded
             } rsn;
+
+            std::string details;
         };
     };
 }
@@ -152,6 +160,12 @@ namespace server {
 namespace message {
 namespace server {
     NETCOM_PACKET(configure_generating) {};
+
+    NETCOM_PACKET(configure_generated_internal) {
+        // TODO: Send statistics about generated data?
+        bool failed;
+        std::string reason;
+    };
 
     NETCOM_PACKET(configure_generated) {
         // TODO: Send statistics about generated data?
