@@ -12,7 +12,7 @@ namespace space {
     /// Underlying type of a position in the universe
     using vec_t = vec2_t<pos_t>;
     /// List of all possible directions one can move in
-    enum class direction { LEFT = 0, UP, RIGHT, DOWN };
+    enum class direction { left = 0, up, right, down };
 
     /// Base exception class that encompasses all the 'space' exceptions.
     namespace exception {
@@ -56,8 +56,8 @@ namespace space {
     }
 
     /// The unit cell of the universe.
-    /** It is not splitable, and is the only type of cell that can
-        contain actual objects. The only features it offers are:
+    /** It is not splitable, and is the only type of cell that can contain actual objects. The only
+        features it offers are:
 
          - containing an object:
            content(), fill(), release(), clear(), empty()
@@ -65,14 +65,13 @@ namespace space {
          - accessing the neighboring cells:
            reach(), try_reach()
 
-         - computing its asolute coordinates:
+         - computing its absolute coordinates:
            get_coordinates()
 
-        The other purpose of this class is to do type erasure:
-        the code that uses this set of classes does not need to
-        know the actual depth of the universe, nor what the actual
-        cell type is. It should only interact through this provided
-        interface. See space::universe for another example.
+        The other purpose of this class is to do type erasure: the code that uses this set of
+        classes does not need to know the actual depth of the universe, nor what the actual cell
+        type is. It should only interact through this provided interface. See space::universe for
+        another example.
     **/
     template<typename T>
     class cell {
@@ -139,7 +138,7 @@ namespace space {
                   parent. If you declare this function as private, do not forget to
                   befriend space::cell<T>.
         **/
-        T& fill(std::unique_ptr<T>&& t) {
+        T& fill(std::unique_ptr<T> t) {
             if (obj_) throw space::exception::cell_occupied();
 
             obj_ = std::move(t);
@@ -176,7 +175,7 @@ namespace space {
                   longer has any parent. If you declare this function as private, do not
                   forget to befriend space::cell<T>.
         **/
-        std::unique_ptr<T>&& release() {
+        std::unique_ptr<T> release() {
             obj_notify_parent_cell_(nullptr, has_notify_parent_cell());
             return std::move(obj_);
         }
@@ -210,7 +209,8 @@ namespace space {
         // Tools to check if T has a 'notify_parent_cell' member function
         // and call it only if that is the case.
         struct has_notify_parent_cell_t {
-            template <typename U> static std::true_type  dummy(decltype(std::declval<U>().notify_parent_cell(std::declval<space::cell<U>&>()))*);
+            template <typename U> static std::true_type  dummy(
+                decltype(std::declval<U>().notify_parent_cell(std::declval<space::cell<U>&>()))*);
             template <typename U> static std::false_type dummy(...);
             using type = decltype(dummy<T>(nullptr));
         };
@@ -231,44 +231,38 @@ namespace space {
     /// Contains all the space cells.
     /** This class is the base class of space management.
 
-        The universe is created as a square that is subdivided
-        into four sub-squares called cells, which are themselves
-        subdivided into four smaller sub-squares, and so on and so
-        forth. This is called a quad-tree. In this context, D is the
-        maximum number of times the universe is subdivided (1: a
-        single cell, 2: four cells, ...). The total number of unit
-        cells in the universe is 4^(D-1). To save some memory, only
-        the cells that actually contain an object are created.
+        The universe is created as a square that is subdivided into four sub-squares called cells,
+        which are themselves subdivided into four smaller sub-squares, and so on and so forth. This
+        is called a quad-tree. In this context, D is the maximum number of times the universe is
+        subdivided (1: a single cell, 2: four cells, ...). The total number of unit cells in the
+        universe is 4^(D-1). To save some memory, only the cells that actually contain an object are
+        created.
 
-        D is specified once, when the universe is created. See make().
-        Note that, for implementation purposes, D should not be
-        greater than 33 in 32 bits environment, and 65 in 64 bits
-        ones (in general, less or equal to N+1 in N bits environment).
-        If you need go past this limit, then you will need to edit
-        space::pos_t and space::impl::pos_t to be larger integers
-        that can take values at least up to 2^(D-1).
-        Also keep in mind that, although there is some memory
+        D is specified once, when the universe is created. See make(). Note that, for implementation
+        purposes, D should not be greater than 33 in 32 bits environment, and 65 in 64 bits ones (in
+        general, less or equal to N+1 in N bits environment). If you need go past this limit, then
+        you will need to edit space::pos_t and space::impl::pos_t to be larger integers that can
+        take values at least up to 2^(D-1). Also keep in mind that, although there is some memory
         optimization:
 
-         * Each cell can be assumed to weight 2*W bytes, where W
-           is the size of a machine word (i.e. 4 bytes for 32 bits,
-           8 bytes for 64bits).
-         * The total number of cells in a universe that is fully
-           resolved (i.e. where all cells contain an object) is
-           (4^D - 1)/3. Assuming the above statement, and
-           considering that the maximum available memory in
-           any machine is 2^(8*W), this translates into the
-           theoretical limit: D < log2(3*2^(8*W-1)/W + 1)/2.
-           This yields 15 for 32 bits, and 30 for 64 bits.
-           This is theoretical in the sense that it assumes that
-           all the memory is available, which is never the case,
-           that all cells are occupied, which should not happen
-           (else it is better to use a plain array), and that
-           the contained objects do not occupy memory.
-         * When N unit cells are created, the memory overhead
-           that is generated by their parent cells is, at best,
-           33% (compared to an ideal but impractical case where
-           only the N unit cells are stored in memory).
+         * Each cell can be assumed to weight 2*W bytes, where W is the size of a machine word (i.e.
+           4 bytes for 32 bits, 8 bytes for 64 bits).
+         * The total number of cells in a universe that is fully resolved (i.e. where all cells
+           contain an object) is (4^D - 1)/3. Assuming the above statement, and considering that the
+           maximum available memory in any any machine is 2^(8*W), this translates into the
+           theoretical limit: D < log2(3*2^(8*W-1)/W + 1)/2. This yields 15 for 32 bits, and 30 for
+           64 bits. This is theoretical in the sense that it assumes that all the memory is
+           available, which is never the case, that all cells are occupied, which should not happen
+           (else it is better to use a plain array), and that the contained objects do not occupy
+           memory.
+         * In practice computers rather tend to be limited by the amount of available RAM they
+           possess, rather than simply by their architecture (32 or 64 bits). For classic desktop
+           configurations (e.g. 2 GB of RAM on a 32 bit computer, or 8 GB of RAM on a 64 bit
+           computer), this translates into the effective limit D < 14. Reaching D = 14 requires a
+           64 bit computer with at least 11 GB of available RAM.
+         * When N unit cells are created, the memory overhead that that is generated by their parent
+           cells is, at best, 33% (compared to an ideal but impractical case where only the N unit
+           cells are stored in memory).
 
         Any cell in this structure can be reached in O(D).
     **/
@@ -334,7 +328,8 @@ namespace space {
                         for them beforehand. This function will not take care
                         about it.
         **/
-        virtual void clip(const axis_aligned_box2d& box, ctl::sorted_vector<const cell<T>&>& list) const = 0;
+        virtual void clip(const axis_aligned_box2d& box,
+            ctl::sorted_vector<const cell<T>&>& list) const = 0;
 
     protected :
         universe() = default;
@@ -369,7 +364,8 @@ namespace space {
             friend any_cell<T,N,D>;
 
             explicit split_cell(any_cell<T,N,D>& self) : childs({
-                any_cell<T,N+1,D>(self), any_cell<T,N+1,D>(self), any_cell<T,N+1,D>(self), any_cell<T,N+1,D>(self)
+                any_cell<T,N+1,D>(self), any_cell<T,N+1,D>(self),
+                any_cell<T,N+1,D>(self), any_cell<T,N+1,D>(self)
             }) {}
 
             split_cell(const split_cell&) = delete;
@@ -412,7 +408,7 @@ namespace space {
             any_cell& operator=(any_cell&&) = default;
 
             /// Called when a child cell is emptied, in order to free
-            /// some memory when the space in inoccupied.
+            /// some memory when the space in unoccupied.
             void on_cell_empty_() {
                 for (std::size_t i = 0; i < 4; ++i) {
                     if (!split->childs[i].empty())
@@ -444,8 +440,8 @@ namespace space {
             }
 
             /// Get a sub-cell from a neighboring cell.
-            /** \param dir The direction in which the neigborig cell lies
-                \param id  The id of the cell to retrieve from this neigbor
+            /** \param dir The direction in which the neighboring cell lies
+                \param id  The id of the cell to retrieve from this neighbor
                 \note Will create the cell if it doesn't exist.
                 \note Will return nullptr if the boundaries of the universe have
                       been reached.
@@ -461,8 +457,8 @@ namespace space {
             }
 
             /// Get a sub-cell from a neighboring cell.
-            /** \param dir The direction in which the neigborig cell lies
-                \param id  The id of the cell to retrieve from this neigbor
+            /** \param dir The direction in which the neighboring cell lies
+                \param id  The id of the cell to retrieve from this neighbor
                 \note Will not create the cell if it doesn't exist.
                 \note Will return nullptr if the boundaries of the universe have
                       been reached.
@@ -477,7 +473,7 @@ namespace space {
                 }
             }
 
-            /// Get a neigboring sub-cell from one of this cell's sub-cells.
+            /// Get a neighboring sub-cell from one of this cell's sub-cells.
             /** \param c   The cell that requests a neighbor
                 \param dir The direction in which to find the neighbor
                 \note Will look in neighboring cells if needed.
@@ -492,7 +488,7 @@ namespace space {
                 }
             }
 
-            /// Get a neigboring sub-cell from one of this cell's sub-cells.
+            /// Get a neighboring sub-cell from one of this cell's sub-cells.
             /** \param c   The cell that requests a neighbor
                 \param dir The direction in which to find the neighbor
                 \note Will look in neighboring cells if needed.
@@ -686,7 +682,9 @@ namespace space {
             }
 
             /// @copydoc space::universe::clip
-            void clip(const axis_aligned_box2d& box, ctl::sorted_vector<const cell<T>&>& list) const override {
+            void clip(const axis_aligned_box2d& box,
+                ctl::sorted_vector<const cell<T>&>& list) const override {
+
                 static const pos_t half_size = 1 << (D-2);
                 clip_(root_, box + vec2d(half_size, half_size), list);
             }
@@ -761,7 +759,9 @@ namespace space {
                 \param list The container within which to store the selected cells
             **/
             template<std::size_t N>
-            void clip_(const any_cell<T,N,D>& c, const axis_aligned_box2d& box, ctl::sorted_vector<const cell<T>&>& list) const {
+            void clip_(const any_cell<T,N,D>& c, const axis_aligned_box2d& box,
+                ctl::sorted_vector<const cell<T>&>& list) const {
+
                 static const double size = 1 << (D-N);
                 static const axis_aligned_box2d cell_boxes[4] = {
                     axis_aligned_box2d(vec2d(   0.0,    0.0), vec2d(size/2, size/2)),
@@ -789,7 +789,9 @@ namespace space {
                 \param box  The box within which to select the cells
                 \param list The container within which to store the selected cells
             **/
-            void clip_(const any_cell<T,D,D>& c, const axis_aligned_box2d& box, ctl::sorted_vector<const cell<T>&>& list) const {
+            void clip_(const any_cell<T,D,D>& c, const axis_aligned_box2d& box,
+                ctl::sorted_vector<const cell<T>&>& list) const {
+
                 if (!c.empty()) {
                     list.insert(c);
                 }
