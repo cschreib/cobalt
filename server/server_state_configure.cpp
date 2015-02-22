@@ -51,8 +51,7 @@ namespace state {
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::configure_is_game_loaded>&& req) {
-            // TODO: do that
-            req.answer(false);
+            req.answer(!loading_ && loaded_game_);
         });
 
         rw_pool_ << net_.watch_request(
@@ -86,11 +85,6 @@ namespace state {
         if (thread_.joinable()) thread_.join();
     }
 
-    bool configure::is_saved_game_(const std::string& file) const {
-        // TODO: do that
-        return true;
-    }
-
     void configure::update_saved_game_list() {
         saved_games_.clear();
 
@@ -100,16 +94,12 @@ namespace state {
             saves.erase(iter);
             auto gens = file::list_directories("saves/generated/");
             for (auto& s : gens) {
-                if (is_saved_game_("saves/generated/"+s)) {
-                    saved_games_.insert("generated/"+s);
-                }
+                saved_games_.insert("generated/"+s);
             }
         }
 
         for (auto& s : saves) {
-            if (is_saved_game_("saves/"+s)) {
-                saved_games_.insert(s);
-            }
+            saved_games_.insert(s);
         }
     }
 
@@ -291,11 +281,13 @@ namespace state {
             throw failure{failure::reason::cannot_load_while_generating, ""};
         }
 
-        if (!file::exist(dir)) {
+        if (!file::exists(dir)) {
             throw failure{failure::reason::no_such_saved_game, ""};
         }
 
-        if (!is_saved_game_(dir)) {
+        loaded_game_ = std::make_unique<state::game>(serv_);
+
+        if (!loaded_game_->is_saved_game_directory(dir)) {
             throw failure{failure::reason::invalid_saved_game, ""};
         }
 
@@ -314,21 +306,31 @@ namespace state {
         net_.send_message<message::server::configure_loading>(server::netcom::all_actor_id);
 
         pool_ << net_.watch_message<watch_policy::once>(
-            [this](const message::server::configure_loaded& msg) {
+            [this](const message::server::configure_loaded_internal& msg) {
+
             loading_ = false;
             rw_pool_.unblock_all();
+
+            message::server::configure_loaded out_msg;
+            out_msg.failed = true; out_msg.reason = msg.reason;
+            net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
         });
 
         if (thread_.joinable()) thread_.join();
         thread_ = std::thread([this, dir]() {
-            // Use a scoped lambda to make this exception safe
-            auto scoped = ctl::make_scoped([&]() {
-                message::server::configure_loaded msg;
-                net_.send_message(server::netcom::all_actor_id, msg);
-            });
+            message::server::configure_loaded_internal msg;
+            msg.failed = true;
 
-            // TODO: implement this
-            // Read data from directory, load game into memory
+            try {
+                loaded_game_->load_from_directory(dir);
+                msg.failed = false;
+            } catch (request::server::game_load::failure& fail) {
+                msg.reason = fail.details;
+            } catch (...) {
+                msg.reason = "unknown";
+            }
+
+            net_.send_message(server::netcom::all_actor_id, msg);
         });
     }
 
@@ -343,13 +345,11 @@ namespace state {
             throw failure{failure::reason::cannot_run_while_loading, ""};
         }
 
-        if (false) {
-            // TODO: do that ^
+        if (!loaded_game_) {
             throw failure{failure::reason::no_game_loaded, ""};
         }
 
-        // TODO: feed the currently loaded game state to the state::game
-        serv_.set_state<state::game>();
+        serv_.set_state(std::move(loaded_game_));
     }
 }
 }

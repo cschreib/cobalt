@@ -8,6 +8,8 @@
 
 namespace server {
 namespace state {
+    class game;
+
     class configure : public base_impl<state_id::configure> {
     public :
         struct generator_info {
@@ -33,9 +35,8 @@ namespace state {
         config::shared_state config_;
 
         ctl::sorted_vector<std::string> saved_games_;
+        std::unique_ptr<state::game> loaded_game_;
         bool loading_ = false;
-
-        bool is_saved_game_(const std::string& file) const;
 
     public :
         explicit configure(server::instance& serv);
@@ -174,6 +175,11 @@ namespace server {
     };
 
     NETCOM_PACKET(configure_loading) {};
+
+    NETCOM_PACKET(configure_loaded_internal) {
+        bool failed;
+        std::string reason;
+    };
 
     NETCOM_PACKET(configure_loaded) {
         bool failed;
