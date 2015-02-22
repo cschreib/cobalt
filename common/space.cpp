@@ -23,31 +23,31 @@ namespace impl {
         switch (id) {
         case sub_cell::TL :
             switch (dir) {
-            case direction::LEFT  : next_id = sub_cell::TR; return false;
-            case direction::UP    : next_id = sub_cell::BL; return false;
-            case direction::RIGHT : next_id = sub_cell::TR; return true;
-            case direction::DOWN  : next_id = sub_cell::BL; return true;
+            case direction::left  : next_id = sub_cell::TR; return false;
+            case direction::up    : next_id = sub_cell::BL; return false;
+            case direction::right : next_id = sub_cell::TR; return true;
+            case direction::down  : next_id = sub_cell::BL; return true;
             }
         case sub_cell::TR :
             switch (dir) {
-            case direction::LEFT  : next_id = sub_cell::TL; return true;
-            case direction::UP    : next_id = sub_cell::BR; return false;
-            case direction::RIGHT : next_id = sub_cell::TL; return false;
-            case direction::DOWN  : next_id = sub_cell::BR; return true;
+            case direction::left  : next_id = sub_cell::TL; return true;
+            case direction::up    : next_id = sub_cell::BR; return false;
+            case direction::right : next_id = sub_cell::TL; return false;
+            case direction::down  : next_id = sub_cell::BR; return true;
             }
         case sub_cell::BR :
             switch (dir) {
-            case direction::LEFT  : next_id = sub_cell::BL; return true;
-            case direction::UP    : next_id = sub_cell::TR; return true;
-            case direction::RIGHT : next_id = sub_cell::BL; return false;
-            case direction::DOWN  : next_id = sub_cell::TR; return false;
+            case direction::left  : next_id = sub_cell::BL; return true;
+            case direction::up    : next_id = sub_cell::TR; return true;
+            case direction::right : next_id = sub_cell::BL; return false;
+            case direction::down  : next_id = sub_cell::TR; return false;
             }
         case sub_cell::BL :
             switch (dir) {
-            case direction::LEFT  : next_id = sub_cell::BR; return false;
-            case direction::UP    : next_id = sub_cell::TL; return true;
-            case direction::RIGHT : next_id = sub_cell::BR; return true;
-            case direction::DOWN  : next_id = sub_cell::TL; return false;
+            case direction::left  : next_id = sub_cell::BR; return false;
+            case direction::up    : next_id = sub_cell::TL; return true;
+            case direction::right : next_id = sub_cell::BR; return true;
+            case direction::down  : next_id = sub_cell::TL; return false;
             }
         default : throw exception::invalid_direction();
         }
