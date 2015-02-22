@@ -71,15 +71,18 @@ namespace server {
 
         template<typename T, typename ... Args>
         T& set_state() {
-            auto tmp = std::make_unique<T>(*this);
+            return set_state(std::make_unique<T>(*this));
+        }
 
+        template<typename T, typename ... Args>
+        T& set_state(std::unique_ptr<T> st) {
             if (current_state_ != nullptr) {
                 net_.send_message(netcom::all_actor_id,
                     make_packet<message::server::changed_state>(T::id));
             }
 
-            T& ret = *tmp;
-            current_state_ = std::move(tmp);
+            T& ret = *st;
+            current_state_ = std::move(st);
             return ret;
         }
     };
