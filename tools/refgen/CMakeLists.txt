@@ -31,6 +31,7 @@ add_custom_target(refgen-gen ALL
     COMMAND ${PROJECT_SOURCE_DIR}/../bin/refgen
      ${REFGEN_BUILD_TYPE} ${PROJECT_SOURCE_DIR}/../../
     -std=c++11
+    -isystem ${CLANG_SYSTEM_INCLUDE}
     -I${PROJECT_SOURCE_DIR}/../../common/include
     -I${PROJECT_SOURCE_DIR}/../../common-netcom/include
     -I${PROJECT_SOURCE_DIR}/../../server/include
