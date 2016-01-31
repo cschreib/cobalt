@@ -211,7 +211,7 @@ namespace space {
         // and call it only if that is the case.
         struct has_notify_parent_cell_t {
             template <typename U> static std::true_type  dummy(
-                decltype(std::declval<U>().notify_parent_cell(std::declval<space::cell<U>&>()))*);
+                decltype(std::declval<U>().notify_parent_cell(std::declval<space::cell<U>*>()))*);
             template <typename U> static std::false_type dummy(...);
             using type = decltype(dummy<T>(nullptr));
         };
@@ -219,7 +219,7 @@ namespace space {
         using has_notify_parent_cell = typename has_notify_parent_cell_t::type;
 
         void obj_notify_parent_cell_(cell* c, std::true_type) {
-            obj_->notify_parent_cell(*c);
+            obj_->notify_parent_cell(c);
         }
 
         void obj_notify_parent_cell_(cell* c, std::false_type) {}
