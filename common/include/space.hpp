@@ -777,7 +777,7 @@ namespace space {
                 };
 
                 if (!c.split) return;
-                for (std::size_t i = 0; i < 4; ++i) {
+                for (std::size_t i : range(c.split->childs)) {
                     if (box.contains(cell_boxes[i])) {
                         clip_(c.split->childs[i], box - offsets[i], list);
                     }

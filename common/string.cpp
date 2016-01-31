@@ -1,4 +1,5 @@
 #include "string.hpp"
+#include "range.hpp"
 
 namespace string {
     std::string trim(std::string s, const std::string& chars) {
@@ -21,7 +22,7 @@ namespace string {
     std::string join(const std::vector<std::string>& vs, const std::string& delim) {
         if (vs.empty()) return "";
         std::string res = vs[0];
-        for (std::size_t i = 1; i < vs.size(); ++i) {
+        for (std::size_t i : range(1, vs)) {
             res += delim + vs[i];
         }
 
@@ -72,8 +73,8 @@ namespace string {
 
     std::size_t distance(const std::string& t, const std::string& u) {
         std::size_t n = std::min(t.size(), u.size());
-        std::size_t d = abs(t.size() - u.size());
-        for (std::size_t i = 0; i < n; ++i) {
+        std::size_t d = std::max(t.size(), u.size()) - n;
+        for (std::size_t i : range(n)) {
             if (t[i] != u[i]) ++d;
         }
 
@@ -82,7 +83,7 @@ namespace string {
 
     bool start_with(const std::string& s, const std::string& pattern) {
         if (s.size() < pattern.size()) return false;
-        for (std::size_t i = 0; i < pattern.size(); ++i) {
+        for (std::size_t i : range(pattern)) {
             if (s[i] != pattern[i]) return false;
         }
 
@@ -91,7 +92,7 @@ namespace string {
 
     bool end_with(const std::string& s, const std::string& pattern) {
         if (s.size() < pattern.size()) return false;
-        for (std::size_t i = 1; i <= pattern.size(); ++i) {
+        for (std::size_t i : range(1, pattern)) {
             if (s[s.size()-i] != pattern[pattern.size()-i]) return false;
         }
 

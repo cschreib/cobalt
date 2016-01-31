@@ -8,6 +8,7 @@
 #include <crc32.hpp>
 #include <variadic.hpp>
 #include <sorted_vector.hpp>
+#include <range.hpp>
 #include "serialized_packet.hpp"
 
 struct color32;
@@ -45,7 +46,7 @@ namespace sf {
         p >> s;
         std::uint32_t i0 = t.size();
         t.resize(i0 + s);
-        for (std::uint32_t i = 0; i < s; ++i) {
+        for (std::uint32_t i : range(s)) {
             p >> t[i0+i];
         }
         return p;
@@ -63,7 +64,7 @@ namespace sf {
     template<typename T, typename C>
     packet_t::base& operator >> (packet_t::base& p, ctl::sorted_vector<T,C>& t) {
         std::uint32_t s; p >> s;
-        for (std::uint32_t i = 0; i < s; ++i) {
+        for (std::uint32_t i : range(s)) {
             T tmp;
             p >> tmp;
             t.insert(std::move(tmp));
@@ -82,7 +83,7 @@ namespace sf {
 
     template<typename T, std::size_t N>
     packet_t::base& operator >> (packet_t::base& p, std::array<T,N>& t) {
-        for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t i : range(N)) {
             p >> t[i];
         }
         return p;
