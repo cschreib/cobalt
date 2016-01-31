@@ -5,7 +5,7 @@ namespace server {
 namespace state {
     game::game(server::instance& serv) : base_impl(serv, "game") {
         // TODO: add all game components to this container
-        // save_chunks_.push_back(...);
+        save_chunks_.push_back(universe_.make_serializer());
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::game_save>&& req) {

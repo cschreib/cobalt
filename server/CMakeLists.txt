@@ -17,4 +17,6 @@ add_library(cobalt-server STATIC
     server_state_iddle.cpp
     server_state_test.cpp
     server_player_list.cpp
+    server_universe.cpp
+    server_space_object.cpp
 )

@@ -3,7 +3,9 @@
 
 #include "server_state.hpp"
 #include "server_serializable.hpp"
+#include "server_universe.hpp"
 #include "ptr_vector.hpp"
+#include "space.hpp"
 #include <thread>
 
 namespace server {
@@ -15,6 +17,8 @@ namespace state {
         std::atomic<bool> saving_;
 
         ctl::ptr_vector<server::serializable> save_chunks_;
+
+        server::universe universe_;
 
     public :
         explicit game(server::instance& serv);
