@@ -2,10 +2,29 @@
 #define DELEGATE_HPP
 
 #include <type_traits>
+#include "variadic.hpp"
 
 namespace ctl {
     template<typename T>
     struct delegate;
+
+    namespace impl {
+        template<typename R, typename T>
+        struct is_valid_function_signature;
+
+        template<typename R>
+        struct is_valid_function_signature<R, std::nullptr_t> : std::false_type {};
+
+        template<typename R, typename ... Args, typename T>
+        struct is_valid_function_signature<R(Args...), T> : std::integral_constant<bool,
+            std::is_convertible<ctl::return_type<T>, R>::value &&
+            ctl::argument_count<T>::value == sizeof...(Args) &&
+            ctl::are_convertible<ctl::function_arguments<T>, type_list<Args...>>::value> {};
+
+        template<typename R, typename T>
+        using is_valid_function_signature_t = typename is_valid_function_signature<
+            R, typename std::decay<T>::type>::type;
+    }
 
     /// Wrapper to store lambda functions.
     /** This structure is a simple wrapper that, much like std::bind(), stores the "this" pointer of
@@ -36,34 +55,45 @@ namespace ctl {
     **/
     template<typename R, typename ... Args>
     struct delegate<R(Args...)> {
-        /// Construct a new delegate.
-        /** In all constructors, the first argument is the object on which the delegate acts, and
-            the second argument is the member function that is to be called. When the object is
-            given as a reference or a pointer, then only a pointer to this object is kept inside the
-            delegate, and the object is expected to outlive the delegate. On the other hand, if the
-            object is given as an r-value (either a temporary or an r-value reference), a new
-            instance is move constructed inside the delegate, and its lifetime is bound to that of
-            the delegate. The member function can be given either as a function pointer, or as an
-            std::integral_constant. The latter is usually faster because the function pointer is a
-            template argument, and can be more easily inlined by the compiler, but it is also more
-            tedious to write.
-            Lastly, if no member function is provided, T::operator() is assumed.
-        **/
-        template<typename ... TArgs>
-        delegate(TArgs&&... args) {
-            create_(std::forward<TArgs>(args)...);
-        }
-
         /// Default constructor.
         /** When default constructed, a delegate is in "empty" state. See empty().
         **/
         delegate() = default;
         delegate(std::nullptr_t) : delegate() {}
 
-        ~delegate() {
-            if (del_) {
-                (*del_)(obj_);
-            }
+        /// Construct a new delegate from a member function.
+        /** \param obj The object on which the delegate acts. When the object is given as a
+                       reference or a pointer, then only a pointer to this object is kept inside
+                       the delegate, and the object is expected to outlive the delegate. On the
+                       other hand, if the object is given as an r-value (either a temporary or an
+                       r-value reference), a new instance is move constructed inside the delegate,
+                       and its lifetime is bound to that of the delegate.
+            \param fun The member function. It can be given either as a function pointer, or as an
+                       std::integral_constant. The latter is usually faster because the function
+                       pointer is a template argument, and can be more easily inlined by the
+                       compiler, but it is also more tedious to write.
+        **/
+        template<typename T, typename M, typename enable = typename std::enable_if<
+            impl::is_valid_function_signature_t<R(Args...), M>::value>::type>
+        delegate(T&& obj, M&& fun) {
+            init_obj_(std::forward<T>(obj));
+            init_fun_<T>(std::forward<M>(fun));
+        }
+
+        /// Construct a new delegate from a functor or lambda.
+        /** \param obj The functor or lambda. If the functor is given as a reference or a pointer,
+                       then only a pointer to this object is kept inside the delegate, and the
+                       object is expected to outlive the delegate. On the other hand, if the
+                       object is given as an r-value (either a temporary or an r-value reference),
+                       a new instance is move constructed inside the delegate, and its lifetime is
+                       bound to that of the delegate.
+        **/
+        template<typename T, typename enable = typename std::enable_if<
+            impl::is_valid_function_signature_t<R(Args...), T>::value>::type>
+        delegate(T&& obj) {
+            init_obj_(std::forward<T>(obj));
+            using RT = typename std::remove_reference<T>::type;
+            init_fun_<T>(std::integral_constant<decltype(&RT::operator()),&RT::operator()>());
         }
 
         delegate(const delegate&) = delete;
@@ -85,6 +115,13 @@ namespace ctl {
             d.del_ = nullptr;
             d.fun_ = nullptr;
             d.wfun_ = nullptr;
+        }
+
+        /// Destructor
+        ~delegate() {
+            if (del_) {
+                (*del_)(obj_);
+            }
         }
 
         /// Move assignment.
@@ -115,6 +152,31 @@ namespace ctl {
             return *this;
         }
 
+        /// Assign a new functor or lambda to this delegate.
+        /** \param obj The functor or lambda. If the functor is given as a reference or a pointer,
+                       then only a pointer to this object is kept inside the delegate, and the
+                       object is expected to outlive the delegate. On the other hand, if the
+                       object is given as an r-value (either a temporary or an r-value reference),
+                       a new instance is move constructed inside the delegate, and its lifetime is
+                       bound to that of the delegate.
+        **/
+        // template<typename T, typename enable = typename std::enable_if<std::is_convertible<
+        //     return_type<T>, R>::value>::type>
+        // delegate& operator= (T&& obj) {
+        //     clear();
+
+        //     init_obj_(std::forward<T>(obj));
+        //     using RT = typename std::remove_reference<T>::type;
+        //     init_fun_<T>(std::integral_constant<decltype(&RT::operator()),&RT::operator()>());
+        //     return *this;
+        // }
+
+        /// Put the delegate in "empty" state. See empty().
+        delegate& operator= (const std::nullptr_t&) {
+            clear();
+            return *this;
+        }
+
         /// Put the delegate in "empty" state. See empty().
         void clear() {
             if (del_) {
@@ -126,13 +188,6 @@ namespace ctl {
             mov_ = nullptr;
             fun_ = nullptr;
             wfun_ = nullptr;
-        }
-
-        /// Re-assign the underlying object and function.
-        template<typename ... TArgs>
-        void assign(TArgs&&... args) {
-            clear();
-            create_(std::forward<TArgs>(args)...);
         }
 
         /// Return 'true' if in "empty" state.
@@ -246,19 +301,6 @@ namespace ctl {
             fun_ = *reinterpret_cast<void**>(&fun);
             using RT = typename std::remove_reference<T>::type;
             wfun_ = &wrapper_<RT, M>;
-        }
-
-        template<typename T, typename M>
-        void create_(T&& obj, M&& fun) {
-            init_obj_(std::forward<T>(obj));
-            init_fun_<T>(std::forward<M>(fun));
-        }
-
-        template<typename T>
-        void create_(T&& obj) {
-            init_obj_(std::forward<T>(obj));
-            using RT = typename std::remove_reference<T>::type;
-            init_fun_<T>(std::integral_constant<decltype(&RT::operator()),&RT::operator()>());
         }
     };
 }
