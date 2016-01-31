@@ -359,15 +359,15 @@ namespace space {
         **/
         template<typename T, std::size_t N, std::size_t D>
         struct split_cell {
-            any_cell<T,N+1,D> childs[4];
+            std::array<any_cell<T,N+1,D>,4> childs;
 
         private :
             friend any_cell<T,N,D>;
 
-            explicit split_cell(any_cell<T,N,D>& self) : childs({
+            explicit split_cell(any_cell<T,N,D>& self) : childs({{
                 any_cell<T,N+1,D>(self), any_cell<T,N+1,D>(self),
                 any_cell<T,N+1,D>(self), any_cell<T,N+1,D>(self)
-            }) {}
+            }}) {}
 
             split_cell(const split_cell&) = delete;
             split_cell& operator=(const split_cell&) = delete;
@@ -411,9 +411,8 @@ namespace space {
             /// Called when a child cell is emptied, in order to free
             /// some memory when the space in unoccupied.
             void on_cell_empty_() {
-                for (std::size_t i = 0; i < 4; ++i) {
-                    if (!split->childs[i].empty())
-                        return;
+                for (auto& c : split->childs) {
+                    if (!c.empty()) return;
                 }
 
                 split.reset();
@@ -574,9 +573,8 @@ namespace space {
 
             /// @copydoc space::impl::any_cell::on_cell_empty_
             void on_cell_empty_() {
-                for (std::size_t i = 0; i < 4; ++i) {
-                    if (!split->childs[i].empty())
-                        return;
+                for (auto& c : split->childs) {
+                    if (!c.empty()) return;
                 }
 
                 split.reset();
