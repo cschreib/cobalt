@@ -3,6 +3,7 @@
 
 #include "axis_aligned_box2.hpp"
 #include "sorted_vector.hpp"
+#include "range.hpp"
 #include <memory>
 #include <stdexcept>
 
