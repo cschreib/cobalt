@@ -92,4 +92,14 @@ range_t<std::size_t> range(T i, const U& n) {
     return range(static_cast<decltype(n.size())>(i), n.size());
 }
 
+template<typename T, std::size_t N>
+range_t<std::size_t> range(T (&n)[N]) {
+    return range(N);
+}
+
+template<typename T, typename U, std::size_t N>
+range_t<std::size_t> range(T i, U (&n)[N]) {
+    return range(static_cast<std::size_t>(i), N);
+}
+
 #endif
