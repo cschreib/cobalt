@@ -68,12 +68,13 @@ serialized_packet& operator >> (serialized_packet& p, serialized_packet& op) {
     return p;
 }
 
-std::ifstream& operator >> (std::ifstream& in, serialized_packet& p) {
+std::istream& operator >> (std::istream& in, serialized_packet& p) {
     // Use a temporary packet to deserialize the data size
     std::uint32_t s;
     serialized_packet tp;
     std::vector<char> buffer(sizeof(s));
     in.read(buffer.data(), buffer.size());
+    tp.append(static_cast<const void*>(buffer.data()), buffer.size());
     tp >> s;
 
     // Then read the actual data
@@ -84,7 +85,7 @@ std::ifstream& operator >> (std::ifstream& in, serialized_packet& p) {
     return in;
 }
 
-std::ofstream& operator << (std::ofstream& out, const serialized_packet& p) {
+std::ostream& operator << (std::ostream& out, const serialized_packet& p) {
     // Use a temporary pack to serialize the data size
     serialized_packet tp;
     std::uint32_t s = p.getDataSize();
