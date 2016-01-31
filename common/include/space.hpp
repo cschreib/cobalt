@@ -2,8 +2,10 @@
 #define SPACE_HPP
 
 #include "axis_aligned_box2.hpp"
+#include "vector2.hpp"
 #include "sorted_vector.hpp"
 #include "range.hpp"
+#include "delegate.hpp"
 #include <memory>
 #include <stdexcept>
 
