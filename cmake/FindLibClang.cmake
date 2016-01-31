@@ -5,11 +5,13 @@ endif()
 find_path(CLANG_INCLUDE clang-c/Index.h
           HINTS
           ${CLANG_ROOT}/include
-          # /usr/lib/llvm-3.4/include
+          /usr/lib/llvm-3.5/include
+          /usr/lib/llvm-3.4/include
           /usr/lib/llvm-3.3/include
           /usr/lib/llvm-3.2/include
           /usr/lib/llvm-3.1/include
-          # /opt/local/libexec/llvm-3.4/include
+          /opt/local/libexec/llvm-3.5/include
+          /opt/local/libexec/llvm-3.4/include
           /opt/local/libexec/llvm-3.3/include
           /opt/local/libexec/llvm-3.2/include
           /opt/local/libexec/llvm-3.1/include
@@ -21,11 +23,13 @@ endif ()
 find_path(CLANG_COMPILATION_INCLUDE clang-c/CXCompilationDatabase.h
       HINTS
       ${CLANG_ROOT}/include
-      # /opt/local/libexec/llvm-3.4/include
+      /opt/local/libexec/llvm-3.5/include
+      /opt/local/libexec/llvm-3.4/include
       /opt/local/libexec/llvm-3.3/include
       /opt/local/libexec/llvm-3.2/include
       /opt/local/libexec/llvm-3.1/include
-      # /usr/lib/llvm-3.4/include
+      /usr/lib/llvm-3.5/include
+      /usr/lib/llvm-3.4/include
       /usr/lib/llvm-3.3/include
       /usr/lib/llvm-3.2/include
       /usr/lib/llvm-3.1/include
