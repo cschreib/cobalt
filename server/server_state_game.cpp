@@ -13,8 +13,18 @@ namespace state {
                 save_to_directory(req.arg.save);
                 req.answer();
             } catch (request::server::game_save::failure& fail) {
+                // Clear load buffers
+                for (auto& c : save_chunks_) {
+                    c.clear();
+                }
+
                 req.fail(std::move(fail));
             } catch (...) {
+                // Clear load buffers
+                for (auto& c : save_chunks_) {
+                    c.clear();
+                }
+
                 out_.error("unexpected exception in game::save_to_directory()");
                 throw;
             }
@@ -26,8 +36,18 @@ namespace state {
                 load_from_directory(req.arg.save);
                 req.answer();
             } catch (request::server::game_load::failure& fail) {
+                // Clear load buffers
+                for (auto& c : save_chunks_) {
+                    c.clear();
+                }
+
                 req.fail(std::move(fail));
             } catch (...) {
+                // Clear load buffers
+                for (auto& c : save_chunks_) {
+                    c.clear();
+                }
+
                 out_.error("unexpected exception in game::load_from_directory()");
                 throw;
             }
@@ -60,6 +80,11 @@ namespace state {
         thread_ = std::thread([this, dir]() {
             for (auto& c : save_chunks_) {
                 c.serialize(dir);
+            }
+
+            // Clear buffers
+            for (auto& c : save_chunks_) {
+                c.clear();
             }
 
             net_.send_message(netcom::all_actor_id, make_packet<message::server::game_save_progress>(
@@ -109,6 +134,11 @@ namespace state {
         // A two pass loading is needed for some components
         for (auto& c : save_chunks_) {
             c.load_data_second_pass();
+        }
+
+        // Clear buffers
+        for (auto& c : save_chunks_) {
+            c.clear();
         }
     }
 

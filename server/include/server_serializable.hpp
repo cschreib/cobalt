@@ -22,8 +22,11 @@ namespace server {
         // De-serizalize saved content into serializable structs
         virtual void deserialize(const std::string& dir) = 0;
         // Load data from serializable structs into current game state
-        virtual void load_data_firt_pass() = 0;
-        virtual void load_data_second_pass() {};
+        virtual void load_data_first_pass() = 0;
+        virtual void load_data_second_pass() {}
+
+        // Empty the buffers used for asynchronous operations
+        virtual void clear() {};
 
         // Check that the given directory contains the necessary data
         virtual bool is_valid_directory(const std::string& dir) const = 0;
