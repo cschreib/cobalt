@@ -32,7 +32,7 @@ namespace string {
             }
         }
     }
-    
+
     template<typename T>
     bool convert(const std::string& s, T& t) {
         std::istringstream ss(s);
