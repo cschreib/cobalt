@@ -9,7 +9,7 @@
 #include <variadic.hpp>
 #include <sorted_vector.hpp>
 #include <range.hpp>
-#include "serialized_packet.hpp"
+#include <serialized_packet.hpp>
 
 struct color32;
 

@@ -6,7 +6,7 @@
 #include <sorted_vector.hpp>
 #include <delegate.hpp>
 #include <variadic.hpp>
-#include "serialized_packet.hpp"
+#include <serialized_packet.hpp>
 
 namespace impl {
     template<typename T>

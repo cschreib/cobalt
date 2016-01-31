@@ -54,16 +54,45 @@ serialized_packet::operator bool() {
 serialized_packet& operator << (serialized_packet& p, const serialized_packet& ip) {
     if (ip.endOfPacket()) return p;
     std::size_t pos = ip.tellg();
-    p.append((const char*)ip.getData() + pos, ip.getDataSize() - pos);
+    p.append(static_cast<const char*>(ip.getData()) + pos, ip.getDataSize() - pos);
     return p;
 }
 
 serialized_packet& operator >> (serialized_packet& p, serialized_packet& op) {
     if (p.endOfPacket()) return p;
     std::size_t pos = p.tellg();
-    op.append((const char*)p.getData() + pos, p.getDataSize() - pos);
+    op.append(static_cast<const char*>(p.getData()) + pos, p.getDataSize() - pos);
     p.seekg(p.getDataSize());
     return p;
+}
+
+std::ifstream& operator >> (std::ifstream& in, serialized_packet& p) {
+    // Use a temporary packet to deserialize the data size
+    std::uint32_t s;
+    serialized_packet tp;
+    std::vector<char> buffer(sizeof(s));
+    in.read(buffer.data(), buffer.size());
+    tp >> s;
+
+    // Then read the actual data
+    buffer.resize(s);
+    in.read(buffer.data(), s);
+    p.append(buffer.data(), s);
+
+    return in;
+}
+
+std::ofstream& operator << (std::ofstream& out, const serialized_packet& p) {
+    // Use a temporary pack to serialize the data size
+    serialized_packet tp;
+    std::uint32_t s = p.getDataSize();
+    tp << s;
+    out.write(static_cast<const char*>(tp.getData()), tp.getDataSize());
+
+    // Then write the actual data
+    out.write(static_cast<const char*>(p.getData()), p.getDataSize());
+
+    return out;
 }
 
 serialized_packet_view::serialized_packet_view(const serialized_packet& p) :

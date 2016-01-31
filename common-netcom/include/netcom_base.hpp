@@ -11,9 +11,9 @@
 #include <signal.hpp>
 #include <log.hpp>
 #include <holdable_signal_connection.hpp>
+#include <serialized_packet.hpp>
 #include "packet.hpp"
 #include "credential.hpp"
-#include "serialized_packet.hpp"
 
 // Unique ID attributed to any request.
 // It is external, but only used explicitly by the sender. It must thus only be unique from the

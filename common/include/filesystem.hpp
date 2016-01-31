@@ -42,9 +42,6 @@ namespace file {
     bool mkdir(const std::string& path);
     bool remove(const std::string& path);
     bool is_older(const std::string& file1, const std::string& file2);
-
-    bool file_to_packet(const std::string& path, sf::Packet& p);
-    bool packet_to_file(const sf::Packet& p, const std::string& path);
 }
 
 #endif

@@ -72,6 +72,9 @@ using packet_t = serialized_packet;
 serialized_packet& operator << (serialized_packet& p, const serialized_packet& ip);
 serialized_packet& operator >> (serialized_packet& p, serialized_packet& op);
 
+std::istream& operator >> (std::istream& in, serialized_packet& p);
+std::ostream& operator << (std::ostream& in, const serialized_packet& path);
+
 template<typename T, typename enable =
     typename std::enable_if<!ctl::exclude_overload<T,serialized_packet>::value>::type>
 serialized_packet& operator << (serialized_packet& p, T&& t) {
