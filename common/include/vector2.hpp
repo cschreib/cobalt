@@ -2,6 +2,7 @@
 #define VECTOR2_HPP
 
 #include <cmath>
+#include <serialized_packet.hpp>
 
 template<typename T>
 struct vec2_t {
@@ -155,16 +156,25 @@ vec2_t<T> operator * (N a, const vec2_t<T>& v) {
     return vec2_t<T>(v.x*a, v.y*a);
 }
 
-template<typename O, typename T>
-O& operator << (O& s, const vec2_t<T>& v) {
-    s << v.x << ", " << v.y;
-    return s;
+template<typename T>
+std::ostream& operator << (std::ostream& s, const vec2_t<T>& v) {
+    return s << v.x << ", " << v.y;
 }
 
-template<typename I, typename T>
-I& operator >> (I& s, vec2_t<T>& v) {
+template<typename T>
+std::istream& operator >> (std::istream& s, vec2_t<T>& v) {
     char delim;
     return s >> v.x >> delim >> v.y;
+}
+
+template<typename T>
+sf::Packet& operator << (sf::Packet& s, const vec2_t<T>& v) {
+    return s << v.x << v.y;
+}
+
+template<typename T>
+sf::Packet& operator >> (sf::Packet& s, vec2_t<T>& v) {
+    return s >> v.x >> v.y;
 }
 
 #endif
