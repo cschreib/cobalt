@@ -8,6 +8,37 @@
 #include <fstream>
 
 namespace server {
+    universe::universe() : object_factory_(std::make_unique<space_object_factory>()) {
+        // Add object factories?
+    }
+
+    universe::~universe() {}
+
+    bool universe::create_space(std::size_t size) {
+        // Ugly but...
+        switch (size) {
+            case  0 : return true;
+            case  2 : space_ = space_universe::make< 2>(); return true;
+            case  3 : space_ = space_universe::make< 3>(); return true;
+            case  4 : space_ = space_universe::make< 4>(); return true;
+            case  5 : space_ = space_universe::make< 5>(); return true;
+            case  6 : space_ = space_universe::make< 6>(); return true;
+            case  7 : space_ = space_universe::make< 7>(); return true;
+            case  8 : space_ = space_universe::make< 8>(); return true;
+            case  9 : space_ = space_universe::make< 9>(); return true;
+            case 10 : space_ = space_universe::make<10>(); return true;
+            case 11 : space_ = space_universe::make<11>(); return true;
+            case 12 : space_ = space_universe::make<12>(); return true;
+            case 13 : space_ = space_universe::make<13>(); return true;
+            case 14 : space_ = space_universe::make<14>(); return true;
+            case 15 : space_ = space_universe::make<15>(); return true;
+            case 16 : space_ = space_universe::make<16>(); return true;
+            default : return false;
+        }
+    }
+
+    /// Serialization
+
     static const std::string master_file_name = "universe.csf";
 
     struct universe_serializer_internal_buffer : v1::universe_serializer_internal_buffer {};
@@ -59,6 +90,10 @@ namespace server {
 
     // NB: this function must always use the latest format
     void universe_serializer::serialize(const std::string& dir) const {
+        if (!buffer_) {
+            throw std::runtime_error("cannot serialize if save_data() has not been called");
+        }
+
         // Write header
         std::ofstream file(dir+master_file_name, std::ios::binary);
 
@@ -80,10 +115,27 @@ namespace server {
 
         serialized_packet phdr;
         file >> phdr;
-        phdr >> buffer_->header.header;
+        if (!(phdr >> buffer_->header.header)) {
+            throw request::server::game_load::failure{
+                request::server::game_load::failure::reason::invalid_saved_game,
+                "could not read save format version"
+            };
+        }
 
         if (buffer_->header.header == v1::version_header) {
-            phdr >> buffer_->header.depth >> buffer_->header.nobject;
+            if (!(phdr >> buffer_->header.depth)) {
+                throw request::server::game_load::failure{
+                    request::server::game_load::failure::reason::invalid_saved_game,
+                    "could not read universe size"
+                };
+            };
+
+            if (!(phdr >> buffer_->header.nobject)) {
+                throw request::server::game_load::failure{
+                    request::server::game_load::failure::reason::invalid_saved_game,
+                    "could not read number of objects in universe"
+                };
+            };
 
             buffer_->objects.resize(buffer_->header.nobject);
             for (auto& so : buffer_->objects) {
@@ -92,55 +144,53 @@ namespace server {
         } else {
             throw request::server::game_load::failure{
                 request::server::game_load::failure::reason::invalid_saved_game,
-                "unsupported save file version '"+buffer_->header.header+"'"
+                "unsupported save file version"
             };
         }
     }
 
     // NB: this function must always use the latest format
     void universe_serializer::load_data_first_pass() {
-        // Ugly but...
-        switch (buffer_->header.depth) {
-            case  0 : return;
-            case  2 : universe_.space_ = space_universe::make< 2>(); break;
-            case  3 : universe_.space_ = space_universe::make< 3>(); break;
-            case  4 : universe_.space_ = space_universe::make< 4>(); break;
-            case  5 : universe_.space_ = space_universe::make< 5>(); break;
-            case  6 : universe_.space_ = space_universe::make< 6>(); break;
-            case  7 : universe_.space_ = space_universe::make< 7>(); break;
-            case  8 : universe_.space_ = space_universe::make< 8>(); break;
-            case  9 : universe_.space_ = space_universe::make< 9>(); break;
-            case 10 : universe_.space_ = space_universe::make<10>(); break;
-            case 11 : universe_.space_ = space_universe::make<11>(); break;
-            case 12 : universe_.space_ = space_universe::make<12>(); break;
-            case 13 : universe_.space_ = space_universe::make<13>(); break;
-            case 14 : universe_.space_ = space_universe::make<14>(); break;
-            case 15 : universe_.space_ = space_universe::make<15>(); break;
-            case 16 : universe_.space_ = space_universe::make<16>(); break;
-            default :  throw request::server::game_load::failure{
+        if (!universe_.create_space(buffer_->header.depth)) {
+            throw request::server::game_load::failure{
                 request::server::game_load::failure::reason::invalid_saved_game,
                 "the depth of the universe must be comprised between 2 and 16"
             };
         }
 
         // Create objects
+        std::size_t i = 0;
         for (auto& so : buffer_->objects) {
+            ++i;
             std::uint32_t id;
             std::uint16_t type;
             space::vec_t pos;
-            so >> id >> pos;
+            if (!(so >> id >> pos >> type)) {
+                throw request::server::game_load::failure{
+                    request::server::game_load::failure::reason::invalid_saved_game,
+                    "could not read generic object properties for object "+
+                    string::convert(i)+"/"+string::convert(buffer_->objects.size())
+                };
+            }
 
             space_cell* cell = universe_.space_->try_reach(pos);
             if (!cell) {
                 throw request::server::game_load::failure{
                     request::server::game_load::failure::reason::invalid_saved_game,
                     "invalid position for object "+string::convert(id)+
-                    " ("+string::convert(pos)+")"
+                    " ("+string::convert(pos)+"), out of universe"
+                };
+            } else if (!cell->empty()) {
+                throw request::server::game_load::failure{
+                    request::server::game_load::failure::reason::invalid_saved_game,
+                    "invalid position for object "+string::convert(id)+
+                    " ("+string::convert(pos)+"), object "+
+                    string::convert(cell->content().id())+" is already there"
                 };
             }
 
-            auto* factory = universe_.object_factory_.get_factory(type);
-            if (!factory) {
+            std::unique_ptr<space_object> ptr = universe_.object_factory_->make(type, id);
+            if (!ptr) {
                 throw request::server::game_load::failure{
                     request::server::game_load::failure::reason::invalid_saved_game,
                     "invalid object type code for object "+string::convert(id)+
@@ -148,7 +198,8 @@ namespace server {
                 };
             }
 
-            cell->fill(factory->deserialize(type, so));
+            ptr->deserialize(so);
+            cell->fill(std::move(ptr));
         }
     }
 

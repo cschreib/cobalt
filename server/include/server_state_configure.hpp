@@ -14,6 +14,7 @@ namespace state {
     public :
         struct generator_info {
             std::string id;
+            std::string libfile;
             // localized_string name, description;
             // a picture...
         };
@@ -29,7 +30,7 @@ namespace state {
 
         generator_list_t available_generators_;
         bool generating_ = false;
-        std::string generator_;
+        generator_info* generator_ = nullptr;
         std::string save_dir_;
 
         config::shared_state config_;

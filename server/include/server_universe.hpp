@@ -9,17 +9,22 @@
 namespace server {
     class universe_serializer;
     class space_object;
+    class space_object_factory;
 
     using space_universe = space::universe<server::space_object>;
 
     class universe {
         friend class universe_serializer;
 
-        std::unique_ptr<space_universe> space_;
+        std::unique_ptr<space_universe>       space_;
+        std::unique_ptr<space_object_factory> object_factory_;
 
     public :
-        universe() = default;
-        virtual ~universe() = default;
+        universe();
+
+        bool create_space(std::size_t size);
+
+        virtual ~universe();
 
         std::unique_ptr<universe_serializer> make_serializer();
     };

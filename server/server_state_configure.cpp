@@ -18,7 +18,7 @@ namespace state {
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::configure_get_current_generator>&& req) {
-            req.answer(generator_);
+            req.answer(generator_->id);
         });
 
         rw_pool_ << net_.watch_request(
@@ -110,26 +110,28 @@ namespace state {
         for (auto&& lib_file : libs) {
             shared_library lib("generators/"+lib_file);
             if (lib.open() && lib.load_symbol("generate_universe") != nullptr) {
-                available_generators_.insert(generator_info{lib_file});
+                available_generators_.insert(generator_info{
+                    file::remove_extension(lib_file), lib_file
+                });
             }
         }
 
         if (available_generators_.empty()) {
             out_.warning("no universe generator available, using default (empty universe)");
-            available_generators_.insert(generator_info{"default"});
+            available_generators_.insert(generator_info{"default", ""});
         }
 
-        generator_ = available_generators_.front().id;
+        set_generator(available_generators_.front().id);
     }
 
     bool configure::set_generator(const std::string& id) {
         auto iter = available_generators_.find(id);
         if (iter == available_generators_.end()) return false;
 
-        generator_ = id;
+        generator_ = &*iter;
         config_.clear();
-        config_.parse_from_file("generators/"+generator_+"_default.conf");
-        config_.set_value("generator", id);
+        config_.parse_from_file("generators/"+generator_->id+".conf");
+        config_.set_value("generator", generator_->id);
 
         return true;
     }
@@ -145,12 +147,12 @@ namespace state {
             throw failure{failure::reason::cannot_generate_while_loading, ""};
         }
 
-        if (generator_.empty()) {
+        if (!generator_) {
             throw failure{failure::reason::no_generator_set, ""};
         }
 
         // Load generator
-        std::string lib_file = "generators/"+generator_;
+        std::string lib_file = "generators/"+generator_->libfile;
         if (!file::exists(lib_file)) {
             throw failure{failure::reason::invalid_generator,
                 "file could not be found"};
@@ -175,17 +177,19 @@ namespace state {
                 "library does not contain the 'free_error' function"};
         }
 
+        // Make directory
+        if (save_dir_.empty()) {
+            save_dir_ = "saves/generated/"+generator_->id+"-"+today_str()+time_of_day_str()+"/";
+            file::mkdir(save_dir_);
+        }
+
+        config_.set_value("output_directory", save_dir_);
+
         // Serialize config
         std::string serialized_config; {
             std::ostringstream ss;
             config_.save(ss);
             serialized_config = ss.str();
-        }
-
-        // Make directory
-        if (save_dir_.empty()) {
-            save_dir_ = "saves/generated/"+generator_+"-"+today_str()+time_of_day_str()+"/";
-            file::mkdir(save_dir_);
         }
 
         // Save config
@@ -199,6 +203,7 @@ namespace state {
         net_.send_message<message::server::configure_generating>(server::netcom::all_actor_id);
         generating_ = true;
 
+        // Register callback for end of generation
         pool_ << net_.watch_message<watch_policy::once>(
             [this](message::server::configure_generated_internal msg) {
 
@@ -214,10 +219,20 @@ namespace state {
 
                 // When done, load it
                 try {
+                    // Register callback for end of loading
+                    pool_ << net_.watch_message<watch_policy::once>(
+                        [this](const message::server::configure_loaded_internal& msg) {
+
+                        message::server::configure_generated out_msg;
+                        out_msg.failed = msg.failed;
+                        if (msg.failed) {
+                            out_msg.reason = "loading of generated universe failed";
+                        }
+
+                        net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
+                    });
+
                     load_saved_game(save_dir_, true);
-                    message::server::configure_generated out_msg;
-                    out_msg.failed = false;
-                    net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
                 } catch (failure& fail) {
                     message::server::configure_generated out_msg;
                     out_msg.failed = true;
@@ -242,6 +257,7 @@ namespace state {
             }
         });
 
+        // Do the actual work in a thread
         if (thread_.joinable()) thread_.join();
         thread_ = std::thread([this, serialized_config, generate_universe, free_error](shared_library) {
             char* errmsg = nullptr;
@@ -259,7 +275,7 @@ namespace state {
                     }
                 }
 
-                net_.send_message(server::netcom::all_actor_id, msg);
+                net_.send_message(server::netcom::self_actor_id, msg);
 
                 if (errmsg != nullptr) {
                     (*free_error)(errmsg);
@@ -299,12 +315,24 @@ namespace state {
             // since the corresponding configuration is already loaded.
             config_.clear();
             config_.parse_from_file(dir+"generator.conf");
-            config_.get_value("generator", generator_);
+
+            std::string gid;
+            config_.get_value("generator", gid);
+
+            auto iter = available_generators_.find(gid);
+            if (iter == available_generators_.end()) {
+                generator_ = nullptr;
+                out_.warning("loading a saved game generated from an unknown generator '",
+                    gid, "'");
+            } else {
+                generator_ = &*iter;
+            }
         }
 
         loading_ = true;
         net_.send_message<message::server::configure_loading>(server::netcom::all_actor_id);
 
+        // Register callback for end of loading
         pool_ << net_.watch_message<watch_policy::once>(
             [this](const message::server::configure_loaded_internal& msg) {
 
@@ -312,10 +340,11 @@ namespace state {
             rw_pool_.unblock_all();
 
             message::server::configure_loaded out_msg;
-            out_msg.failed = true; out_msg.reason = msg.reason;
+            out_msg.failed = msg.failed; out_msg.reason = msg.reason;
             net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
         });
 
+        // Do the actual work in a thread
         if (thread_.joinable()) thread_.join();
         thread_ = std::thread([this, dir]() {
             message::server::configure_loaded_internal msg;
@@ -330,7 +359,7 @@ namespace state {
                 msg.reason = "unknown";
             }
 
-            net_.send_message(server::netcom::all_actor_id, msg);
+            net_.send_message(server::netcom::self_actor_id, msg);
         });
     }
 
