@@ -32,10 +32,18 @@ constexpr std::array<constant_credential_t, sizeof...(Args)> make_credential_arr
 #define NETCOM_REQUIRES(...) \
     static constexpr auto credentials = make_credential_array(__VA_ARGS__)
 
+// Trick to avoid undefined static member template errors in debug mode
 template<typename T>
 constant_credential_t get_credential(std::size_t i) {
     static constexpr auto credentials = T::credentials;
     return credentials[i];
+}
+
+// Trick to avoid undefined static member template errors in debug mode
+template<typename T>
+std::size_t get_num_credentials() {
+    static constexpr std::size_t num = T::credentials.size();
+    return num;
 }
 
 class constant_credential_list_t {
@@ -45,7 +53,8 @@ class constant_credential_list_t {
 public :
     template<typename T>
     constexpr constant_credential_list_t(ctl::type_list<T>) :
-        provider_([](std::size_t i) { return get_credential<T>(i); }), len_(T::credentials.size()) {}
+        provider_([](std::size_t i) { return get_credential<T>(i); }),
+        len_(get_num_credentials<T>()) {}
 
     class iterator {
         const constant_credential_list_t* parent_ = nullptr;
