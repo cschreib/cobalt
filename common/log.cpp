@@ -48,7 +48,7 @@ namespace color {
                 if (s.bold_) o << bold;
                 return o;
             } else {
-                return o << color_codes[s.bold_ ? 1 : 0][(char)s.col_ & 7];
+                return o << color_codes[s.bold_ ? 1 : 0][static_cast<char>(s.col_) & 7];
             }
         }
     }

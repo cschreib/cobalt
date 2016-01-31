@@ -54,7 +54,7 @@ namespace sf {
 
     template<typename T>
     packet_t::base& operator << (packet_t::base& p, const std::vector<T>& t) {
-        p << (std::uint32_t)t.size();
+        p << static_cast<std::uint32_t>(t.size());
         for (auto& i : t) {
             p << i;
         }
@@ -74,7 +74,7 @@ namespace sf {
 
     template<typename T, typename C>
     packet_t::base& operator << (packet_t::base& p, const ctl::sorted_vector<T,C>& t) {
-        p << (std::uint32_t)t.size();
+        p << static_cast<std::uint32_t>(t.size());
         for (auto& i : t) {
             p << i;
         }

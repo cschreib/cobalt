@@ -23,7 +23,7 @@ public :
 
     template<typename T>
     T* load_function(const std::string& name) {
-        return (T*)load_symbol(name);
+        return reinterpret_cast<T*>(load_symbol(name));
     }
 
     static const std::string file_extension;

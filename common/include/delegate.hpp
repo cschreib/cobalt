@@ -189,7 +189,7 @@ namespace ctl {
 
         template<typename T>
         static void inplace_mover_(delegate&& from, delegate& to) {
-            to.obj_ = new ((void*)to.inplace_) T(std::move(*static_cast<T*>(from.obj_)));
+            to.obj_ = new (static_cast<void*>(to.inplace_)) T(std::move(*static_cast<T*>(from.obj_)));
             inplace_deleter_<T>(from.obj_);
         }
 
@@ -224,7 +224,7 @@ namespace ctl {
         template<typename T>
         void init_obj_(T&& obj, std::true_type) {
             // Small object optimization
-            obj_ = new ((void*)inplace_) T(std::forward<T>(obj));
+            obj_ = new (static_cast<void*>(inplace_)) T(std::forward<T>(obj));
             del_ = &inplace_deleter_<T>;
             mov_ = &inplace_mover_<T>;
         }

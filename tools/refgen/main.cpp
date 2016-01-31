@@ -117,7 +117,7 @@ struct client_data_t {
 CXChildVisitResult visitor(CXCursor cursor, CXCursor parent, CXClientData client_data) {
     CXCursorKind cKind = clang_getCursorKind(cursor);
 
-    client_data_t& data = *(client_data_t*)client_data;
+    client_data_t& data = *static_cast<client_data_t*>(client_data);
 
     if (cKind == CXCursor_StructDecl || cKind == CXCursor_ClassDecl) {
         if (is_in_file(cursor, data.main_file_id)) {
@@ -342,7 +342,7 @@ sf::Packet& operator >> (sf::Packet& p, std::vector<T>& t) {
 
 template<typename T>
 sf::Packet& operator << (sf::Packet& p, const std::vector<T>& t) {
-    p << (std::uint32_t)t.size();
+    p << static_cast<std::uint32_t>(t.size());
     for (auto& i : t) {
         p << i;
     }
@@ -373,13 +373,13 @@ void save_db(const std::string& file, const std::deque<packet>& db) {
     std::ofstream out(file);
 
     sf::Packet sp;
-    sp << (std::uint32_t)db.size();
+    sp << static_cast<std::uint32_t>(db.size());
 
     for (auto& p : db) {
         sp << p;
     }
 
-    out.write((const char*)sp.getData(), sp.getDataSize());
+    out.write(reinterpret_cast<const char*>(sp.getData()), sp.getDataSize());
 }
 
 void load_db(const std::string& file, std::deque<packet>& db) {

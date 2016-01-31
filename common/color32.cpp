@@ -171,7 +171,7 @@ color32 operator * (float f, const color32& c2) {
 
 std::string uchar_to_hex(std::uint8_t i) {
     std::ostringstream ss;
-    ss << std::hex << (std::size_t)i;
+    ss << std::hex << static_cast<std::size_t>(i);
     std::string res = ss.str();
     if (res.size() != 2) {
         res = '0' + res;

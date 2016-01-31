@@ -148,13 +148,13 @@ namespace ctl {
             if (iter != b.childs.end()) {
                 if ((*iter)->is_branch) {
                     if (pos != std::string::npos) {
-                        return try_reach_((const branch&)**iter, name, pos+1);
+                        return try_reach_(static_cast<const branch&>(**iter), name, pos+1);
                     } else {
                         return nullptr;
                     }
                 } else {
                     if (pos == std::string::npos) {
-                        return (const leaf*)iter->get();
+                        return static_cast<const leaf*>(iter->get());
                     } else {
                         return nullptr;
                     }
@@ -177,13 +177,13 @@ namespace ctl {
             if (iter != b.childs.end()) {
                 if ((*iter)->is_branch) {
                     if (pos != std::string::npos) {
-                        return reach_((branch&)**iter, name, pos+1);
+                        return reach_(static_cast<branch&>(**iter), name, pos+1);
                     } else {
                         throw expecting_leaf_exception(name.substr(0, pos));
                     }
                 } else {
                     if (pos == std::string::npos) {
-                        return (leaf&)**iter;
+                        return static_cast<leaf&>(**iter);
                     } else {
                         throw expecting_branch_exception(name.substr(0, pos));
                     }
@@ -191,10 +191,10 @@ namespace ctl {
             } else {
                 if (pos == std::string::npos) {
                     auto iter = b.childs.insert(std::unique_ptr<node>(new leaf(node_name)));
-                    return (leaf&)**iter;
+                    return static_cast<leaf&>(**iter);
                 } else {
                     auto iter = b.childs.insert(std::unique_ptr<node>(new branch(node_name)));
-                    return reach_((branch&)**iter, name, pos+1);
+                    return reach_(static_cast<branch&>(**iter), name, pos+1);
                 }
             }
         }

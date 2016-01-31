@@ -35,7 +35,7 @@ namespace string {
         }
         static void serialize(char i, std::string& value) {
             std::ostringstream ss;
-            ss << (int)i;
+            ss << static_cast<int>(i);
             value = ss.str();
         }
     };
@@ -55,7 +55,7 @@ namespace string {
         }
         static void serialize(unsigned char i, std::string& value) {
             std::ostringstream ss;
-            ss << (unsigned int)i;
+            ss << static_cast<unsigned int>(i);
             value = ss.str();
         }
     };
