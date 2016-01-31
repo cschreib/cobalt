@@ -29,3 +29,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 endif()
 
 add_library(cobalt-common STATIC ${SRC_LIST})
+
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+  set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "-fPIC")
+endif()

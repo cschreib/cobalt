@@ -11,3 +11,7 @@ add_library(cobalt-client STATIC
     client_netcom.cpp
     client_player_list.cpp
 )
+
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+  set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "-fPIC")
+endif()

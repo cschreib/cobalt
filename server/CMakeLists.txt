@@ -20,3 +20,7 @@ add_library(cobalt-server STATIC
     server_universe.cpp
     server_space_object.cpp
 )
+
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+  set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "-fPIC")
+endif()

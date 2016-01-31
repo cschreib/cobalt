@@ -15,3 +15,7 @@ set(SRC_LIST
 )
 
 add_library(cobalt-common-netcom STATIC ${SRC_LIST})
+
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+  set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "-fPIC")
+endif()
