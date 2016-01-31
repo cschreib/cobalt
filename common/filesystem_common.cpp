@@ -27,27 +27,4 @@ namespace file {
         if (tree.size() == 1) return "./";
         return file.substr(0, file.size()-tree[tree.size()-1].size());
     }
-
-
-    bool file_to_packet(const std::string& path, sf::Packet& p) {
-        std::ifstream file(path, std::ios::binary);
-        if (!file) return false;
-
-        file.seekg(0, std::ios_base::end);
-        std::size_t nbyte = file.tellg();
-        file.seekg(0, std::ios_base::beg);
-
-        std::vector<char> buffer(nbyte);
-        p.append(buffer.data(), nbyte);
-    }
-
-    bool packet_to_file(const sf::Packet& p, const std::string& path) {
-        std::ofstream file(path, std::ios::binary);
-        if (!file) return false;
-
-        file.write(tp.getData(), tp.getDataSize());
-
-        if (!file) return false;
-        else       return true;
-    }
 }
