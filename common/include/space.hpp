@@ -270,6 +270,8 @@ namespace space {
     template<typename T>
     class universe {
     public :
+        virtual ~universe() = default;
+
         /// Create a new universe of depth D.
         template<std::size_t D>
         static std::unique_ptr<universe> make() {
