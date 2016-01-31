@@ -338,11 +338,23 @@ namespace space {
         /** \param callback The callback function to call. Must return a boolean
                             value, 'false' to stop the iteration, and 'true' to
                             keep going. The callback shall not modify the structure
-                            of the universe.
+                            of space.
         **/
-        virtual void for_each_cell(const ctl::function<bool(cell<T>&)>& callback) = 0;
+        virtual void for_each_cell(const ctl::delegate<bool(T&)>& callback) = 0;
         /// @copydoc space::universe::for_each_cell
-        virtual void for_each_cell(const ctl::function<bool(const cell<T>&)>& callback) const = 0;
+        virtual void for_each_cell(const ctl::delegate<bool(const T&)>& callback) const = 0;
+
+        /// Call the provided callback function on each non-empty cell in this universe.
+        /** \param callback The callback function to call. The callback shall not
+                            modify the structure of space.
+        **/
+        void for_each_cell(const ctl::delegate<void(T&)>& callback) {
+            for_each_cell([&callback](T& t) { callback(t); return true; });
+        }
+        /// @copydoc space::universe::for_each_cell
+        void for_each_cell(const ctl::delegate<void(const T&)>& callback) const {
+            for_each_cell([&callback](const T& t) { callback(t); return true; });
+        }
 
     protected :
         universe() = default;
@@ -371,15 +383,15 @@ namespace space {
         **/
         template<typename T, std::size_t N, std::size_t D>
         struct split_cell {
-            std::array<any_cell<T,N+1,D>,4> childs;
+            any_cell<T,N+1,D> childs[4];
 
         private :
             friend any_cell<T,N,D>;
 
-            explicit split_cell(any_cell<T,N,D>& self) : childs({{
+            explicit split_cell(any_cell<T,N,D>& self) : childs{
                 any_cell<T,N+1,D>(self), any_cell<T,N+1,D>(self),
                 any_cell<T,N+1,D>(self), any_cell<T,N+1,D>(self)
-            }}) {}
+            } {}
 
             split_cell(const split_cell&) = delete;
             split_cell& operator=(const split_cell&) = delete;
@@ -701,16 +713,16 @@ namespace space {
             }
 
             /// @copydoc space::universe::for_each_cell
-            void for_each_cell(const ctl::function<bool(cell<T>&)>& callback) override {
+            void for_each_cell(const ctl::delegate<bool(T&)>& callback) override {
                 const_cast<const universe*>(this)->for_each_cell_(root_,
-                    [](const cell<T>& c) { return callback(const_cast<cell<T>&>(c)); }
+                    [&callback](const T& c) { return callback(const_cast<T&>(c)); }
                 );
             }
 
             /// @copydoc space::universe::for_each_cell
-            void for_each_cell(const ctl::function<bool(const cell<T>&)>& callback) const override {
+            void for_each_cell(const ctl::delegate<bool(const T&)>& callback) const override {
                 for_each_cell_(root_, callback);
-            };
+            }
 
         private :
             /// The root cell of the quad-tree.
@@ -826,7 +838,7 @@ namespace space {
             **/
             template<std::size_t N>
             void for_each_cell_(const any_cell<T,N,D>& c,
-                const ctl::function<bool(const cell<T>&)>& callback) const {
+                const ctl::delegate<bool(const T&)>& callback) const {
 
                 if (!c.split) return;
                 for (auto& sc : c.split->childs) {
@@ -839,9 +851,9 @@ namespace space {
                 \param callback The function
             **/
             void for_each_cell_(const any_cell<T,D,D>& c,
-                const ctl::function<bool(const cell<T>&)>& callback) const {
+                const ctl::delegate<bool(const T&)>& callback) const {
 
-                if (!c.empty()) callback(c);
+                if (!c.empty()) callback(c.content());
             }
         };
     }
