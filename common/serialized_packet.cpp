@@ -49,7 +49,8 @@ serialized_packet_view serialized_packet::view() const {
 }
 
 serialized_packet::operator bool() {
-    return !endOfPacket();
+    using btype = bool (sf::Packet::*)(std::size_t);
+    return sf::Packet::operator btype() != nullptr;
 }
 
 serialized_packet& operator << (serialized_packet& p, const serialized_packet& ip) {
