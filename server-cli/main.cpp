@@ -1,6 +1,7 @@
 #include <server_instance.hpp>
 #include <server_state_configure.hpp>
 #include <server_state_test.hpp>
+#include <server_state_game.hpp>
 #include <log.hpp>
 #include <config.hpp>
 #include <signal.h>
@@ -78,6 +79,37 @@ int main(int argc, const char* argv[]) {
             pool << net.watch_request([&](server::netcom::request_t<request::server::ping>&& req){
                 out.note("ping client ", req.packet.from);
                 req.answer();
+            });
+
+            pool << net.watch_message([&](const message::server::configure_generating& msg) {
+                out.note("begin generating new universe...");
+            });
+
+            pool << net.watch_message([&](const message::server::configure_generated& msg) {
+                if (msg.failed) {
+                    out.error("generation of universe failed");
+                    out.reason(msg.reason);
+                } else {
+                    out.note("universe generated successfuly");
+                }
+            });
+
+            pool << net.watch_message([&](const message::server::configure_loading& msg) {
+                out.note("loading universe...");
+            });
+
+            pool << net.watch_message([&](const message::server::configure_loaded& msg) {
+                if (msg.failed) {
+                    out.error("loading of universe failed");
+                    out.reason(msg.reason);
+                } else {
+                    out.note("universe loaded successfuly");
+                }
+            });
+
+            pool << net.watch_message([&](const message::server::game_load_progress& msg) {
+                out.note("loading: ", msg.current_step, "/", msg.num_steps,
+                    " (", msg.current_step_name, ")");
             });
 
             std::string start_state = "configure";
