@@ -202,11 +202,9 @@ namespace ctl {
     template<typename Pack1, typename Pack2>
     struct are_convertible;
 
-    template<typename T1, typename T2,typename ... Args1, typename ... Args2>
-    struct are_convertible<type_list<T1, Args1...>, type_list<T2, Args2...>> {
-        static const bool value = std::is_convertible<T1,T2>::value &&
-            are_convertible<type_list<Args1...>, type_list<Args2...>>::value;
-    };
+    template<typename ... Args1, typename ... Args2>
+    struct are_convertible<type_list<Args1...>, type_list<Args2...>> :
+        are_true<std::is_convertible<Args1, Args2>...> {};
 
     template<>
     struct are_convertible<type_list<>, type_list<>> {
