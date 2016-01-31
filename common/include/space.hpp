@@ -334,6 +334,16 @@ namespace space {
         virtual void clip(const axis_aligned_box2d& box,
             ctl::sorted_vector<const cell<T>&>& list) const = 0;
 
+        /// Call the provided callback function on each non-empty cell in this universe.
+        /** \param callback The callback function to call. Must return a boolean
+                            value, 'false' to stop the iteration, and 'true' to
+                            keep going. The callback shall not modify the structure
+                            of the universe.
+        **/
+        virtual void for_each_cell(const ctl::function<bool(T&)>& callback) = 0;
+        /// @copydoc space::universe::for_each_cell
+        virtual void for_each_cell(const ctl::function<bool(const T&)>& callback) const = 0;
+
     protected :
         universe() = default;
         universe(const universe&) = delete;
@@ -690,6 +700,18 @@ namespace space {
                 clip_(root_, box + vec2d(half_size, half_size), list);
             }
 
+            /// @copydoc space::universe::for_each_cell
+            void for_each_cell(const ctl::function<bool(T&)>& callback) override {
+                const_cast<const universe*>(this)->for_each_cell_(root_,
+                    [](const T& c) { return callback(const_cast<T&>(c)); }
+                );
+            }
+
+            /// @copydoc space::universe::for_each_cell
+            void for_each_cell(const ctl::function<bool(const T&)>& callback) const override {
+                for_each_cell_(root_, callback);
+            };
+
         private :
             /// The root cell of the quad-tree.
             any_cell<T,1,D> root_;
@@ -796,6 +818,30 @@ namespace space {
                 if (!c.empty()) {
                     list.insert(c);
                 }
+            }
+
+            /// Recursively traverse the quad-tree to call a function on each non-empty cell.
+            /** \param c        The cell to dive in
+                \param callback The function
+            **/
+            template<std::size_t N>
+            void for_each_cell_(const any_cell<T,N,D>& c,
+                const ctl::function<bool(const T&)>& callback) const {
+
+                if (!c.split) return;
+                for (auto& sc : c.split->childs) {
+                    for_each_cell_(sc, callback);
+                }
+            }
+
+            /// Recursively traverse the quad-tree to call a function on each non-empty cell.
+            /** \param c        The cell to dive in
+                \param callback The function
+            **/
+            void for_each_cell_(const any_cell<T,D,D>& c,
+                const ctl::function<bool(const T&)>& callback) const {
+
+                if (!c.empty()) callback(c.content());
             }
         };
     }
