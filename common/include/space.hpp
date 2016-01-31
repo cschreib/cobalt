@@ -340,9 +340,9 @@ namespace space {
                             keep going. The callback shall not modify the structure
                             of the universe.
         **/
-        virtual void for_each_cell(const ctl::function<bool(T&)>& callback) = 0;
+        virtual void for_each_cell(const ctl::function<bool(cell<T>&)>& callback) = 0;
         /// @copydoc space::universe::for_each_cell
-        virtual void for_each_cell(const ctl::function<bool(const T&)>& callback) const = 0;
+        virtual void for_each_cell(const ctl::function<bool(const cell<T>&)>& callback) const = 0;
 
     protected :
         universe() = default;
@@ -701,14 +701,14 @@ namespace space {
             }
 
             /// @copydoc space::universe::for_each_cell
-            void for_each_cell(const ctl::function<bool(T&)>& callback) override {
+            void for_each_cell(const ctl::function<bool(cell<T>&)>& callback) override {
                 const_cast<const universe*>(this)->for_each_cell_(root_,
-                    [](const T& c) { return callback(const_cast<T&>(c)); }
+                    [](const cell<T>& c) { return callback(const_cast<cell<T>&>(c)); }
                 );
             }
 
             /// @copydoc space::universe::for_each_cell
-            void for_each_cell(const ctl::function<bool(const T&)>& callback) const override {
+            void for_each_cell(const ctl::function<bool(const cell<T>&)>& callback) const override {
                 for_each_cell_(root_, callback);
             };
 
@@ -826,7 +826,7 @@ namespace space {
             **/
             template<std::size_t N>
             void for_each_cell_(const any_cell<T,N,D>& c,
-                const ctl::function<bool(const T&)>& callback) const {
+                const ctl::function<bool(const cell<T>&)>& callback) const {
 
                 if (!c.split) return;
                 for (auto& sc : c.split->childs) {
@@ -839,9 +839,9 @@ namespace space {
                 \param callback The function
             **/
             void for_each_cell_(const any_cell<T,D,D>& c,
-                const ctl::function<bool(const T&)>& callback) const {
+                const ctl::function<bool(const cell<T>&)>& callback) const {
 
-                if (!c.empty()) callback(c.content());
+                if (!c.empty()) callback(c);
             }
         };
     }
