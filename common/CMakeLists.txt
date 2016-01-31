@@ -14,6 +14,7 @@ set(SRC_LIST
     ${PROJECT_SOURCE_DIR}/string_tree.cpp
     ${PROJECT_SOURCE_DIR}/time.cpp
     ${PROJECT_SOURCE_DIR}/xorshift.cpp
+    ${PROJECT_SOURCE_DIR}/serialized_packet.cpp
     ${PROJECT_SOURCE_DIR}/log.cpp
 )
 
