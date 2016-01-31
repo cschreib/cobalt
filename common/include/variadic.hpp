@@ -277,12 +277,10 @@ namespace ctl {
     };
 
     template<typename T>
-    using function_arguments = typename function_arguments_t<typename std::decay<T>::type>::type;
+    struct function_arguments_t : function_arguments_t<decltype(&T::operator())> {};
 
     template<typename T>
-    using functor_arguments_ = function_arguments<decltype(&T::operator())>;
-    template<typename T>
-    using functor_arguments = functor_arguments_<typename std::decay<T>::type>;
+    using function_arguments = typename function_arguments_t<typename std::decay<T>::type>::type;
 
     template<typename T>
     struct function_argument_t;
@@ -298,12 +296,10 @@ namespace ctl {
     };
 
     template<typename T>
-    using function_argument = typename function_argument_t<typename std::decay<T>::type>::type;
+    struct function_argument_t : function_argument_t<decltype(&T::operator())> {};
 
     template<typename T>
-    using functor_argument_ = function_argument<decltype(&T::operator())>;
-    template<typename T>
-    using functor_argument = functor_argument_<typename std::decay<T>::type>;
+    using function_argument = typename function_argument_t<typename std::decay<T>::type>::type;
 
     template<typename T>
     struct argument_count_;
@@ -324,6 +320,9 @@ namespace ctl {
 
     template<typename T>
     struct return_type_t;
+
+    template<typename T>
+    struct return_type_t : return_type_t<decltype(&T::operator())> {};
 
     template<typename R, typename ... Args>
     struct return_type_t<R(Args...)> {

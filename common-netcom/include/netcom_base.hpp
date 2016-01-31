@@ -758,7 +758,7 @@ public :
         // Check the function signature
         static_assert(ctl::argument_count<FR>::value == 1,
             "answer reception handler can only take one argument");
-        using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
+        using ArgType = typename std::decay<ctl::function_argument<FR>>::type;
         static_assert(netcom_impl::is_request_answer<ArgType>::value ||
                       std::is_same<ArgType, typename RequestType::answer>::value,
             "answer reception handler argument must either be a packet::answer or "
@@ -783,7 +783,7 @@ private :
     /// Watch function argument is a plain packet
     template<template<typename> class WP, typename FR>
     signal_connection_base& watch_message_(FR&& receive_func, std::false_type) {
-        using MessageType = typename std::decay<ctl::functor_argument<FR>>::type;
+        using MessageType = typename std::decay<ctl::function_argument<FR>>::type;
         using ArgType = message_t<MessageType>;
 
         // Find the signal corresponding to this packet type
@@ -800,7 +800,7 @@ private :
     /// Watch function argument is a message_t<P>
     template<template<typename> class WP, typename FR>
     signal_connection_base& watch_message_(FR&& receive_func, std::true_type) {
-        using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
+        using ArgType = typename std::decay<ctl::function_argument<FR>>::type;
         using MessageType = typename ArgType::packet_t;
 
         // Find the signal corresponding to this packet type
@@ -820,7 +820,7 @@ public :
         // Check the function signature
         static_assert(ctl::argument_count<FR>::value == 1,
             "message reception handler can only take one argument");
-        using ArgType = typename std::decay<ctl::functor_argument<FR>>::type;
+        using ArgType = typename std::decay<ctl::function_argument<FR>>::type;
         static_assert(netcom_impl::is_message<ArgType>::value ||
                       packet_impl::is_packet<ArgType>::value,
             "message reception handler argument must either be a packet or a message_t");
@@ -919,7 +919,7 @@ public :
         // Check the function signature
         static_assert(ctl::argument_count<FR>::value == 1,
             "request reception handler can only take one argument");
-        using Arg = typename std::decay<ctl::functor_argument<FR>>::type;
+        using Arg = typename std::decay<ctl::function_argument<FR>>::type;
         static_assert(netcom_impl::is_request<Arg>::value,
             "request reception handler argument must be a request_t");
 

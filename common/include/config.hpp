@@ -224,7 +224,7 @@ namespace config {
         signal_connection_base& bind(const std::string& name, F&& func) {
             static_assert(ctl::argument_count<F>::value == 1,
                 "configuration callback can only take one argument");
-            using ArgType = typename std::decay<ctl::functor_argument<F>>::type;
+            using ArgType = typename std::decay<ctl::function_argument<F>>::type;
             static_assert(impl::is_configurable<ArgType>::value,
                 "configuration callback argument must be configurable");
 
@@ -256,7 +256,7 @@ namespace config {
         signal_connection_base& bind(const std::string& name, F&& func, const N& def) {
             static_assert(ctl::argument_count<F>::value == 1,
                 "configuration callback can only take one argument");
-            using ArgType = typename std::decay<ctl::functor_argument<F>>::type;
+            using ArgType = typename std::decay<ctl::function_argument<F>>::type;
             static_assert(impl::is_configurable<ArgType>::value,
                 "configuration callback argument must be configurable");
 

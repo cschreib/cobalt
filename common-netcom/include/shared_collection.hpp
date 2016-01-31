@@ -401,7 +401,7 @@ public :
     void make_collection_packet(F&& func) {
         static_assert(ctl::argument_count<F>::value == 1,
             "make_collection_packet function can only take one argument (collection packet)");
-        using ArgType = typename std::decay<ctl::functor_argument<F>>::type;
+        using ArgType = typename std::decay<ctl::function_argument<F>>::type;
         static_assert(std::is_same<ArgType, full_collection_packet>::value,
             "argument of make_collection_packet function must be a <trait>::full_packet");
 
@@ -412,7 +412,7 @@ public :
 private :
     template<typename F>
     void register_client_(F&& func, std::integral_constant<std::size_t,2>) {
-        using ArgTypes = ctl::functor_arguments<F>;
+        using ArgTypes = ctl::function_arguments<F>;
         using Arg1 = ctl::type_list_element<0,ArgTypes>;
         using Arg2 = ctl::type_list_element<1,ArgTypes>;
         static_assert(std::is_same<Arg1, register_collection_packet>::value,
@@ -425,7 +425,7 @@ private :
 
     template<typename F>
     void register_client_(F&& func, std::integral_constant<std::size_t,1>) {
-        using ArgType = typename std::decay<ctl::functor_argument<F>>::type;
+        using ArgType = typename std::decay<ctl::function_argument<F>>::type;
         static_assert(std::is_empty<register_collection_failed_packet>::value,
             "register_client function is missing failure packet in its signature (the failure "
             "packet is not empty and thus cannot be ignored)");
