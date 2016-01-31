@@ -14,7 +14,7 @@ namespace ctl {
         Inspired from: [1] www.lafstern.org/matt/col1.pdf
 
         The sorted vector achieves the same O(log(N)) look up complexity as std::set, but with a
-        lower constant of propor- tionality thanks to the binary search algorithm (twice lower
+        lower constant of proportionality thanks to the binary search algorithm (twice lower
         according to [1]). The fact that this container uses an std::vector internally also implies
         that it has the lowest possible memory usage.
 
@@ -44,10 +44,10 @@ namespace ctl {
                     return n1.id < n2.id;
                 }
                 bool operator() (const test& n1, int i) const {
-                    return n1.id < s;
+                    return n1.id < i;
                 }
                 bool operator() (int i, const test& n2) const {
-                    return s < n2.id;
+                    return i < n2.id;
                 }
             };
         \endcode
