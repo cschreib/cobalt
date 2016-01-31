@@ -176,9 +176,8 @@ namespace ctl {
     using tuple_to_type_list = typename tuple_to_type_list_<typename std::decay<T>::type>::type;
 
     template<typename ... Args, typename ... TArgs>
-    struct are_true<type_list<Args...>, TArgs...> {
-        static const bool value = are_true<Args...>::value && are_true<TArgs...>::value;
-    };
+    struct are_true<type_list<Args...>, TArgs...> : std::integral_constant<bool,
+        are_true<Args...>::value && are_true<TArgs...>::value> {};
 
     namespace impl {
         template<template<typename> class A, typename T>
