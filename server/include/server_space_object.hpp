@@ -2,6 +2,7 @@
 #define SERVER_SPACE_OBJECT_HPP
 
 #include <space.hpp>
+#include <uuid.hpp>
 #include <std_addon.hpp>
 
 namespace server {
@@ -10,17 +11,17 @@ namespace server {
     using space_cell = space::cell<server::space_object>;
 
     class space_object {
-        const std::uint32_t id_;
+        const uuid_t id_;
         space_cell* cell_;
 
     public :
-        explicit space_object(std::uint32_t);
+        explicit space_object(uuid_t);
         virtual ~space_object() = default;
 
         virtual void serialize(serialized_packet& p) const = 0;
         virtual void deserialize(serialized_packet& p) = 0;
 
-        std::uint32_t id() const;
+        uuid_t id() const;
         virtual std::uint16_t type() const = 0;
 
         space_cell* cell();
@@ -34,13 +35,31 @@ namespace server {
 
             explicit object_factory(std::uint16_t t) : type(t) {}
             virtual ~object_factory() = default;
-            virtual std::unique_ptr<space_object> make(std::uint32_t id) const = 0;
+            virtual std::unique_ptr<space_object> make() const = 0;
+            virtual std::unique_ptr<space_object> make(uuid_t id) const = 0;
         };
 
         template<typename T>
         struct object_factory_impl : object_factory {
             explicit object_factory_impl(std::uint16_t t) : object_factory(t) {}
-            std::unique_ptr<space_object> make(std::uint32_t id) const override {
+            std::unique_ptr<space_object> make() const override {
+                std::unique_ptr<space_object> obj;
+
+                // Pre-allocate memory to get uuid before object is constructed
+                void* buffer = operator new(sizeof(T));
+                uuid_t id = make_uuid(buffer);
+
+                // Construct object
+                try {
+                    obj = new (buffer) T(id);
+                } catch (...) {
+                    operator delete(buffer);
+                }
+
+                return obj;
+            }
+
+            std::unique_ptr<space_object> make(uuid_t id) const override {
                 return std::make_unique<T>(id);
             }
         };
@@ -67,7 +86,8 @@ namespace server {
             factories_.insert(std::make_unique<object_factory_impl<T>>(type));
         }
 
-        std::unique_ptr<space_object> make(std::uint16_t type, std::uint32_t id) const;
+        std::unique_ptr<space_object> make(std::uint16_t type) const;
+        std::unique_ptr<space_object> make(std::uint16_t type, uuid_t id) const;
     };
 }
 

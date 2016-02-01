@@ -162,9 +162,10 @@ namespace server {
         std::size_t i = 0;
         for (auto& so : buffer_->objects) {
             ++i;
-            std::uint32_t id;
-            std::uint16_t type;
+            uuid_t id;
             space::vec_t pos;
+            std::uint16_t type;
+
             if (!(so >> id >> pos >> type)) {
                 throw request::server::game_load::failure{
                     request::server::game_load::failure::reason::invalid_saved_game,

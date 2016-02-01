@@ -1,9 +1,9 @@
 #include "server_space_object.hpp"
 
 namespace server {
-    space_object::space_object(std::uint32_t id) : id_(id) {}
+    space_object::space_object(uuid_t id) : id_(id) {}
 
-    std::uint32_t space_object::id() const {
+    uuid_t space_object::id() const {
         return id_;
     }
 
@@ -19,9 +19,14 @@ namespace server {
         cell_ = c;
     }
 
+    std::unique_ptr<space_object> space_object_factory::make(std::uint16_t type) const {
+        auto iter = factories_.find(type);
+        if (iter == factories_.end()) return nullptr;
 
-    std::unique_ptr<space_object> space_object_factory::make(std::uint16_t type,
-        std::uint32_t id) const {
+        return (*iter)->make();
+    }
+
+    std::unique_ptr<space_object> space_object_factory::make(std::uint16_t type, uuid_t id) const {
         auto iter = factories_.find(type);
         if (iter == factories_.end()) return nullptr;
 
