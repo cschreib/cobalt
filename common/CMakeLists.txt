@@ -16,6 +16,7 @@ set(SRC_LIST
     ${PROJECT_SOURCE_DIR}/xorshift.cpp
     ${PROJECT_SOURCE_DIR}/serialized_packet.cpp
     ${PROJECT_SOURCE_DIR}/log.cpp
+    ${PROJECT_SOURCE_DIR}/uuid.cpp
 )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
