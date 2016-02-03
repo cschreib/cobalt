@@ -3,7 +3,8 @@
 
 #include "server_netcom.hpp"
 #include "server_state.hpp"
-#include "config_shared_state.hpp"
+#include "server_player_list.hpp"
+#include <config_shared_state.hpp>
 #include <thread>
 
 namespace server {
@@ -35,9 +36,13 @@ namespace state {
 
         config::shared_state config_;
 
+        std::unique_ptr<server::player_list> plist_;
+
         ctl::sorted_vector<std::string> saved_games_;
         std::unique_ptr<state::game> loaded_game_;
         bool loading_ = false;
+
+        void load_generated_saved_game_();
 
     public :
         explicit configure(server::instance& serv);

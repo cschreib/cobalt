@@ -4,6 +4,7 @@
 #include "server_state.hpp"
 #include "server_serializable.hpp"
 #include "server_universe.hpp"
+#include "server_player_list.hpp"
 #include "ptr_vector.hpp"
 #include "space.hpp"
 #include <thread>
@@ -18,10 +19,14 @@ namespace state {
 
         ctl::ptr_vector<server::serializable> save_chunks_;
 
+        std::unique_ptr<server::player_list> plist_;
+
         server::universe universe_;
 
     public :
         explicit game(server::instance& serv);
+
+        void set_player_list(std::unique_ptr<server::player_list> plist);
 
         void save_to_directory(const std::string& dir);
         void load_from_directory(const std::string& dir);

@@ -12,6 +12,8 @@ namespace state {
 
         update_generator_list();
 
+        plist_ = std::make_unique<server::player_list>(net_, serv_.get_conf());
+
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::configure_list_generators>&& req) {
             req.answer(available_generators_);
@@ -124,11 +126,10 @@ namespace state {
         }
 
         if (available_generators_.empty()) {
-            out_.warning("no universe generator available, using default (empty universe)");
-            available_generators_.insert(generator_info{"default", ""});
+            out_.warning("no universe generator available");
+        } else {
+            set_generator(available_generators_.front().id);
         }
-
-        set_generator(available_generators_.front().id);
     }
 
     bool configure::set_generator(const std::string& id) {
@@ -216,51 +217,13 @@ namespace state {
 
             generating_ = false;
 
-            if (msg.failed) {
+            if (!msg.failed) {
+                load_generated_saved_game_();
+            } else {
                 message::server::configure_generated out_msg;
                 out_msg.failed = true; out_msg.reason = msg.reason;
                 net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
                 rw_pool_.unblock_all();
-            } else {
-                using failure = request::server::configure_load_game::failure;
-
-                // When done, load it
-                try {
-                    // Register callback for end of loading
-                    pool_ << net_.watch_message<watch_policy::once>(
-                        [this](const message::server::configure_loaded_internal& msg) {
-
-                        message::server::configure_generated out_msg;
-                        out_msg.failed = msg.failed;
-                        if (msg.failed) {
-                            out_msg.reason = "loading of generated universe failed";
-                        }
-
-                        net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
-                    });
-
-                    load_saved_game(save_dir_, true);
-                } catch (failure& fail) {
-                    message::server::configure_generated out_msg;
-                    out_msg.failed = true;
-                    switch (fail.rsn) {
-                        case failure::reason::invalid_saved_game :
-                            out_msg.reason = "the generated save file is invalid"; break;
-                        case failure::reason::no_such_saved_game :
-                        case failure::reason::already_loading :
-                        case failure::reason::cannot_load_while_generating :
-                            // Will never happen
-                            out_msg.reason = "unexpected code path: logic error while calling "
-                                "load_saved_game inside generate";
-                            out_.error(out_msg.reason);
-                            break;
-                    }
-                    net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
-                    rw_pool_.unblock_all();
-                } catch (...) {
-                    rw_pool_.unblock_all();
-                    throw;
-                }
             }
         });
 
@@ -291,6 +254,49 @@ namespace state {
 
             ret = (*generate_universe)(serialized_config.c_str(), &errmsg);
         }, std::move(lib));
+    }
+
+    void configure::load_generated_saved_game_() {
+        using failure = request::server::configure_load_game::failure;
+
+        // Register callback for end of loading
+        pool_ << net_.watch_message<watch_policy::once>(
+            [this](const message::server::configure_loaded_internal& msg) {
+
+            message::server::configure_generated out_msg;
+            out_msg.failed = msg.failed;
+            if (msg.failed) {
+                out_msg.reason = "loading of generated universe failed";
+            }
+
+            net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
+        });
+
+        // Try loading
+        try {
+            load_saved_game(save_dir_, true);
+        } catch (failure& fail) {
+            message::server::configure_generated out_msg;
+            out_msg.failed = true;
+            switch (fail.rsn) {
+                case failure::reason::invalid_saved_game :
+                    out_msg.reason = "the generated save file is invalid"; break;
+                case failure::reason::no_such_saved_game :
+                case failure::reason::already_loading :
+                case failure::reason::cannot_load_while_generating :
+                    // Will never happen
+                    out_msg.reason = "unexpected code path: logic error while calling "
+                        "load_saved_game inside generate";
+                    out_.error(out_msg.reason);
+                    break;
+            }
+
+            net_.send_message(server::netcom::all_actor_id, std::move(out_msg));
+            rw_pool_.unblock_all();
+        } catch (...) {
+            rw_pool_.unblock_all();
+            throw;
+        }
     }
 
     void configure::load_saved_game(const std::string& dir, bool just_generated) {
@@ -355,14 +361,15 @@ namespace state {
         if (thread_.joinable()) thread_.join();
         thread_ = std::thread([this, dir]() {
             message::server::configure_loaded_internal msg;
-            msg.failed = true;
+            msg.failed = false;
 
             try {
                 loaded_game_->load_from_directory(dir);
-                msg.failed = false;
             } catch (request::server::game_load::failure& fail) {
+                msg.failed = true;
                 msg.reason = fail.details;
             } catch (...) {
+                msg.failed = true;
                 msg.reason = "unknown";
             }
 
@@ -385,6 +392,7 @@ namespace state {
             throw failure{failure::reason::no_game_loaded, ""};
         }
 
+        loaded_game_->set_player_list(std::move(plist_));
         serv_.set_state(std::move(loaded_game_));
     }
 }

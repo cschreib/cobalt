@@ -62,6 +62,10 @@ namespace state {
         });
     }
 
+    void game::set_player_list(std::unique_ptr<server::player_list> plist) {
+        plist_ = std::move(plist);
+    }
+
     void game::save_to_directory(const std::string& dir) {
         using failure = request::server::game_save::failure;
 
