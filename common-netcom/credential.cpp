@@ -28,6 +28,10 @@ void credential_list_t::clear() {
     list_.clear();
 }
 
+std::size_t credential_list_t::size() const {
+    return list_.size();
+}
+
 bool credential_list_t::empty() const {
     return list_.empty();
 }

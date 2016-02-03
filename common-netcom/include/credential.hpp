@@ -113,6 +113,7 @@ public :
     void remove(const credential_t& removed);
     void remove(const credential_list_t& removed);
     void clear();
+    std::size_t size() const;
     bool empty() const;
 
     using const_iterator = ctl::sorted_vector<credential_t>::const_iterator;
