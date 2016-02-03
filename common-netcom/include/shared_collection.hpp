@@ -539,6 +539,9 @@ public :
     /// Triggered when the collection is cleared.
     signal_t<void(const clear_collection_packet&)> on_clear;
 
+    /// Triggered when the collection is disconnected.
+    signal_t<void()> on_disconnect;
+
     template<typename T = register_collection_packet>
     void connect(actor_id_t aid, T&& arg = register_collection_packet()) {
         using ArgType = typename std::decay<T>::type;
@@ -599,6 +602,8 @@ public :
 
     void disconnect() {
         if (!connected_) return;
+
+        on_disconnect.dispatch();
 
         net_->send_message(aid_, make_packet<message::leave_shared_collection>(id()));
         pool_.stop_all();
