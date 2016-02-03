@@ -23,11 +23,17 @@ namespace server {
         struct answer {
             ::server::state_id state;
         };
+        struct failure {};
     };
 
     NETCOM_PACKET(shutdown) {
         NETCOM_REQUIRES("admin");
 
+        struct answer {};
+        struct failure {};
+    };
+
+    NETCOM_PACKET(stop_and_iddle) {
         struct answer {};
         struct failure {};
     };

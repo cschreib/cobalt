@@ -1,5 +1,7 @@
 #include "server_state_game.hpp"
-#include "filesystem.hpp"
+#include "server_state_iddle.hpp"
+#include "server_instance.hpp"
+#include <filesystem.hpp>
 
 namespace server {
 namespace state {
@@ -51,6 +53,12 @@ namespace state {
                 out_.error("unexpected exception in game::load_from_directory()");
                 throw;
             }
+        });
+
+        pool_ << net_.watch_request(
+            [this](server::netcom::request_t<request::server::stop_and_iddle>&& req) {
+            serv_.set_state<server::state::iddle>();
+            req.answer();
         });
     }
 

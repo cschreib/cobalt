@@ -1,5 +1,6 @@
 #include "server_state_configure.hpp"
 #include "server_state_game.hpp"
+#include "server_state_iddle.hpp"
 #include "server_instance.hpp"
 #include <filesystem.hpp>
 #include <time.hpp>
@@ -78,6 +79,12 @@ namespace state {
                 out_.error("unexpected exception in configure::run_game()");
                 throw;
             }
+        });
+
+        rw_pool_ << net_.watch_request(
+            [this](server::netcom::request_t<request::server::stop_and_iddle>&& req) {
+            serv_.set_state<server::state::iddle>();
+            req.answer();
         });
     }
 
