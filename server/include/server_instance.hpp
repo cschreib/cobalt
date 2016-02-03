@@ -50,6 +50,7 @@ namespace server {
     class instance {
         logger log_;
 
+        config::state& conf_;
         netcom net_;
         scoped_connection_pool pool_;
 
@@ -64,6 +65,7 @@ namespace server {
 
         logger& get_log();
         netcom& get_netcom();
+        config::state& get_conf();
 
         bool is_running() const;
         void run();

@@ -8,9 +8,9 @@ namespace server {
             log.add_output<file_logger>(conf, "server");
             log.add_output<cout_logger>(conf);
             return log;
-        }()), net_(conf, log_), shutdown_(false) {
+        }()), conf_(conf), net_(conf_, log_), shutdown_(false) {
 
-        pool_ << conf.bind("admin.password", admin_password_);
+        pool_ << conf_.bind("admin.password", admin_password_);
 
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::admin_rights>&& req) {
@@ -33,6 +33,10 @@ namespace server {
 
     logger& instance::get_log() {
         return log_;
+    }
+
+    config::state& instance::get_conf() {
+        return conf_;
     }
 
     server::netcom& instance::get_netcom() {
