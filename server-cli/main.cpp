@@ -1,6 +1,5 @@
 #include <server_instance.hpp>
 #include <server_state_configure.hpp>
-#include <server_state_test.hpp>
 #include <server_state_game.hpp>
 #include <log.hpp>
 #include <config.hpp>
