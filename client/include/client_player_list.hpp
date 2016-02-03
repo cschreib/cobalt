@@ -18,6 +18,9 @@ namespace client {
         signal_t<void()> on_list_received;
         signal_t<void()> on_connect_fail;
 
+        void disconnect();
+        signal_t<void()> on_disconnect;
+
         bool is_connected() const;
 
         bool is_player(actor_id_t id) const;

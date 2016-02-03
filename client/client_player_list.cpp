@@ -18,6 +18,12 @@ namespace client {
                     msg.answer.id
                 );
 
+                collection_.on_disconnect.connect([this]() {
+                    leave();
+                    players_.clear();
+                    on_disconnect.dispatch();
+                });
+
                 collection_.on_received.connect([this](const packet::player_list& lst) {
                     for (auto& p : lst.players) {
                         players_.emplace_back(p.id, p.ip, p.name, p.color, p.is_ai);
@@ -60,6 +66,10 @@ namespace client {
                 collection_.connect(netcom::server_actor_id);
             }
         );
+    }
+
+    void player_list::disconnect() {
+        collection_.disconnect();
     }
 
     bool player_list::is_connected() const {
