@@ -111,4 +111,14 @@ namespace string {
 
         return ret;
     }
+
+    std::string collapse(const std::vector<std::string>& sv, const std::string& sep) {
+        std::string ret = sv[0];
+        for (std::size_t i : range(1, sv)) {
+            ret += sep;
+            ret += sv[1];
+        }
+
+        return ret;
+    }
 }

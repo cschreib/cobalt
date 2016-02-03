@@ -50,6 +50,7 @@ namespace string {
     bool start_with(const std::string& s, const std::string& pattern);
     bool end_with(const std::string& s, const std::string& pattern);
     std::vector<std::string> split(const std::string& ts, const std::string& pattern);
+    std::string collapse(const std::vector<std::string>& sv, const std::string& sep);
 }
 
 #endif
