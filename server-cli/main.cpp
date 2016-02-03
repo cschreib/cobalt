@@ -111,18 +111,6 @@ int main(int argc, const char* argv[]) {
                     " (", msg.current_step_name, ")");
             });
 
-            std::string start_state = "configure";
-            conf.get_value("state", start_state, start_state);
-            out.note("switching server to '", start_state, "' state");
-
-            if (start_state == "configure") {
-                serv.set_state<server::state::configure>();
-            } else if (start_state == "test") {
-                serv.set_state<server::state::test>();
-            } else {
-                out.error("unknown state '", start_state, "'");
-            }
-
             serv.run();
 
             out.note("server stopped");

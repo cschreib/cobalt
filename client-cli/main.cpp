@@ -8,6 +8,7 @@
 #include <time.hpp>
 #include <log.hpp>
 #include <config.hpp>
+#include <string.hpp>
 #include <iostream>
 
 int main(int argc, const char* argv[]) {
@@ -20,6 +21,10 @@ int main(int argc, const char* argv[]) {
     conf.parse_from_file(conf_file);
     cout.add_output<cout_logger>(conf);
     // cout.add_output<file_logger>(conf, "client");
+
+    std::string behavior = "watcher";
+    conf.get_value("player.behavior", behavior, behavior);
+    cout.print("client behavior: \"", behavior, "\"");
 
     client::netcom net;
     conf.bind("netcom.debug_packets", net.debug_packets);
@@ -67,32 +72,31 @@ int main(int argc, const char* argv[]) {
     });
 
     pool << net.watch_message([&](const message::credentials_granted& msg) {
-        cout.note("new credentials acquired:");
-        for (auto& c : msg.cred) {
-            cout.note(" - ", c);
-        }
+        std::vector<std::string> creds;
+        for (auto& c : msg.cred) creds.push_back(c);
+        cout.note("new credentials acquired: ", string::collapse(creds, ", "));
     });
 
     pool << net.watch_message([&](const message::credentials_removed& msg) {
-        cout.note("credentials removed:");
-        for (auto& c : msg.cred) {
-            cout.note(" - ", c);
-        }
+        std::vector<std::string> creds;
+        for (auto& c : msg.cred) creds.push_back(c);
+        cout.note("credentials removed: ", string::collapse(creds, ", "));
     });
 
     pool << net.watch_message([&](const message::server::will_shutdown& msg) {
         cout.note("server will shutdown in ", msg.countdown, "sec");
     });
 
+
     client::player_list plist(net);
 
     pool << plist.on_list_received.connect([&plist]() {
         if (plist.empty()) {
-            cout.print("player list received (empty)");
+            cout.note("player list received (empty)");
         } else {
-            cout.print("player list received:");
+            cout.note("player list received:");
             for (const client::player& p : plist) {
-                cout.print(" - id=", p.id, ", ip=", p.ip, ", name=", p.name, ", color=",
+                cout.note(" - id=", p.id, ", ip=", p.ip, ", name=", p.name, ", color=",
                     p.color, ", ai=", p.is_ai);
             }
         }
@@ -101,35 +105,57 @@ int main(int argc, const char* argv[]) {
         cout.error("could not read player list");
     });
     pool << plist.on_join.connect([](client::player& p) {
-        cout.print("joined as player \"", p.name, "\"");
+        cout.note("joined as player \"", p.name, "\"");
     });
     pool << plist.on_leave.connect([]() {
-        cout.print("left player list");
+        cout.note("left player list");
     });
     pool << plist.on_join_fail.connect([]() {
         cout.error("could not join as player");
     });
     pool << plist.on_player_connected.connect([](client::player& p) {
-        cout.print("new player connected: id=", p.id, ", ip=", p.ip, ", name=",
+        cout.note("new player connected: id=", p.id, ", ip=", p.ip, ", name=",
             p.name, ", color=", p.color, ", ai=", p.is_ai);
     });
     pool << plist.on_player_disconnected.connect([](const client::player& p) {
-        cout.print("player disconnected: id=", p.id, ", name=", p.name);
+        cout.note("player disconnected: id=", p.id, ", name=", p.name);
+    });
+    pool << plist.on_disconnect.connect([]() {
+        cout.note("player list was disconnected");
     });
 
-    plist.connect();
+    pool << net.watch_message([&](const message::server::changed_state& msg) {
+        std::string state_name;
+        switch (msg.new_state) {
+            case server::state_id::configure : {
+                state_name = "configure";
+                if (!plist.is_connected()) {
+                    plist.connect();
+                }
 
-    std::string behavior = "watcher";
-    conf.get_value("player.behavior", behavior, behavior);
-    cout.print("client behavior: \"", behavior, "\"");
+                if (!plist.is_joined() && behavior == "player") {
+                    std::string player_name = "kalith";
+                    conf.get_value("player.name", player_name, player_name);
+                    color32 player_color = color32::blue;
+                    conf.get_value("player.color", player_color, player_color);
+                    plist.join_as(player_name, player_color, false);
+                }
 
-    if (behavior == "player") {
-        std::string player_name = "kalith";
-        conf.get_value("player.name", player_name, player_name);
-        color32 player_color = color32::blue;
-        conf.get_value("player.color", player_color, player_color);
-        plist.join_as(player_name, player_color, false);
-    }
+                break;
+            }
+            case server::state_id::iddle : {
+                state_name = "iddle";
+                plist.disconnect();
+                break;
+            }
+            case server::state_id::game : {
+                state_name = "game";
+                break;
+            }
+        }
+
+        cout.note("server is now in the '", state_name, "' state");
+    });
 
     if (behavior == "admin") {
         std::string password = "";
@@ -165,7 +191,8 @@ int main(int argc, const char* argv[]) {
     double start = now();
     double last = start;
     bool end = false;
-    bool done = false;
+    bool done1 = false;
+    bool done2 = false;
     while (net.is_running()) {
         sf::sleep(sf::milliseconds(5));
         net.process_packets();
@@ -189,7 +216,7 @@ int main(int argc, const char* argv[]) {
             });
         }
 
-        if (n - start > 3 && !end && behavior == "player") {
+        if (n - start > 10 && !end && behavior == "player") {
             end = true;
             plist.leave();
             pool << plist.on_leave.connect([&]() {
@@ -197,38 +224,50 @@ int main(int argc, const char* argv[]) {
             });
         }
 
-        if (n - start > 3 && !done && behavior == "admin") {
-            done = true;
-            pool << net.send_request(client::netcom::server_actor_id,
-                request::server::configure_generate{},
-                [&](const client::netcom::request_answer_t<request::server::configure_generate>& msg) {}
-            );
-        }
+        // if (n - start > 3 && !done1 && behavior == "admin") {
+        //     done1 = true;
+        //     pool << net.send_request(client::netcom::server_actor_id,
+        //         request::server::new_game{},
+        //         [&](const client::netcom::request_answer_t<request::server::new_game>& msg) {}
+        //     );
+        // }
+
+        // if (n - start > 5 && !done2 && behavior == "admin") {
+        //     done2 = true;
+        //     pool << net.send_request(client::netcom::server_actor_id,
+        //         request::server::stop_and_iddle{},
+        //         [&](const client::netcom::request_answer_t<request::server::stop_and_iddle>& msg) {}
+        //     );
+        //     // pool << net.send_request(client::netcom::server_actor_id,
+        //     //     request::server::configure_generate{},
+        //     //     [&](const client::netcom::request_answer_t<request::server::configure_generate>& msg) {}
+        //     // );
+        // }
 
         // if (n - start > 3 && !end && behavior == "admin") {
-            // end = true;
-            // pool << net.send_request(client::netcom::server_actor_id,
-            //     request::server::shutdown{},
-            //     [&](const client::netcom::request_answer_t<request::server::shutdown>& msg) {
-            //         if (msg.failed) {
-            //             if (msg.missing_credentials.empty()) {
-            //                 cout.error("server will not shutdown");
-            //             } else {
-            //                 cout.error("insufficient credentials to shutdown server");
-            //                 cout.note("missing:");
-            //                 for (auto& c : msg.missing_credentials) {
-            //                     cout.note(" - ", c);
-            //                 }
-            //             }
-            //         } else {
-            //             cout.note("asked server to shutdown");
-            //         }
-            //     }
-            // );
-        // }s
+        //     end = true;
+        //     pool << net.send_request(client::netcom::server_actor_id,
+        //         request::server::shutdown{},
+        //         [&](const client::netcom::request_answer_t<request::server::shutdown>& msg) {
+        //             if (msg.failed) {
+        //                 if (msg.missing_credentials.empty()) {
+        //                     cout.error("server will not shutdown");
+        //                 } else {
+        //                     cout.error("insufficient credentials to shutdown server");
+        //                     cout.note("missing:");
+        //                     for (auto& c : msg.missing_credentials) {
+        //                         cout.note(" - ", c);
+        //                     }
+        //                 }
+        //             } else {
+        //                 cout.note("asked server to shutdown");
+        //             }
+        //         }
+        //     );
+        // }
     }
 
-    std::cout << "stopped." << std::endl;
+    cout.note("stopped.");
 
     conf.save_to_file(conf_file);
 
