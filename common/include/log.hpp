@@ -43,7 +43,7 @@ public :
 
     virtual bool is_open() const = 0;
 
-    void print_stamp() {
+    virtual void print_stamp() {
         if (stamp_) {
             print(color::set(color::normal,true)); print("[");
             print(color::set(color::cyan,  true)); print(today_str("/"));
