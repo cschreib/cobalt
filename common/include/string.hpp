@@ -7,6 +7,9 @@
 #include <cmath>
 
 namespace string {
+    using unicode_char = std::uint32_t;
+    using unicode = std::basic_string<unicode_char>;
+
     template<typename T>
     std::string convert(const T& t) {
         std::ostringstream ss;
@@ -51,6 +54,14 @@ namespace string {
     bool end_with(const std::string& s, const std::string& pattern);
     std::vector<std::string> split(const std::string& ts, const std::string& pattern);
     std::string collapse(const std::vector<std::string>& sv, const std::string& sep);
+
+    std::string uchar_to_hex(std::uint8_t i);
+    std::uint8_t hex_to_uchar(std::string s);
+
+    unicode_char to_unicode(unsigned char c);
+    unicode to_unicode(const std::string& s);
+    std::string to_utf8(unicode_char s);
+    std::string to_utf8(const unicode& s);
 }
 
 #endif

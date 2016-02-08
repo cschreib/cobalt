@@ -121,4 +121,102 @@ namespace string {
 
         return ret;
     }
+
+    std::string uchar_to_hex(std::uint8_t i) {
+        std::ostringstream ss;
+        ss << std::hex << static_cast<std::size_t>(i);
+        std::string res = ss.str();
+        if (res.size() != 2) {
+            res = '0' + res;
+        }
+
+        return res;
+    }
+
+    std::uint8_t hex_to_uchar(std::string s) {
+        std::size_t v = 0;
+        std::istringstream ss(s);
+        ss >> std::hex >> v;
+        return v;
+    }
+
+    void to_utf8_(std::string& res, unicode_char c) {
+        static unicode_char MAX_ANSI = 127;
+        static unicode_char ESC_C2   = 194;
+        static unicode_char ESC_C3   = 195;
+
+        if (c <= MAX_ANSI) {
+            res.push_back(c);
+        } else {
+            if (c < 192) {
+                res.push_back((unsigned char)ESC_C2);
+                res.push_back((unsigned char)(128 + c - 128));
+            } else {
+                res.push_back((unsigned char)ESC_C3);
+                res.push_back((unsigned char)(128 + c - 192));
+            }
+        }
+    }
+
+    std::string to_utf8(unicode_char c) {
+        std::string res;
+        to_utf8_(res, c);
+        return res;
+    }
+
+    std::string to_utf8(const unicode& s) {
+        std::string res;
+        for (auto c : s) {
+            to_utf8_(res, c);
+        }
+
+        return res;
+    }
+
+    unicode_char to_unicode(unsigned char c) {
+        static unsigned char MAX_ANSI = 127;
+
+        unicode_char res;
+
+        if (c <= MAX_ANSI) {
+            res = c;
+        } else {
+            res = 0;
+        }
+
+        return res;
+    }
+
+    unicode to_unicode(const std::string& s) {
+        static unsigned char MAX_ANSI = 127;
+        static unsigned char ESC_C2   = 194;
+        static unsigned char ESC_C3   = 195;
+
+        unicode res;
+
+        unsigned char esc = 0;
+
+        for (auto c : s) {
+            if (c <= MAX_ANSI) {
+                res.push_back(c);
+            } else {
+                if (c == ESC_C2 || c == ESC_C3) {
+                    esc = c;
+                    continue;
+                }
+
+                if (esc != 0) {
+                    if (esc == ESC_C3) {
+                        res.push_back(192 + c - 128);
+                    } else if (esc == ESC_C2) {
+                        res.push_back(128 + c - 128);
+                    }
+
+                    esc = 0;
+                }
+            }
+        }
+
+        return res;
+    }
 }
