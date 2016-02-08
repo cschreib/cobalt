@@ -32,7 +32,7 @@ void netcom_base::terminate_() {
     if (processing_) {
         call_terminate_ = true;
     } else {
-        terminate_();
+        do_terminate_();
     }
 }
 
