@@ -56,9 +56,8 @@ file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/tools/bin")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 set(BINARY_DIR "${PROJECT_SOURCE_DIR}/bin")
 
-find_package(SFML 2 COMPONENTS system network)
+find_package(SFML 2 COMPONENTS system network window graphics)
 find_package(LibClang 3)
-find_package(lxgui 1)
 find_package(TBB 4)
 
 if (UNIX)
