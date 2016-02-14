@@ -6,6 +6,7 @@ include_directories(${PROJECT_SOURCE_DIR}/../common/include)
 include_directories(${PROJECT_SOURCE_DIR}/../common-netcom/include)
 include_directories(${PROJECT_SOURCE_DIR}/../client/include)
 include_directories(${PROJECT_SOURCE_DIR}/../server/include)
+include_directories(${LUABIND_INCLUDE_DIRS})
 include_directories(${SFML_INCLUDE_DIR})
 include_directories(${TBB_INCLUDE_DIR})
 
@@ -16,6 +17,7 @@ add_executable(cobalt-client-cli
     sfml_wrapper.cpp
     console_input.cpp
     console_output.cpp
+    work_loop.cpp
     main.cpp
 )
 
@@ -27,6 +29,7 @@ target_link_libraries(cobalt-client-cli ${SFML_GRAPHICS_LIBRARY})
 target_link_libraries(cobalt-client-cli ${SFML_WINDOW_LIBRARY})
 target_link_libraries(cobalt-client-cli ${SFML_NETWORK_LIBRARY})
 target_link_libraries(cobalt-client-cli ${SFML_SYSTEM_LIBRARY})
+target_link_libraries(cobalt-client-cli ${LUABIND_LIBRARIES})
 target_link_libraries(cobalt-client-cli ${TBB_LIBRARY})
 
 if (UNIX)
