@@ -77,6 +77,11 @@ namespace ctl {
             base::erase(iter.stdbase());
         }
 
+        /// Erase a range from this vector.
+        void erase(iterator iter1, iterator iter2) {
+            base::erase(iter1.stdbase(), iter2.stdbase());
+        }
+
         /// Get the first object of this vector.
         T& front() {
             return *base::front();
@@ -160,6 +165,14 @@ namespace ctl {
             return base::rend();
         }
     };
+
+    // Shortcut for std::remove_if
+    template<typename T, typename TP, typename F>
+    void erase_if(ctl::ptr_vector<T,TP>& cont, F&& func) {
+        cont.erase(std::remove_if(cont.begin().stdbase(), cont.end().stdbase(), [&](TP& p) {
+            return func(*p);
+        }), cont.end());
+    }
 }
 
 #endif
