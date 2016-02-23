@@ -8,9 +8,9 @@
 #include "ptr_iterator_base.hpp"
 
 namespace ctl {
-    template<typename T>
-    class ptr_vector : private std::vector<std::unique_ptr<T>> {
-        using base = std::vector<std::unique_ptr<T>>;
+    template<typename T, typename PointerType = std::unique_ptr<T>>
+    class ptr_vector : private std::vector<PointerType> {
+        using base = std::vector<PointerType>;
 
         using base_iterator = typename base::iterator;
         using base_const_iterator = typename base::const_iterator;
@@ -58,13 +58,13 @@ namespace ctl {
         /// Insert the provided object in the vector.
         template<typename U=T, typename ... Args>
         iterator insert(iterator iter, Args&& ... args) {
-            return base::insert(iter.stdbase(), std::unique_ptr<T>(new U(std::forward<Args>(args)...)));
+            return base::insert(iter.stdbase(), PointerType(new U(std::forward<Args>(args)...)));
         }
 
         /// Insert the provided object in the vector.
         template<typename U=T, typename ... Args>
         void emplace_back(Args&& ... args) {
-            base::emplace_back(std::unique_ptr<T>(new U(std::forward<Args>(args)...)));
+            base::emplace_back(PointerType(new U(std::forward<Args>(args)...)));
         }
 
         /// Insert the provided object in the vector.

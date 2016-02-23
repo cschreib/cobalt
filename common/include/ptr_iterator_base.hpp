@@ -253,8 +253,8 @@ namespace ctl {
         using type = T;
     };
 
-    template<typename T>
-    struct ptr_to_raw<std::unique_ptr<T>> {
+    template<typename T, typename D>
+    struct ptr_to_raw<std::unique_ptr<T,D>> {
         using type = T;
     };
 }
