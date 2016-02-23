@@ -5,6 +5,7 @@
 #include <memory>
 #include "delegate.hpp"
 #include "scoped.hpp"
+#include "ptr_vector.hpp"
 #include "std_addon.hpp"
 #include "variadic.hpp"
 
@@ -17,8 +18,14 @@
 **/
 class signal_connection_base {
     bool blocked_ = false;
+    bool stopped_ = false; // manipulated by the signal
 
 protected :
+    // Called by the signal
+    void flag_stopped_() {
+        stopped_ = true;
+    }
+
     virtual ~signal_connection_base() {
         if (on_stop) {
             on_stop(*this);
@@ -54,6 +61,11 @@ public :
         }
 
         signal_stop_();
+    }
+
+    /// Check wether this connection has been stopped and is about to be destroyed.
+    bool stopped() const {
+        return stopped_;
     }
 
     /// Temporarily prevent the slot from being called.
@@ -181,29 +193,16 @@ private :
 
     using connection_ptr = std::unique_ptr<connection_type, typename connection_type::deleter>;
 
-    struct slot_t {
-        slot_t(connection_ptr s) : connection(std::move(s)) {}
-        slot_t(slot_t&&) = default;
-        slot_t& operator= (slot_t&&) = default;
-
-        connection_ptr connection;
-        bool stopped = false;
-    };
-
     bool dispatching_ = false;
 
-    using slot_container = std::vector<slot_t>;
+    using slot_container = ctl::ptr_vector<connection_type, connection_ptr>;
     using slot_iterator = typename slot_container::iterator;
     slot_container slots_;
 
     slot_iterator get_connection_(connection_type& c) {
-        for (auto iter = slots_.begin(); iter != slots_.end(); ++iter) {
-            if (iter->connection.get() == &c) {
-                return iter;
-            }
-        }
-
-        return slots_.end();
+        return std::find_if(slots_.begin(), slots_.end(), [&c](const connection_type& p) {
+            return &p == &c;
+        });
     }
 
     void stop_(connection_type& c) {
@@ -211,7 +210,7 @@ private :
         if (iter == slots_.end()) return;
 
         if (dispatching_) {
-            iter->stopped = true;
+            c.flag_stopped_();
         } else {
             slots_.erase(iter);
         }
@@ -238,7 +237,7 @@ public :
         ));
         slot_connection& connection = static_cast<slot_connection&>(*cptr);
 
-        slots_.emplace_back(std::move(cptr));
+        slots_.push_back(std::move(cptr));
 
         return connection;
     }
@@ -249,14 +248,24 @@ public :
         {
             auto sc = ctl::scoped_toggle(dispatching_);
 
-            tuple_type arg(std::forward<TArgs>(args)...);
+            // Work with a copy of the slot list
+            std::vector<connection_type*> local_slots;
+            local_slots.reserve(slots_.size());
             for (auto& s : slots_) {
-                if (s.stopped) continue;
-                s.connection->call_(arg);
+                if (s.stopped()) continue;
+                local_slots.push_back(&s);
+            }
+
+            // Dispatch
+            tuple_type arg(std::forward<TArgs>(args)...);
+            for (auto* s : local_slots) {
+                // Still need to check, they may be stopped inside a callback
+                if (s->stopped()) continue;
+                s->call_(arg);
             }
         }
 
-        ctl::erase_if(slots_, [](const slot_t& s) { return s.stopped; });
+        ctl::erase_if(slots_, [](const connection_type& s) { return s.stopped(); });
     }
 
     /// Stop all connections and destroy all slots.
