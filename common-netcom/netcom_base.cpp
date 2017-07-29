@@ -44,7 +44,9 @@ void netcom_base::do_terminate_() {
     request_id_provider_.clear();
 
     answer_signals_.clear();
+}
 
+void netcom_base::clear_all_signals() {
     for (auto& s : request_signals_) {
         s->clear();
     }

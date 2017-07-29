@@ -668,6 +668,9 @@ public :
     void process_packets();
     bool debug_packets = false;
 
+    /// Clear all the registered callbacks for requests and messages
+    void clear_all_signals();
+
     /// Create a message packet without sending it
     template<typename M>
     out_packet_t create_message(M&& msg) {
