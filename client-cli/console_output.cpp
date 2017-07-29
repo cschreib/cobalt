@@ -26,6 +26,65 @@ void console_output::poll_messages() {
     }
 }
 
+void console_output::move_page_(int delta) {
+    if (delta > 0) {
+        if (lines_.size() <= line_per_page_) {
+            firstline_ = 0;
+        } else {
+            if (firstline_ == std::size_t(-1)) {
+                firstline_ = lines_.size() - line_per_page_;
+            }
+
+            if (firstline_ > std::size_t(delta)) {
+                firstline_ -= delta;
+            } else {
+                firstline_ = 0;
+            }
+        }
+    } else {
+        if (lines_.size() <= line_per_page_) {
+            firstline_ = -1;
+        } else {
+            if (firstline_ != std::size_t(-1)) {
+                firstline_ += std::size_t(-delta);
+                if (firstline_ > lines_.size()-line_per_page_) {
+                    firstline_ = -1;
+                }
+            }
+        }
+    }
+
+    on_updated.dispatch();
+}
+
+void console_output::page_up_() {
+    move_page_(line_per_page_/2);
+}
+
+void console_output::page_down_() {
+    move_page_(-int(line_per_page_)/2);
+}
+
+void console_output::on_event(const sf::Event& e) {
+    switch (e.type) {
+    case sf::Event::KeyPressed:
+        switch (e.key.code) {
+            case sf::Keyboard::Key::PageUp:
+                page_up_();
+                break;
+            case sf::Keyboard::Key::PageDown:
+                page_down_();
+                break;
+            default: break;
+        }
+        break;
+    case sf::Event::MouseWheelMoved:
+        move_page_(e.mouseWheel.delta);
+        break;
+    default: break;
+    }
+}
+
 void console_output::draw(sf::RenderTarget& target) const {
     std::vector<std::vector<sf::Text>> lines;
 
@@ -150,8 +209,18 @@ void console_output::draw(sf::RenderTarget& target) const {
     float p0 = 0.2*charsize_;
     float line_height = charsize_ + inter_line_;
 
-    std::size_t maxline = floor((target.getSize().y - 1.5*charsize_)/line_height);
-    std::size_t firstline = (lines.size() > maxline ? lines.size() - maxline : 0);
+    line_per_page_ = floor((target.getSize().y - 1.5*charsize_)/line_height);
+
+    std::size_t firstline = firstline_;
+    std::size_t lastline = lines.size();
+    if (firstline == std::size_t(-1)) {
+        firstline = (lines.size() > line_per_page_ ? lines.size() - line_per_page_ : 0);
+    } else {
+        lastline = firstline + line_per_page_;
+        if (lastline > lines.size()) {
+            lastline = lines.size();
+        }
+    }
 
     for (std::size_t i : range(firstline, lines)) {
         auto& line = lines[i];

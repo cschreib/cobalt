@@ -137,6 +137,7 @@ int main(int argc, const char* argv[]) {
             }
 
             edit_box.on_event(e);
+            message_list.on_event(e);
         }
 
         message_list.poll_messages();
