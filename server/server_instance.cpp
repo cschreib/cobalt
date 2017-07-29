@@ -23,6 +23,15 @@ namespace server {
         });
 
         pool_ << net_.watch_request(
+            [this](server::netcom::request_t<request::server::current_state>&& req) {
+            if (current_state_) {
+                req.answer(current_state_->id());
+            } else {
+                req.fail();
+            }
+        });
+
+        pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::shutdown>&& req) {
             req.answer();
             shutdown();
