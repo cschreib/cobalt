@@ -7,9 +7,6 @@
 #include <server_state_configure.hpp>
 #include <server_instance.hpp>
 #include <string.hpp>
-#include <luabind/function.hpp>
-#include <luabind/class.hpp>
-#include <lualib.h>
 
 work_loop::work_loop(config::state& conf) : plist_(net_), shutdown_(false) {
     conf.bind("netcom.debug_packets", net_.debug_packets);
@@ -139,42 +136,19 @@ work_loop::work_loop(config::state& conf) : plist_(net_), shutdown_(false) {
     open_lua_();
 }
 
-work_loop::~work_loop() {
-    lua_close(lua_);
-}
+work_loop::~work_loop() {}
 
 void work_loop::open_lua_() {
-    lua_ = lua_open();
-
-    auto open_lib = [&](const char* name, int func(lua_State*)) {
-        lua_pushcfunction(lua_, func);
-        lua_pushstring(lua_, name);
-        lua_call(lua_, 1, 0);
-    };
-
-    open_lib("",              luaopen_base);
-    open_lib(LUA_LOADLIBNAME, luaopen_package);
-    open_lib(LUA_TABLIBNAME,  luaopen_table);
-    open_lib(LUA_IOLIBNAME,   luaopen_io);
-    open_lib(LUA_OSLIBNAME,   luaopen_os);
-    open_lib(LUA_STRLIBNAME,  luaopen_string);
-    open_lib(LUA_MATHLIBNAME, luaopen_math);
-    open_lib(LUA_DBLIBNAME,   luaopen_debug);
-
-    using namespace luabind;
-
-    open(lua_);
-
-    // module(lua_)[
-    //     def("reconnect", [this]() {
-    //         if (!net_.is_running()) {
-    //             server_connect_();
-    //         }
-    //     })
-    // ];
+    lua_.open_libraries(sol::lib::base, sol::lib::math);
+    lua_.set_function("print", [](std::string msg) { cout.print(msg); });
 }
 
 void work_loop::server_connect_() {
+    if (net_.is_running()) {
+        cout.warning("already connected to server");
+        return;
+    }
+
     cout.note("connecting to server...");
 
     net_.run(server_ip_, server_port_);
@@ -253,38 +227,15 @@ void work_loop::run_() {
     }
 }
 
-bool lua_do_string(lua_State* lua, const std::string& str) {
-    int top = lua_gettop(lua);
-
-    auto on_error = [&]() {
-        if (lua_isstring(lua, -1)) {
-            cout.error(lua_tostring(lua, -1));
-        } else {
-            cout.error("unknown Lua error");
-        }
-
-        lua_settop(lua, top);
-    };
-
-    if (luaL_loadstring(lua, str.c_str()) != 0) {
-        on_error();
-        return false;
-    }
-
-    int e = lua_pcall(lua, 0, LUA_MULTRET, -2);
-    if (e != 0) {
-        on_error();
-        return false;
-    }
-
-    return true;
-}
-
 void work_loop::execute_(const std::string& cmd) {
     if (cmd == "exit") {
         shutdown_ = true;
     } else {
-        lua_do_string(lua_, cmd);
+        try {
+            lua_.script(cmd);
+        } catch (sol::error& e) {
+            cout.error(string::erase_begin(e.what(), std::string("lua: error: ").size()));
+        }
     }
 }
 

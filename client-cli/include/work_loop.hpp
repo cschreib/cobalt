@@ -6,7 +6,7 @@
 #include <atomic>
 #include <thread>
 #include <client_player_list.hpp>
-#include <lua.h>
+#include <sol.hpp>
 
 class work_loop {
     client::netcom net_;
@@ -24,7 +24,7 @@ class work_loop {
     std::thread worker_;
 
     ctl::lock_free_queue<std::string> commands_;
-    lua_State* lua_ = nullptr;
+    sol::state lua_;
 
     void open_lua_();
     void server_connect_();

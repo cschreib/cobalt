@@ -59,7 +59,7 @@ set(BINARY_DIR "${PROJECT_SOURCE_DIR}/bin")
 
 find_package(SFML 2 COMPONENTS system network window graphics)
 find_package(LibClang 3)
-find_package(LuaBind)
+find_package(Lua 5.2)
 find_package(TBB 4)
 
 if (UNIX)
