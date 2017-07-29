@@ -11,7 +11,7 @@ namespace server {
 namespace state {
     class game;
 
-    class configure : public base_impl<state_id::configure> {
+    class configure : public base {
     public :
         struct generator_info {
             std::string id;

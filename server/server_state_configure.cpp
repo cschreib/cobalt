@@ -7,7 +7,8 @@
 
 namespace server {
 namespace state {
-    configure::configure(server::instance& serv) : base_impl(serv, "configure"),
+    configure::configure(server::instance& serv) :
+        base(serv, server::state_id::configure, "configure"),
         config_(net_, "server_state_configure") {
 
         update_generator_list();

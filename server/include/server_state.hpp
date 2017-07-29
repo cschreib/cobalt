@@ -14,6 +14,7 @@ namespace server {
 
     namespace state {
         class base {
+            const server::state_id id_;
             const std::string name_;
 
         protected :
@@ -21,28 +22,14 @@ namespace server {
             netcom& net_;
             logger& out_;
 
-            base(server::instance& serv, std::string name);
+            base(server::instance& serv, server::state_id id, std::string name);
 
         public :
             virtual ~base() = default;
 
             const std::string& name() const;
+            state_id id() const;
         };
-
-        template<state_id ID>
-        class base_impl : public base {
-        protected :
-            base_impl(server::instance& serv, std::string name) :
-                base(serv, name) {}
-
-        public :
-            virtual ~base_impl() = default;
-
-            static const server::state_id id = ID;
-        };
-
-        template<state_id ID>
-        const server::state_id base_impl<ID>::id;
     }
 }
 

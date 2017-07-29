@@ -4,7 +4,7 @@
 
 namespace server {
 namespace state {
-    iddle::iddle(server::instance& serv) : base_impl(serv, "iddle") {
+    iddle::iddle(server::instance& serv) : base(serv, server::state_id::iddle, "iddle") {
         pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::new_game>&& req) {
                 serv_.set_state<state::configure>();

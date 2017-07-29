@@ -5,7 +5,7 @@
 
 namespace server {
 namespace state {
-    class iddle : public base_impl<state_id::iddle> {
+    class iddle : public base {
         scoped_connection_pool pool_;
 
     public :

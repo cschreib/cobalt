@@ -11,7 +11,7 @@
 
 namespace server {
 namespace state {
-    class game : public base_impl<state_id::game> {
+    class game : public base {
         scoped_connection_pool pool_;
 
         std::thread thread_;

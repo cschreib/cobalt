@@ -5,7 +5,7 @@
 
 namespace server {
 namespace state {
-    game::game(server::instance& serv) : base_impl(serv, "game") {
+    game::game(server::instance& serv) : base(serv, server::state_id::game, "game") {
         // TODO: add all game components to this container
         save_chunks_.push_back(universe_.make_serializer());
 

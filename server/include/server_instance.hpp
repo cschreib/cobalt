@@ -86,7 +86,7 @@ namespace server {
         T& set_state(std::unique_ptr<T> st) {
             if (current_state_ != nullptr) {
                 net_.send_message(netcom::all_actor_id,
-                    make_packet<message::server::changed_state>(T::id));
+                    make_packet<message::server::changed_state>(st->id()));
             }
 
             T& ret = *st;
