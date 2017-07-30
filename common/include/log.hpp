@@ -260,8 +260,16 @@ private :
 
 public :
     template<typename T, typename ... Args>
-    void add_output(Args&&... args) {
+    T& add_output(Args&&... args) {
         out_.emplace_back(new T(std::forward<Args>(args)...));
+        return static_cast<T&>(*out_.back());
+    }
+
+    template<typename T>
+    void remove_output(T& t) {
+        ctl::erase_if(out_, [&](std::unique_ptr<logger_base>& p) {
+            return p.get() == &t;
+        });
     }
 
     template<typename ... Args>
