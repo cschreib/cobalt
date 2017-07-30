@@ -80,6 +80,23 @@ int main(int argc, const char* argv[]) {
                 req.answer();
             });
 
+            pool << net.watch_message([&](const message::changed_state& msg) {
+                std::string state = "unknown";
+                switch (msg.answer.state) {
+                    case server::state_id::iddle :
+                        state = "iddle";
+                        break;
+                    case server::state_id::configure :
+                        state = "configure";
+                        break;
+                    case server::state_id::game :
+                        state = "game";
+                        break;
+                    default: break;
+                }
+                out.note("state changed to '", state,"'");
+            });
+
             pool << net.watch_message([&](const message::server::configure_generating& msg) {
                 out.note("begin generating new universe...");
             });
