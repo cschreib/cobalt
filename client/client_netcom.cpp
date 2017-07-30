@@ -4,7 +4,12 @@
 namespace client {
     netcom::netcom() : self_id_(invalid_actor_id), running_(false), connected_(false),
         terminate_thread_(false),
-        listener_thread_(std::bind(&netcom::loop_, this)), sc_factory_(*this) {}
+        listener_thread_(std::bind(&netcom::loop_, this)), sc_factory_(*this) {
+
+        watch_message([this](const message::server::will_shutdown&) {
+            shutdown();
+        });
+    }
 
     netcom::~netcom() {
         shutdown();
@@ -26,10 +31,6 @@ namespace client {
         if (running_) {
             throw netcom_exception::already_running{};
         }
-
-        watch_message([this](const message::server::will_shutdown&) {
-            shutdown();
-        });
 
         terminate_thread_ = false;
         address_ = addr;
