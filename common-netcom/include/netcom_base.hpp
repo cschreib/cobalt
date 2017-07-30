@@ -435,6 +435,7 @@ namespace netcom_impl {
         virtual void clear() = 0;
         const packet_id_t  id;
         const request_id_t rid;
+        bool processing = false;
     };
 
     template<typename P>
@@ -444,6 +445,7 @@ namespace netcom_impl {
         explicit answer_signal_impl(request_id_t rid) : answer_signal_t(P::packet_id__, rid) {}
 
         void dispatch(packet_type t, in_packet_t&& p) override {
+            auto pt = ctl::scoped_toggle(processing);
             request_answer_t<P> r(t, std::move(p));
             signal.dispatch(r);
         }

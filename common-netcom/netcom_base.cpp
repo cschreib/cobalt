@@ -22,10 +22,13 @@ void netcom_base::stop_request_(request_id_t id) {
 
     auto iter = answer_signals_.find(id);
     if (iter != answer_signals_.end()) {
-        answer_signals_.erase(iter);
+        if (!(*iter)->processing) {
+            answer_signals_.erase(iter);
+            request_id_provider_.free_id(id);
+        }
+    } else {
+        request_id_provider_.free_id(id);
     }
-
-    request_id_provider_.free_id(id);
 }
 
 void netcom_base::terminate_() {
@@ -141,6 +144,7 @@ void netcom_base::process_answer_(netcom_impl::packet_type t, in_packet_t&& p) {
         }
 
         (*iter)->dispatch(t, std::move(p));
+        stop_request_(rid);
     }
 }
 
