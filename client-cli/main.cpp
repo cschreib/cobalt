@@ -93,7 +93,7 @@ int main(int argc, const char* argv[]) {
         font_regular, font_bold, charsize, inter_line, console_color
     );
 
-    cout.add_output<console_logger>(message_list, color_palette);
+    auto& clog = cout.add_output<console_logger>(message_list, color_palette);
 
     message_list.on_updated.connect([&]() {
         repaint = true;
@@ -153,6 +153,7 @@ int main(int argc, const char* argv[]) {
     worker.stop();
 
     cout.note("stopped.");
+    cout.remove_output(clog);
     conf.save_to_file(conf_file);
 
     return 0;
