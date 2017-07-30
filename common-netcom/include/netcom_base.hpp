@@ -1028,6 +1028,7 @@ namespace netcom_impl {
 
     template<typename T>
     void answer_connection<T>::stop() {
+        base::stop();
         net_.stop_request_(rid_);
     }
 }
