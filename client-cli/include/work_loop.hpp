@@ -39,6 +39,8 @@ public :
     bool is_stopped() const;
     void stop();
 
+    std::atomic<bool> restart;
+
     void execute(std::string cmd);
 };
 

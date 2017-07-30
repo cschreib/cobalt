@@ -8,7 +8,7 @@
 #include <server_instance.hpp>
 #include <string.hpp>
 
-work_loop::work_loop(config::state& conf) : plist_(net_), shutdown_(false) {
+work_loop::work_loop(config::state& conf) : plist_(net_), shutdown_(false), restart(false) {
     conf.bind("netcom.debug_packets", net_.debug_packets);
 
     pool_ << net_.watch_message([this](const message::unhandled_message& msg) {
@@ -141,11 +141,16 @@ work_loop::~work_loop() {}
 void work_loop::open_lua_() {
     lua_.open_libraries(sol::lib::base, sol::lib::math);
     lua_.set_function("print", [](std::string msg) { cout.print(msg); });
+
+    auto stbl = lua_.create_table("server");
+    stbl.set_function("reconnect", [this] {
+        restart = true;
+    });
 }
 
 void work_loop::server_connect_() {
     if (net_.is_running()) {
-        cout.warning("already connected to server");
+        cout.warning("already connected");
         return;
     }
 
@@ -167,9 +172,9 @@ void work_loop::server_connect_() {
             } else {
                 std::string state = "unknown";
                 switch (msg.answer.state) {
-                    case server::state_id::iddle : state = "iddle"; break;
+                    case server::state_id::iddle :     state = "iddle";     break;
                     case server::state_id::configure : state = "configure"; break;
-                    case server::state_id::game : state = "game"; break;
+                    case server::state_id::game :      state = "game";      break;
                     default: break;
                 }
                 cout.note("server is in the "+state+" state");
@@ -240,6 +245,8 @@ void work_loop::execute_(const std::string& cmd) {
 }
 
 void work_loop::start() {
+    stop();
+
     worker_ = std::thread(&work_loop::run_, this);
 }
 
@@ -255,6 +262,10 @@ bool work_loop::is_stopped() const {
 }
 
 void work_loop::stop() {
-    shutdown_ = true;
-    if (worker_.joinable()) worker_.join();
+    if (worker_.joinable()) {
+        shutdown_ = true;
+        worker_.join();
+    }
+
+    shutdown_ = false;
 }

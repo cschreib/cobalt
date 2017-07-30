@@ -144,6 +144,9 @@ int main(int argc, const char* argv[]) {
 
         if (worker.is_stopped()) {
             break;
+        } else if (worker.restart) {
+            worker.restart = false;
+            worker.start();
         }
     }
 
