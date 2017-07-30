@@ -176,6 +176,7 @@ void netcom_base::process_packets() {
     }
 
     if (call_terminate_) {
+        call_terminate_ = false;
         do_terminate_();
     }
 }
