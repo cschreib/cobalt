@@ -106,18 +106,17 @@ work_loop::work_loop(config::state& conf) : plist_(net_), shutdown_(false), rest
         switch (msg.new_state) {
             case server::state_id::configure : {
                 state_name = "configure";
-                if (!plist_.is_connected()) {
-                    plist_.connect();
-                }
+                setup_configure_();
                 break;
             }
             case server::state_id::iddle : {
                 state_name = "iddle";
-                plist_.disconnect();
+                setup_iddle_();
                 break;
             }
             case server::state_id::game : {
                 state_name = "game";
+                setup_game_();
                 break;
             }
         }
@@ -137,6 +136,33 @@ work_loop::work_loop(config::state& conf) : plist_(net_), shutdown_(false), rest
 }
 
 work_loop::~work_loop() {}
+
+void work_loop::setup_iddle_() {
+    plist_.disconnect();
+    auto stbl = lua_.create_table("state");
+    stbl.set_function("start_configure", [this] {
+        net_.send_request(client::netcom::server_actor_id,
+            make_packet<request::server::new_game>(),
+            [](const client::netcom::request_answer_t<request::server::new_game>& msg) {
+                if (msg.failed) {
+                    cout.error("could not switch to configure state");
+                }
+            }
+        );
+    });
+}
+
+void work_loop::setup_configure_() {
+    if (!plist_.is_connected()) {
+        plist_.connect();
+    }
+}
+
+void work_loop::setup_game_() {
+    if (!plist_.is_connected()) {
+        plist_.connect();
+    }
+}
 
 void work_loop::open_lua_() {
     lua_.open_libraries(sol::lib::base, sol::lib::math);
@@ -164,26 +190,35 @@ void work_loop::server_connect_() {
 
     cout.note("connected to server");
 
-    net_.send_request(client::netcom::server_actor_id,
+    pool_ << net_.send_request(client::netcom::server_actor_id,
         make_packet<request::server::current_state>(),
-        [](const client::netcom::request_answer_t<request::server::current_state>& msg) {
+        [this](const client::netcom::request_answer_t<request::server::current_state>& msg) {
             if (msg.failed) {
                 cout.error("could not determine current server state");
             } else {
                 std::string state = "unknown";
                 switch (msg.answer.state) {
-                    case server::state_id::iddle :     state = "iddle";     break;
-                    case server::state_id::configure : state = "configure"; break;
-                    case server::state_id::game :      state = "game";      break;
+                    case server::state_id::iddle :
+                        state = "iddle";
+                        setup_iddle_();
+                        break;
+                    case server::state_id::configure :
+                        state = "configure";
+                        setup_configure_();
+                        break;
+                    case server::state_id::game :
+                        state = "game";
+                        setup_game_();
+                        break;
                     default: break;
                 }
-                cout.note("server is in the "+state+" state");
+                cout.note("server is in the '"+state+"' state");
             }
         }
     );
 
     if (!admin_password_.empty()) {
-        net_.send_request(client::netcom::server_actor_id,
+        pool_ << net_.send_request(client::netcom::server_actor_id,
             make_packet<request::server::admin_rights>(admin_password_),
             [](const client::netcom::request_answer_t<request::server::admin_rights>& msg) {
                 if (msg.failed) {
