@@ -125,7 +125,7 @@ work_loop::work_loop(config::state& conf) : plist_(net_), shutdown_(false), rest
         cout.note("server is now in the '", state_name, "' state");
     });
 
-    conf.get_value("console.prompt_", prompt_, prompt_);
+    conf.get_value("console.prompt", prompt_, prompt_);
     conf.get_value("netcom.server_ip", server_ip_, server_ip_);
     conf.get_value("netcom.server_port", server_port_, server_port_);
 
