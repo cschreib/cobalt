@@ -245,6 +245,9 @@ public :
     /// Trigger the signal, and dispatch it to all slots.
     template<typename ... TArgs>
     void dispatch(TArgs&& ... args) {
+        static_assert(sizeof...(TArgs) == sizeof...(Args),
+            "incorrect number of arguments in call");
+
         {
             auto sc = ctl::scoped_toggle(dispatching_);
 
