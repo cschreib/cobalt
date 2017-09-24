@@ -68,6 +68,17 @@ public:
         type_assert(L, index, type::table);
     }
 
+    template<typename T, typename Key>
+    bool is(Key&& key) const {
+        push();
+        stack::push(state(), std::forward<Key>(key));
+        lua_gettable(state(), -2);
+        auto expected = type_of<T>();
+        auto actual = lua_type(state(), -1);
+        lua_pop(state(), 1);
+        return (static_cast<int>(expected) == actual) || (expected == type::poly);
+    }
+
     template<typename... Ret, typename... Keys>
     typename return_type<typename stack::get_return<Ret>::type...>::type get(Keys&&... keys) const {
        return get(types<Ret...>(), std::forward<Keys>(keys)...);

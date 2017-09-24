@@ -39,6 +39,11 @@ public:
     proxy(Table& table, T&& key) : tbl(table), key(std::forward<T>(key)) {}
 
     template<typename T>
+    bool is() const {
+        return tbl.template is<T>(key);
+    }
+
+    template<typename T>
     T get() const {
         return tbl.template get<T>(key);
     }
