@@ -4,6 +4,10 @@
 #include "client_netcom.hpp"
 #include <server_state.hpp>
 
+namespace sol {
+    class state;
+}
+
 namespace client {
     class server_instance;
 
@@ -19,11 +23,19 @@ namespace client {
 
             base(server_instance& serv, server::state_id id, std::string name);
 
+            virtual void transition_to_(server_state::base& st);
+            virtual void end_of_transition_();
+
         public :
-            virtual ~base() = default;
+            virtual ~base();
 
             const std::string& name() const;
             server::state_id id() const;
+
+            void transition_to(server_state::base& st);
+
+            virtual void register_lua(sol::state& lua);
+            virtual void unregister_lua(sol::state& lua);
         };
     }
 }

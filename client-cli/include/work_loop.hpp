@@ -28,6 +28,10 @@ class work_loop {
     void run_();
     void execute_(const std::string& cmd);
 
+    void setup_idle_();
+    void setup_configure_();
+    void setup_game_();
+
 public :
     explicit work_loop(config::state& conf, logger& log);
     ~work_loop();

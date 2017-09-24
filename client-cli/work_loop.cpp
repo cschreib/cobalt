@@ -210,15 +210,14 @@ void work_loop::connect_() {
         out_.note("credentials removed: ", string::collapse(creds, ", "));
     });
 
-    serv.on_state_changed.connect([this](server::state_id s) {
-        std::string state_name;
-        switch (s) {
-        case server::state_id::configure : state_name = "configure"; break;
-        case server::state_id::idle :      state_name = "idle";      break;
-        case server::state_id::game :      state_name = "game";      break;
-        }
+    serv.on_state_left.connect([this](client::server_state::base& s) {
+        s.unregister_lua(lua_);
+        out_.note("leaving the '", s.name(), "' server state");
+    });
 
-        out_.note("server is now in the '", state_name, "' state");
+    serv.on_state_entered.connect([this](client::server_state::base& s) {
+        s.register_lua(lua_);
+        out_.note("server is now in the '", s.name(), "' state");
     });
 
     pool_ << net.watch_message([this](const message::server::will_shutdown& msg) {

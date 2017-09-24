@@ -29,8 +29,15 @@ namespace client {
         template<typename T>
         T& set_state_(std::unique_ptr<T> st) {
             T& ret = *st;
+
+            if (current_state_) {
+                current_state_->transition_to(ret);
+                on_state_left.dispatch(*current_state_);
+            }
+
             current_state_ = std::move(st);
-            on_state_changed.dispatch(st.id());
+            on_state_entered.dispatch(ret);
+
             return ret;
         }
 
@@ -68,7 +75,8 @@ namespace client {
         signal_t<void()> on_unexpected_disconnected;
 
         // Signals for server state
-        signal_t<void(server::state_id)> on_state_changed;
+        signal_t<void(server_state::base&)> on_state_left;
+        signal_t<void(server_state::base&)> on_state_entered;
 
         // Signals for administative rights
         signal_t<void(request::server::admin_rights::failure::reason)> on_admin_rights_denied;

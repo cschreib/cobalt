@@ -61,8 +61,8 @@ namespace client {
         void wait_for_shutdown();
 
         template<typename T>
-        shared_collection<T> make_shared_collection() {
-            return sc_factory_.make_shared_collection<T>();
+        shared_collection<T> make_shared_collection(std::string name) {
+            return sc_factory_.make_shared_collection<T>(name);
         }
 
         template<typename T>

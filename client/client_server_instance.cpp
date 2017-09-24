@@ -1,4 +1,7 @@
 #include "client_server_instance.hpp"
+#include "client_server_state_idle.hpp"
+#include "client_server_state_configure.hpp"
+#include "client_server_state_game.hpp"
 
 namespace client {
     server_instance::server_instance(config::state& conf, logger& log) :
@@ -48,9 +51,6 @@ namespace client {
             set_state_(msg.new_state);
         });
 
-        // TODO
-        // set_state<server_state::iddle>();
-
         // TODO: move the player list to the configure state
         // pool_ << plist_.on_list_received.connect([this]() {
         //     if (plist_.empty()) {
@@ -90,15 +90,15 @@ namespace client {
     void server_instance::set_state_(server::state_id sid) {
         switch (sid) {
         case server::state_id::configure : {
-            // setup_configure_();
+            set_state_<server_state::configure>();
             break;
         }
-        case server::state_id::iddle : {
-            // setup_iddle_();
+        case server::state_id::idle : {
+            set_state_<server_state::idle>();
             break;
         }
         case server::state_id::game : {
-            // setup_game_();
+            set_state_<server_state::game>();
             break;
         }
         }
@@ -169,7 +169,7 @@ namespace client {
         net_.process_packets();
     }
 
-    // void server_instance::setup_iddle_() {
+    // void server_instance::setup_idle_() {
     //     plist_.disconnect();
     //     auto stbl = lua_.create_table("state");
     //     stbl.set_function("start_configure", [this] {
