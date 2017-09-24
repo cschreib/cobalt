@@ -59,6 +59,51 @@ void netcom_base::clear_all_signals() {
     }
 }
 
+void netcom_base::process_packets() {
+    auto sc = ctl::scoped_toggle(processing_);
+
+    // Process newly arrived packets
+    in_packet_t p;
+    while (input_.try_pop(p)) {
+        netcom_impl::packet_type t;
+        p >> t;
+
+        // TODO: implement optional packet compression?
+
+        switch (t) {
+        case netcom_impl::packet_type::message :
+            process_message_(std::move(p));
+            break;
+        case netcom_impl::packet_type::request :
+            process_request_(std::move(p));
+            break;
+        case netcom_impl::packet_type::answer :
+        case netcom_impl::packet_type::failure :
+        case netcom_impl::packet_type::missing_credentials :
+        case netcom_impl::packet_type::unhandled :
+            process_answer_(t, std::move(p));
+            break;
+        }
+    }
+
+    if (call_terminate_) {
+        call_terminate_ = false;
+        do_terminate_();
+    }
+}
+
+void netcom_base::flush_packets() {
+    out_packet_t op;
+    while (output_.try_pop(op)) {
+        if (op.to == self_actor_id) {
+            // Bounce back packets sent to oneself
+            input_.push(std::move(op.to_input()));
+        } else {
+            // Do nothing, packet is discarded
+        }
+    }
+}
+
 void netcom_base::process_message_(in_packet_t&& p) {
     packet_id_t id;
     p >> id;
@@ -145,38 +190,5 @@ void netcom_base::process_answer_(netcom_impl::packet_type t, in_packet_t&& p) {
 
         (*iter)->dispatch(t, std::move(p));
         stop_request_(rid);
-    }
-}
-
-void netcom_base::process_packets() {
-    auto sc = ctl::scoped_toggle(processing_);
-
-    // Process newly arrived packets
-    in_packet_t p;
-    while (input_.try_pop(p)) {
-        netcom_impl::packet_type t;
-        p >> t;
-
-        // TODO: implement optional packet compression?
-
-        switch (t) {
-        case netcom_impl::packet_type::message :
-            process_message_(std::move(p));
-            break;
-        case netcom_impl::packet_type::request :
-            process_request_(std::move(p));
-            break;
-        case netcom_impl::packet_type::answer :
-        case netcom_impl::packet_type::failure :
-        case netcom_impl::packet_type::missing_credentials :
-        case netcom_impl::packet_type::unhandled :
-            process_answer_(t, std::move(p));
-            break;
-        }
-    }
-
-    if (call_terminate_) {
-        call_terminate_ = false;
-        do_terminate_();
     }
 }

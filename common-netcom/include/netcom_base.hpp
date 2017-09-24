@@ -670,6 +670,12 @@ public :
     void process_packets();
     bool debug_packets = false;
 
+    /// Flush all self-sent output packets to the input queue and discard outbound packets.
+    /** This function should only be called in scenarios where the output queue is no longer
+        consumed, for example after a disconnection.
+    **/
+    void flush_packets();
+
     /// Clear all the registered callbacks for requests and messages
     void clear_all_signals();
 
