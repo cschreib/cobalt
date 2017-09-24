@@ -214,7 +214,7 @@ void work_loop::connect_() {
         std::string state_name;
         switch (s) {
         case server::state_id::configure : state_name = "configure"; break;
-        case server::state_id::iddle :     state_name = "iddle";     break;
+        case server::state_id::idle :      state_name = "idle";      break;
         case server::state_id::game :      state_name = "game";      break;
         }
 

@@ -7,7 +7,7 @@ namespace server {
     class instance;
 
     enum class state_id : std::uint8_t {
-        iddle,
+        idle,
         configure,
         game
     };

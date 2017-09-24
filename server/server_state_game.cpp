@@ -1,5 +1,5 @@
 #include "server_state_game.hpp"
-#include "server_state_iddle.hpp"
+#include "server_state_idle.hpp"
 #include "server_instance.hpp"
 #include <filesystem.hpp>
 
@@ -56,8 +56,8 @@ namespace state {
         });
 
         pool_ << net_.watch_request(
-            [this](server::netcom::request_t<request::server::stop_and_iddle>&& req) {
-            serv_.set_state<server::state::iddle>();
+            [this](server::netcom::request_t<request::server::stop_and_idle>&& req) {
+            serv_.set_state<server::state::idle>();
             req.answer();
         });
     }

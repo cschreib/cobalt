@@ -92,8 +92,8 @@ int main(int argc, const char* argv[]) {
             pool << net.watch_message([&](const message::server::changed_state& msg) {
                 std::string state = "unknown";
                 switch (msg.new_state) {
-                    case server::state_id::iddle :
-                        state = "iddle";
+                    case server::state_id::idle :
+                        state = "idle";
                         break;
                     case server::state_id::configure :
                         state = "configure";

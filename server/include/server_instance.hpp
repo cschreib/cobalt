@@ -32,7 +32,7 @@ namespace server {
         struct failure {};
     };
 
-    NETCOM_PACKET(stop_and_iddle) {
+    NETCOM_PACKET(stop_and_idle) {
         struct answer {};
         struct failure {};
     };

@@ -1,15 +1,15 @@
-#ifndef SERVER_STATE_IDDLE_HPP
-#define SERVER_STATE_IDDLE_HPP
+#ifndef SERVER_STATE_IDLE_HPP
+#define SERVER_STATE_IDLE_HPP
 
 #include "server_state.hpp"
 
 namespace server {
 namespace state {
-    class iddle : public base {
+    class idle : public base {
         scoped_connection_pool pool_;
 
     public :
-        explicit iddle(server::instance& serv);
+        explicit idle(server::instance& serv);
     };
 }
 }
@@ -26,7 +26,7 @@ namespace server {
 }
 
 #ifndef NO_AUTOGEN
-#include "autogen/packets/server_state_iddle.hpp"
+#include "autogen/packets/server_state_idle.hpp"
 #endif
 
 #endif

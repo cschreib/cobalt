@@ -1,5 +1,5 @@
 #include "server_instance.hpp"
-#include "server_state_iddle.hpp"
+#include "server_state_idle.hpp"
 
 namespace server {
     instance::instance(config::state& conf, logger& log) :
@@ -32,7 +32,7 @@ namespace server {
             shutdown();
         });
 
-        set_state<server::state::iddle>();
+        set_state<server::state::idle>();
     }
 
     logger& instance::get_log() {
