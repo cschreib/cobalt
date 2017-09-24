@@ -17,8 +17,6 @@ namespace server {
         shutdown_(false), shutdown_time_out_(3.0),
         sc_factory_(*this) {
 
-        // TODO: switch to std::thread
-
         pool_ << conf_.bind("netcom.listen_port", listen_port_)
               << conf_.bind("netcom.connection.time_out", connection_time_out_)
               << conf_.bind("netcom.debug_packets", debug_packets)
