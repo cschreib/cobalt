@@ -23,11 +23,20 @@ int main(int argc, const char* argv[]) {
     while (!stop) {
         config::state conf;
         conf.parse_from_file(conf_file);
-        cout.add_output<cout_logger>(conf);
+        auto& clog = cout.add_output<cout_logger>(conf);
+        auto scl = ctl::make_scoped([&]() {
+            cout.remove_output(clog);
+        });
 
-        server::instance serv(conf);
+        logger out;
+        out.add_output<file_logger>(conf, "server");
+        out.add_output<cout_logger>(conf);
+
+        out.note("read configuration");
+
+        server::instance serv(conf, out);
         gserv = &serv;
-        logger& out = serv.get_log();
+
         server::netcom& net = serv.get_netcom();
 
         #ifdef POSIX
@@ -80,9 +89,9 @@ int main(int argc, const char* argv[]) {
                 req.answer();
             });
 
-            pool << net.watch_message([&](const message::changed_state& msg) {
+            pool << net.watch_message([&](const message::server::changed_state& msg) {
                 std::string state = "unknown";
-                switch (msg.answer.state) {
+                switch (msg.new_state) {
                     case server::state_id::iddle :
                         state = "iddle";
                         break;

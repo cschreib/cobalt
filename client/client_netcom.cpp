@@ -1,18 +1,17 @@
 #include "client_netcom.hpp"
 #include "server_netcom.hpp"
+#include <config.hpp>
 
 namespace client {
-    netcom::netcom() : self_id_(invalid_actor_id), running_(false), connected_(false),
-        terminate_thread_(false),
-        listener_thread_(std::bind(&netcom::loop_, this)), sc_factory_(*this) {
+    netcom::netcom(config::state& conf, logger& out) :
+        netcom_base(out), self_id_(invalid_actor_id), running_(false), connected_(false),
+        terminate_thread_(false), sc_factory_(*this) {
 
-        watch_message([this](const message::server::will_shutdown&) {
-            shutdown();
-        });
+        pool_ << conf.bind("netcom.debug_packets", debug_packets);
     }
 
     netcom::~netcom() {
-        shutdown();
+        wait_for_shutdown();
     }
 
     actor_id_t netcom::self_id() const {
@@ -28,34 +27,47 @@ namespace client {
     }
 
     void netcom::run(const std::string& addr, std::uint16_t port) {
-        if (running_) {
+        if (is_running()) {
             throw netcom_exception::already_running{};
         }
 
-        terminate_thread_ = false;
         address_ = addr;
         port_ = port;
         running_ = true;
-        listener_thread_.launch();
+        listener_thread_ = std::thread(&netcom::loop_, this);
     }
 
     void netcom::shutdown() {
-        if (running_) {
-            terminate_();
-        }
+        terminate_();
+    }
+
+    void netcom::wait_for_shutdown() {
+        shutdown();
+
+        do {
+            process_packets(); // will join() if shutdown() didn't
+            sf::sleep(sf::milliseconds(10));
+        } while (running_);
     }
 
     void netcom::do_terminate_() {
-        terminate_thread_ = true;
-        listener_thread_.wait();
+        if (listener_thread_.joinable()) {
+            terminate_thread_ = true;
+            listener_thread_.join();
+        }
 
         netcom_base::do_terminate_();
         sc_factory_.clear();
-        self_id_ = invalid_actor_id;
-        running_ = false;
     }
 
     void netcom::loop_() {
+        auto scfc = ctl::make_scoped([this]() {
+            // Clean-up
+            self_id_ = invalid_actor_id;
+            terminate_thread_ = false;
+            running_ = false;
+        });
+
         sf::TcpSocket socket;
 
         // Try to connect
@@ -107,7 +119,7 @@ namespace client {
             case sf::Socket::Error : break;
             case sf::Socket::Disconnected :
                 send_message(self_actor_id, make_packet<message::server::connection_failed>(
-                    message::server::connection_failed::reason::disconnected
+                    message::server::connection_failed::reason::unreachable
                 ));
                 return;
             }
@@ -124,7 +136,7 @@ namespace client {
             }
         }
 
-        auto sc = ctl::scoped_toggle(connected_);
+        auto sctc = ctl::scoped_toggle(connected_);
 
         // Enter main loop
         while (!terminate_thread_) {

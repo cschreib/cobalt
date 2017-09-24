@@ -24,8 +24,6 @@ int main(int argc, const char* argv[]) {
     // Configure logging
     config::state conf;
     conf.parse_from_file(conf_file);
-    cout.add_output<file_logger>(conf, "file");
-    // cout.add_output<cout_logger>(conf);
 
     // Configure console window
     std::size_t wx = 640, wy = 480;
@@ -66,8 +64,13 @@ int main(int argc, const char* argv[]) {
         );
     }
 
+    // Initialize logger
+    logger out;
+    out.add_output<file_logger>(conf, "client");
+    out.add_output<cout_logger>(conf);
+
     // Initialize worker thread
-    work_loop worker(conf);
+    work_loop worker(conf, out);
 
     // Configure console input
     std::string prompt = "> ";
@@ -93,22 +96,24 @@ int main(int argc, const char* argv[]) {
         font_regular, font_bold, charsize, inter_line, console_color
     );
 
-    auto& clog = cout.add_output<console_logger>(message_list, color_palette);
+    auto& clog = out.add_output<console_logger>(message_list, color_palette);
+    auto scl = ctl::make_scoped([&]() {
+        out.remove_output(clog);
+    });
 
     message_list.on_updated.connect([&]() {
         repaint = true;
     });
 
     // Start work
-    worker.start();
+    worker.run();
 
     // Rendering and input loop
     double refresh_delay = 1.0;
     conf.get_value("console.refresh_delay", refresh_delay);
 
-
     double prev = now();
-    while (window.isOpen()) {
+    while (window.isOpen() && worker.is_running()) {
         double current = now();
         if (repaint || (current - prev > refresh_delay)) {
             window.clear(to_sfml(console_background));
@@ -128,9 +133,7 @@ int main(int argc, const char* argv[]) {
                     window.close();
                     break;
                 case sf::Event::Resized:
-                    window.setView(sf::View(sf::FloatRect(
-                        0, 0, e.size.width, e.size.height
-                    )));
+                    window.setView(sf::View(sf::FloatRect(0, 0, e.size.width, e.size.height)));
                     repaint = true;
                     break;
                 default: break;
@@ -141,19 +144,12 @@ int main(int argc, const char* argv[]) {
         }
 
         message_list.poll_messages();
-
-        if (worker.is_stopped()) {
-            break;
-        } else if (worker.restart) {
-            worker.restart = false;
-            worker.start();
-        }
     }
 
-    worker.stop();
+    worker.wait_for_shutdown();
 
-    cout.note("stopped.");
-    cout.remove_output(clog);
+    out.note("stopped.");
+
     conf.save_to_file(conf_file);
 
     return 0;

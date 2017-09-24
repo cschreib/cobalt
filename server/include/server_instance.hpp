@@ -1,7 +1,6 @@
 #ifndef SERVER_INSTANCE_HPP
 #define SERVER_INSTANCE_HPP
 
-#include <config.hpp>
 #include <log.hpp>
 #include "server_netcom.hpp"
 #include "server_state.hpp"
@@ -54,7 +53,7 @@ namespace config {
 
 namespace server {
     class instance {
-        logger log_;
+        logger& log_;
 
         config::state& conf_;
         netcom net_;
@@ -67,7 +66,7 @@ namespace server {
         std::unique_ptr<server::state::base> current_state_;
 
     public :
-        explicit instance(config::state& conf);
+        explicit instance(config::state& conf, logger& log);
 
         logger& get_log();
         netcom& get_netcom();
@@ -78,11 +77,11 @@ namespace server {
         void shutdown();
 
         template<typename T, typename ... Args>
-        T& set_state() {
-            return set_state(std::make_unique<T>(*this));
+        T& set_state(Args&& ... args) {
+            return set_state(std::make_unique<T>(*this, std::forward<Args>(args)...));
         }
 
-        template<typename T, typename ... Args>
+        template<typename T>
         T& set_state(std::unique_ptr<T> st) {
             if (current_state_ != nullptr) {
                 net_.send_message(netcom::all_actor_id,

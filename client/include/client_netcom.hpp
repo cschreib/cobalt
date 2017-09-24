@@ -2,15 +2,20 @@
 #define CLIENT_NETCOM_HPP
 
 #include <netcom_base.hpp>
-#include <SFML/Network.hpp>
 #include <shared_collection.hpp>
+#include <thread>
+#include <atomic>
+
+namespace config {
+    class state;
+}
 
 namespace client {
     class netcom : public netcom_base {
     public :
-        netcom();
+        explicit netcom(config::state& conf, logger& out);
 
-        /// Call terminate().
+        /// Call wait_for_shutdown().
         ~netcom();
 
         /// Return the public actor ID of this client.
@@ -47,8 +52,13 @@ namespace client {
         **/
         void run(const std::string& addr, std::uint16_t port);
 
-        /// Disconnects from server and free all resources.
+        /// Disconnects from server and frees all resources.
         void shutdown();
+
+        /// Same as shutdown(), but explicitely waits for the loop to end.
+        /** Called in the destructor.
+        **/
+        void wait_for_shutdown();
 
         template<typename T>
         shared_collection<T> make_shared_collection() {
@@ -64,14 +74,16 @@ namespace client {
         void do_terminate_() override;
         void loop_();
 
+        scoped_connection_pool pool_;
+
         std::string   address_;
         std::uint16_t port_;
 
         std::atomic<actor_id_t> self_id_;
-        bool                    running_;
+        std::atomic<bool>       running_;
         std::atomic<bool>       connected_;
         std::atomic<bool>       terminate_thread_;
-        sf::Thread              listener_thread_;
+        std::thread             listener_thread_;
 
         shared_collection_factory sc_factory_;
     };

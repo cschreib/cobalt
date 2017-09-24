@@ -10,6 +10,8 @@ include_directories(${SFML_INCLUDE_DIR})
 add_library(cobalt-client STATIC
     client_netcom.cpp
     client_player_list.cpp
+    client_server_state.cpp
+    client_server_instance.cpp
 )
 
 if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")

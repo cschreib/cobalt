@@ -3,7 +3,8 @@
 #include "client_player.hpp"
 
 namespace client {
-    player_list::player_list(netcom& net) : net_(net), self_(nullptr) {}
+    player_list::player_list(netcom& net) : net_(net), self_(nullptr),
+        joining_(false), leaving_(false) {}
 
     void player_list::connect() {
         pool_ << net_.send_request(netcom::server_actor_id,
@@ -90,6 +91,8 @@ namespace client {
         pool_ << net_.send_request(netcom::server_actor_id,
             make_packet<request::client::join_players>(name, col, as_ai),
             [this](const netcom::request_answer_t<request::client::join_players>& msg) {
+                joining_ = false;
+
                 if (msg.failed) {
                     on_join_fail.dispatch();
                 }
@@ -98,12 +101,17 @@ namespace client {
     }
 
     void player_list::join_as(const std::string& name, const color32& col, bool as_ai) {
-        if (self_ != nullptr) return;
+        if (self_ != nullptr || joining_ || leaving_) {
+            on_join_fail.dispatch();
+            return;
+        }
+
+        joining_ = true;
 
         if (collection_.is_connected()) {
             request_join_(name, col, as_ai);
         } else {
-            pool_ << collection_.on_received.connect<unique_signal_connection>(
+            collection_.on_received.connect<unique_signal_connection>(
                 [=](const packet::player_list&) {
                     request_join_(name, col, as_ai);
                 }
@@ -111,18 +119,40 @@ namespace client {
         }
     }
 
-    void player_list::leave() {
-        if (self_ == nullptr) return;
-
+    void player_list::request_leave_() {
         pool_ << net_.send_request(client::netcom::server_actor_id,
             make_packet<request::client::leave_players>(),
             [this](const netcom::request_answer_t<request::client::leave_players>& msg) {
+                leaving_ = false;
+
                 if (!msg.failed) {
                     self_ = nullptr;
+
+                    if (joining_) {
+                        on_join_fail.dispatch();
+                        joining_ = false;
+                    }
+
                     on_leave.dispatch();
                 }
             }
         );
+    }
+
+    void player_list::leave() {
+        if (self_ == nullptr || leaving_ || joining_) return;
+
+        leaving_ = true;
+
+        if (collection_.is_connected()) {
+            request_leave_();
+        } else {
+            collection_.on_received.connect<unique_signal_connection>(
+                [=](const packet::player_list&) {
+                    request_leave_();
+                }
+            );
+        }
     }
 
     bool player_list::is_joined() const {

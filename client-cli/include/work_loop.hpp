@@ -1,51 +1,46 @@
 #ifndef WORK_LOOP_HPP
 #define WORK_LOOP_HPP
 
-#include <config.hpp>
 #include <lock_free_queue.hpp>
-#include <atomic>
-#include <thread>
-#include <client_player_list.hpp>
+#include <client_server_instance.hpp>
 #include <sol.hpp>
 
 class work_loop {
-    client::netcom net_;
+    config::state& conf_;
+    logger& out_;
     scoped_connection_pool pool_;
 
-    std::string prompt_ = "> ";
-    std::string admin_password_;
-
-    std::string   server_ip_   = "127.0.0.1";
-    std::uint16_t server_port_ = 4444;
-
-    client::player_list plist_;
-
-    std::atomic<bool> shutdown_;
+    std::atomic<bool> running_;
+    std::atomic<bool> stop_;
     std::thread worker_;
+    client::server_instance* server_ = nullptr;
+    bool reconnect_now_ = false;
+
+    std::string prompt_ = "> ";
+    bool auto_reconnect_ = true;
+    float auto_reconnect_delay_ = 2.0f;
 
     ctl::lock_free_queue<std::string> commands_;
     sol::state lua_;
 
     void open_lua_();
-    void server_connect_();
+    void connect_();
     void run_();
     void execute_(const std::string& cmd);
 
-    void setup_iddle_();
-    void setup_configure_();
-    void setup_game_();
-
 public :
-    explicit work_loop(config::state& conf);
+    explicit work_loop(config::state& conf, logger& log);
     ~work_loop();
 
-    void start();
-    bool is_stopped() const;
-    void stop();
-
+    std::atomic<bool> quit;
     std::atomic<bool> restart;
 
     void execute(std::string cmd);
+
+    bool is_running() const;
+    void run();
+    void shutdown();
+    void wait_for_shutdown();
 };
 
 #endif

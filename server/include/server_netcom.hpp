@@ -6,6 +6,7 @@
 #include <scoped_connection_pool.hpp>
 #include <unique_id_provider.hpp>
 #include <shared_collection.hpp>
+#include <thread>
 
 namespace config {
     class state;
@@ -20,7 +21,7 @@ namespace server {
         **/
         explicit netcom(config::state& conf, logger& out);
 
-        /// Call wait_shutdown().
+        /// Call wait_for_shutdown().
         ~netcom();
 
         /// Define the maximum number of simultaneously connected clients.
@@ -63,7 +64,7 @@ namespace server {
         /// Same as shutdown(), but explicitely waits for the loop to end.
         /** Called in the destructor.
         **/
-        void wait_shutdown();
+        void wait_for_shutdown();
 
         /// Return the IP address of a given actor.
         std::string get_actor_ip(actor_id_t cid) const;
@@ -145,7 +146,7 @@ namespace server {
         std::atomic<bool> shutdown_;
         double            shutdown_time_out_;
         double            shutdown_countdown_ = 0.0;
-        sf::Thread listener_thread_;
+        std::thread       listener_thread_;
 
         shared_collection_factory sc_factory_;
     };
@@ -176,6 +177,7 @@ namespace server {
         enum class reason : std::uint8_t {
             cannot_authenticate,
             disconnected,
+            unreachable,
             timed_out
         } rsn;
     };

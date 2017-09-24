@@ -2,13 +2,8 @@
 #include "server_state_iddle.hpp"
 
 namespace server {
-    instance::instance(config::state& conf) :
-        log_([&]() {
-            logger log;
-            log.add_output<file_logger>(conf, "server");
-            log.add_output<cout_logger>(conf);
-            return log;
-        }()), conf_(conf), net_(conf_, log_), shutdown_(false) {
+    instance::instance(config::state& conf, logger& log) :
+        log_(log), conf_(conf), net_(conf_, log_), shutdown_(false) {
 
         pool_ << conf_.bind("admin.password", admin_password_);
 
@@ -62,6 +57,7 @@ namespace server {
 
     void instance::run() {
         net_.run();
+
         while (net_.is_running()) {
             sf::sleep(sf::milliseconds(5));
 
@@ -74,5 +70,8 @@ namespace server {
             // Receive and send packets
             net_.process_packets();
         }
+
+        net_.flush_packets();
+        net_.process_packets();
     }
 }

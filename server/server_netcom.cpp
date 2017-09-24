@@ -15,8 +15,9 @@ namespace server {
         listen_port_(4444), max_client_(1),
         client_id_provider_(max_client_, first_actor_id),
         shutdown_(false), shutdown_time_out_(3.0),
-        listener_thread_(std::bind(&netcom::loop_, this)),
         sc_factory_(*this) {
+
+        // TODO: switch to std::thread
 
         pool_ << conf_.bind("netcom.listen_port", listen_port_)
               << conf_.bind("netcom.connection.time_out", connection_time_out_)
@@ -41,7 +42,7 @@ namespace server {
     }
 
     netcom::~netcom() {
-        wait_shutdown();
+        wait_for_shutdown();
     }
 
     void netcom::set_max_client_(std::size_t max_client) {
@@ -78,7 +79,7 @@ namespace server {
         }
 
         running_ = true;
-        listener_thread_.launch();
+        listener_thread_ = std::thread(&netcom::loop_, this);
     }
 
     void netcom::shutdown() {
@@ -102,22 +103,22 @@ namespace server {
         }
     }
 
-    void netcom::wait_shutdown() {
-        if (running_) {
-            shutdown();
-            while (running_) {
-                process_packets();
-                sf::sleep(sf::milliseconds(10));
-            }
-        }
+    void netcom::wait_for_shutdown() {
+        shutdown();
+
+        do {
+            process_packets(); // will join() if shutdown() didn't
+            sf::sleep(sf::milliseconds(10));
+        } while (running_);
     }
 
     void netcom::do_terminate_() {
+        if (listener_thread_.joinable()) {
+            listener_thread_.join();
+        }
+
         netcom_base::do_terminate_();
-        client_id_provider_.clear();
         sc_factory_.clear();
-        shutdown_countdown_ = 0.0;
-        running_ = false;
     }
 
     std::string netcom::get_actor_ip(actor_id_t cid) const {
@@ -178,6 +179,13 @@ namespace server {
     }
 
     void netcom::loop_() {
+        auto scfc = ctl::make_scoped([this]() {
+            // Clean-up
+            client_id_provider_.clear();
+            shutdown_countdown_ = 0.0;
+            running_ = false;
+        });
+
         // Try to open the port
         while (listener_.listen(listen_port_) != sf::Socket::Done && !shutdown_) {
             send_message(self_actor_id,
@@ -324,6 +332,11 @@ namespace server {
                     stop = true;
                 } else {
                     if (last == 0.0) {
+                        out_packet_t tp = create_message(
+                            make_packet<message::server::internal::begin_terminate>()
+                        );
+                        input_.push(std::move(tp.to_input()));
+
                         last = now();
                     }
 

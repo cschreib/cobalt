@@ -50,11 +50,14 @@ namespace client {
 
     private :
         void request_join_(const std::string& name, const color32& col, bool as_ai);
+        void request_leave_();
 
         netcom& net_;
 
         ctl::ptr_vector<player> players_;
         player* self_;
+        bool joining_;
+        bool leaving_;
 
         scoped_connection_pool pool_;
         shared_collection_observer<player_collection_traits> collection_;
