@@ -109,6 +109,15 @@ public:
         return *this;
     }
 
+    template<typename Key>
+    table create_table(Key&& key, int narr = 0, int nrec = 0) {
+        lua_createtable(state(), narr, nrec);
+        table result(state());
+        lua_pop(state(), 1);
+        set(std::forward<Key>(key), result);
+        return result;
+    }
+
     size_t size() const {
         push();
         return lua_rawlen(state(), -1);

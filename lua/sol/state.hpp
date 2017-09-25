@@ -173,11 +173,7 @@ public:
 
     template<typename T>
     table create_table(T&& key, int narr = 0, int nrec = 0) {
-        lua_createtable(L.get(), narr, nrec);
-        table result(L.get());
-        lua_pop(L.get(), 1);
-        global.set(std::forward<T>(key), result);
-        return result;
+        return global.create_table(std::forward<T>(key), narr, nrec);
     }
 
     table create_table(int narr = 0, int nrec = 0) {
