@@ -95,7 +95,26 @@ class table;
 class function;
 class object;
 
+template<typename T>
+class optional;
+
 namespace detail {
+template<typename T>
+struct is_optional : std::false_type {};
+
+template<typename T>
+struct is_optional<optional<T>> : std::true_type {};
+
+template<typename T>
+inline type selet_optional(std::true_type) {
+    return type::poly;
+}
+
+template<typename T>
+inline type selet_optional(std::false_type) {
+    return type::userdata;
+}
+
 template<typename T>
 inline type arithmetic(std::true_type) {
     return type::number;
@@ -103,7 +122,7 @@ inline type arithmetic(std::true_type) {
 
 template<typename T>
 inline type arithmetic(std::false_type) {
-    return type::userdata;
+    return select_optional(is_optional<T>{});
 }
 } // detail
 

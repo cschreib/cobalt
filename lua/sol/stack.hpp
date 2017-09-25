@@ -331,6 +331,17 @@ struct pusher<std::string> {
     }
 };
 
+template<typename T>
+struct pusher<optional<T>> {
+    static void push(lua_State* L, const optional<T>& obj) {
+        if (obj.is_set()) {
+            pusher<Unqualified<T>>::push(L, obj.get());
+        } else {
+            pusher<nil_t>::push(L, nil);
+        }
+    }
+};
+
 template<typename T, typename... Args>
 inline void push(lua_State* L, T&& t, Args&&... args) {
     pusher<Unqualified<T>>{}.push(L, std::forward<T>(t), std::forward<Args>(args)...);

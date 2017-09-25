@@ -19,12 +19,46 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#ifndef SOL_HPP
-#define SOL_HPP
+#ifndef SOL_OPTIONAL_HPP
+#define SOL_OPTIONAL_HPP
 
-#include "sol/state.hpp"
-#include "sol/object.hpp"
-#include "sol/optional.hpp"
-#include "sol/function.hpp"
+#include "error.hpp"
 
-#endif // SOL_HPP
+namespace sol {
+template<typename T>
+class optional {
+    T value;
+    bool isset = false;
+
+public:
+    optional() = default;
+    optional(T v) : value(std::move(v)), isset(true) {}
+
+    void set(T v) {
+        value = std::move(v);
+        isset = true;
+    }
+
+    void unset() {
+        isset = false;
+    }
+
+    const T& get() const {
+        if (isset) {
+            return value;
+        } else {
+            throw error("optional has no value");
+        }
+    }
+
+    bool is_set() const {
+        return isset;
+    }
+
+    explicit operator bool() const {
+        return isset;
+    }
+};
+} // sol
+
+#endif // SOL_OPTIONAL_HPP
