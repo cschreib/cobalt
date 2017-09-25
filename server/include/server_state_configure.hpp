@@ -23,6 +23,8 @@ namespace state {
         using generator_list_t =
             ctl::sorted_vector<generator_info, mem_var_comp(&generator_info::id)>;
 
+        static const std::string config_meta_header;
+
     private :
         scoped_connection_pool pool_;
         scoped_connection_pool rw_pool_;
@@ -50,6 +52,7 @@ namespace state {
 
         void update_generator_list();
         bool set_generator(const std::string& id);
+        void set_parameter(const std::string& key, const std::string& value);
         void generate();
 
         void update_saved_game_list();
@@ -79,13 +82,6 @@ namespace server {
         struct failure {};
     };
 
-    NETCOM_PACKET(configure_get_current_generator) {
-        struct answer {
-            std::string gen;
-        };
-        struct failure {};
-    };
-
     NETCOM_PACKET(configure_set_current_generator) {
         NETCOM_REQUIRES("game_configurer");
 
@@ -95,6 +91,21 @@ namespace server {
         struct failure {
             enum class reason {
                 no_such_generator
+            } rsn;
+        };
+    };
+
+    NETCOM_PACKET(configure_change_parameter) {
+        NETCOM_REQUIRES("game_configurer");
+
+        std::string key;
+        std::string value;
+
+        struct answer {};
+        struct failure {
+            enum class reason {
+                no_such_parameter,
+                invalid_value
             } rsn;
         };
     };
@@ -166,6 +177,10 @@ namespace server {
 
 namespace message {
 namespace server {
+    NETCOM_PACKET(configure_current_generator_changed) {
+        std::string gen;
+    };
+
     NETCOM_PACKET(configure_generating) {};
 
     NETCOM_PACKET(configure_generated_internal) {

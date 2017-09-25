@@ -50,11 +50,14 @@ void work_loop::open_lua_() {
         conf_.set_value(key, value);
     });
     ctbl.set_function("get", [this](std::string key) {
+        sol::optional<std::string> ret;
         std::string value;
         if (!conf_.get_value(key, value)) {
             out_.error("no value exists for '", key, "'");
+        } else {
+            ret.set(value);
         }
-        return value;
+        return ret;
     });
 }
 

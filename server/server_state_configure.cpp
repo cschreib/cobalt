@@ -4,9 +4,12 @@
 #include "server_instance.hpp"
 #include <filesystem.hpp>
 #include <time.hpp>
+#include <string.hpp>
 
 namespace server {
 namespace state {
+    const std::string configure::config_meta_header = "__meta.";
+
     configure::configure(server::instance& serv) :
         base(serv, server::state_id::configure, "configure"),
         config_(net_, "server_state_configure") {
@@ -20,11 +23,6 @@ namespace state {
             req.answer(available_generators_);
         });
 
-        pool_ << net_.watch_request(
-            [this](server::netcom::request_t<request::server::configure_get_current_generator>&& req) {
-            req.answer(generator_->id);
-        });
-
         rw_pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::configure_set_current_generator>&& req) {
             if (set_generator(req.arg.gen)) {
@@ -32,6 +30,19 @@ namespace state {
             } else {
                 using failure_t = request::server::configure_set_current_generator::failure;
                 req.fail(failure_t::reason::no_such_generator);
+            }
+        });
+
+        rw_pool_ << net_.watch_request(
+            [this](server::netcom::request_t<request::server::configure_change_parameter>&& req) {
+            try {
+                set_parameter(req.arg.key, req.arg.value);
+                req.answer();
+            } catch (request::server::configure_change_parameter::failure& fail) {
+                req.fail(std::move(fail));
+            } catch (...) {
+                out_.error("unexpected exception in configure::set_parameter()");
+                throw;
             }
         });
 
@@ -143,6 +154,82 @@ namespace state {
         config_.set_value("generator", generator_->id);
 
         return true;
+    }
+
+    template<typename T>
+    void set_parameter_impl(config::shared_state& config, const std::string& key, const T& value) {
+        using failure_t = request::server::configure_change_parameter::failure;
+
+        std::string allowed_vals;
+        if (config.get_value(configure::config_meta_header+key+".allowed_values", allowed_vals)) {
+            bool found = false;
+            for (auto& s : string::split(allowed_vals, ",")) {
+                T v;
+                if (string::convert(s, v) && value == v) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                throw failure_t{failure_t::reason::invalid_value};
+            }
+        } else {
+            std::string min_val;
+            if (config.get_value(configure::config_meta_header+key+".min_value", min_val)) {
+                T v;
+                if (string::convert(min_val, v) && value < v) {
+                    throw failure_t{failure_t::reason::invalid_value};
+                }
+            }
+
+            std::string max_val;
+            if (config.get_value(configure::config_meta_header+key+".max_value", min_val)) {
+                T v;
+                if (string::convert(min_val, v) && value > v) {
+                    throw failure_t{failure_t::reason::invalid_value};
+                }
+            }
+        }
+
+        config.set_value(key, value);
+    }
+
+    void configure::set_parameter(const std::string& key, const std::string& value) {
+        using failure_t = request::server::configure_change_parameter::failure;
+
+        if (string::start_with(key, config_meta_header) || !config_.value_exists(key)) {
+            throw failure_t{failure_t::reason::no_such_parameter};
+        }
+
+        std::string type;
+        if (!config_.get_value(config_meta_header+key+".type", type)) {
+            type = "string";
+        }
+
+        if (type == "string") {
+            return set_parameter_impl(config_, key, value);
+        } else if (type == "int") {
+            int ival;
+            if (!string::convert(value, ival)) {
+                throw failure_t{failure_t::reason::invalid_value};
+            }
+            return set_parameter_impl(config_, key, ival);
+        } else if (type == "unit") {
+            unsigned int ival;
+            if (!string::convert(value, ival)) {
+                throw failure_t{failure_t::reason::invalid_value};
+            }
+            return set_parameter_impl(config_, key, ival);
+        } else if (type == "float") {
+            float fval;
+            if (!string::convert(value, fval)) {
+                throw failure_t{failure_t::reason::invalid_value};
+            }
+            return set_parameter_impl(config_, key, fval);
+        } else {
+            throw failure_t{failure_t::reason::invalid_value};
+        }
     }
 
     void configure::generate() {
