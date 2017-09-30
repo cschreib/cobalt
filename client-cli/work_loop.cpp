@@ -17,7 +17,18 @@ work_loop::~work_loop() {
 
 void work_loop::open_lua_() {
     lua_.open_libraries(sol::lib::base, sol::lib::math);
-    lua_.set_function("print", [this](std::string msg) { out_.print(msg); });
+    lua_.set_function("print", [this](std::vector<sol::optional<std::string>> vals) {
+        std::string msg;
+        for (std::size_t i = 0; i < vals.size(); ++i) {
+            if (i != 0) msg += ",";
+            if (vals[i]) {
+                msg += vals[i].get();
+            } else {
+                msg += "nil";
+            }
+        }
+        out_.print(msg);
+    });
 
     auto stbl = lua_.create_table("server");
     stbl.set_function("connect", [this] {
