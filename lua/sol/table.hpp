@@ -118,6 +118,35 @@ public:
         return result;
     }
 
+    template<typename Fun>
+    void foreach(Fun&& f) {
+        using Signature = decltype(&Fun::operator());
+        using Key = typename function_traits<Signature>::template arg<0>;
+        using Value = typename function_traits<Signature>::template arg<1>;
+
+        push();
+        lua_pushnil(state());
+        while (lua_next(state(), -2) != 0) {
+            f(stack::getter<Unqualified<Key>>::get(state(), -2),
+              stack::getter<Unqualified<Value>>::get(state(),-1));
+            lua_pop(state(), 1);
+        }
+    }
+
+    template<typename Fun>
+    void foreach_proxy(Fun&& f) {
+        using Signature = decltype(&Fun::operator());
+        using Key = typename function_traits<Signature>::template arg<0>;
+
+        push();
+        lua_pushnil(state());
+        while (lua_next(state(), -2) != 0) {
+            Key k = stack::getter<Unqualified<Key>>::get(state(), -2);
+            f(k, proxy<table,Key>(*this, k));
+            lua_pop(state(), 1);
+        }
+    }
+
     size_t size() const {
         push();
         return lua_rawlen(state(), -1);
