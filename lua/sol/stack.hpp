@@ -168,6 +168,36 @@ struct getter<nil_t> {
     }
 };
 
+template<typename T>
+struct getter<optional<T>> {
+    static optional<T> get(lua_State* L, int index = -1) {
+        optional<T> ret;
+        if(lua_isnil(L, index) == 0) {
+            ret.set(getter<Unqualified<T>>::get(L, index));
+        }
+        return ret;
+    }
+};
+
+template<typename T>
+struct getter<std::vector<T>> {
+    static std::vector<T> get(lua_State* L, int index = -1) {
+        std::vector<T> ret;
+        if(lua_istable(L, index) == 0) {
+            ret.push_back(getter<Unqualified<T>>::get(L, index));
+        } else {
+            std::size_t len = lua_rawlen(L, index);
+            ret.reserve(len);
+            for(std::size_t i = 0; i < len; ++i) {
+                lua_rawgeti(L, index, i);
+                ret.push_back(getter<Unqualified<T>>::get(L, -1));
+                lua_pop(L, 1);
+            }
+        }
+        return ret;
+    }
+};
+
 template<>
 struct getter<userdata_t> {
     static userdata_t get(lua_State* L, int index = -1) {
@@ -335,7 +365,7 @@ struct pusher<std::string> {
 template<typename T>
 struct pusher<optional<T>> {
     static void push(lua_State* L, const optional<T>& obj) {
-        if (obj.is_set()) {
+        if(obj.is_set()) {
             pusher<Unqualified<T>>::push(L, obj.get());
         } else {
             pusher<nil_t>::push(L, nil);
@@ -347,7 +377,7 @@ template<typename T>
 struct pusher<std::vector<T>> {
     static void push(lua_State* L, const std::vector<T>& v) {
         lua_createtable(L, v.size(), 0);
-        for (std::size_t i = 0; i < v.size(); ++i) {
+        for(std::size_t i = 0; i < v.size(); ++i) {
             pusher<Unqualified<T>>::push(L, v[i]);
             lua_rawseti(L, -2, i);
         }
