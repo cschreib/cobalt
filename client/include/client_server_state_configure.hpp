@@ -14,6 +14,7 @@ namespace server_state {
         using generator_list_t = server::state::configure::generator_list_t;
 
         config::shared_state_observer config_;
+        config::shared_state_observer generator_config_;
         scoped_connection_pool pool_;
 
         std::unique_ptr<client::player_list> plist_;
@@ -21,8 +22,6 @@ namespace server_state {
         std::string generator_;
 
         void transition_to_(server_state::base& st) override;
-
-        static const std::string config_meta_header;
 
     public :
         explicit configure(server_instance& serv);

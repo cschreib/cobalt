@@ -8,40 +8,41 @@
 
 namespace server {
 namespace state {
-    const std::string configure::config_meta_header = "__meta.";
-
     configure::configure(server::instance& serv) :
         base(serv, server::state_id::configure, "configure"),
-        config_(net_, "server_state_configure") {
+        config_(net_, "server_state_configure"),
+        generator_config_(net_, "server_state_configure_generator") {
 
         update_generator_list();
 
         plist_ = std::make_unique<server::player_list>(net_, serv_.get_conf());
 
-        pool_ << net_.watch_request(
-            [this](server::netcom::request_t<request::server::configure_list_generators>&& req) {
-            req.answer(available_generators_);
-        });
-
-        rw_pool_ << net_.watch_request(
-            [this](server::netcom::request_t<request::server::configure_set_current_generator>&& req) {
-            if (set_generator(req.arg.gen)) {
-                req.answer();
-            } else {
-                using failure_t = request::server::configure_set_current_generator::failure;
-                req.fail(failure_t::reason::no_such_generator);
-            }
+        config_.bind("generator", [this](std::string id) {
+            set_generator_(id);
         });
 
         rw_pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::configure_change_parameter>&& req) {
             try {
-                set_parameter(req.arg.key, req.arg.value);
+                set_parameter(req.arg.key, req.arg.value, true);
                 req.answer();
             } catch (request::server::configure_change_parameter::failure& fail) {
                 req.fail(std::move(fail));
             } catch (...) {
                 out_.error("unexpected exception in configure::set_parameter()");
+                throw;
+            }
+        });
+
+        rw_pool_ << net_.watch_request(
+            [this](server::netcom::request_t<request::server::configure_change_generator_parameter>&& req) {
+            try {
+                set_generator_parameter(req.arg.key, req.arg.value, true);
+                req.answer();
+            } catch (request::server::configure_change_generator_parameter::failure& fail) {
+                req.fail(std::move(fail));
+            } catch (...) {
+                out_.error("unexpected exception in configure::set_generator_parameter()");
                 throw;
             }
         });
@@ -125,7 +126,13 @@ namespace state {
     }
 
     void configure::update_generator_list() {
+        std::string previous_id;
+        if (generator_) {
+            previous_id = generator_->id;
+        }
+
         available_generators_.clear();
+        generator_ = nullptr;
 
         auto libs = file::list_files("generators/*."+shared_library::file_extension);
         for (auto&& lib_file : libs) {
@@ -137,97 +144,58 @@ namespace state {
             }
         }
 
+        std::vector<std::string> gens;
+        gens.reserve(available_generators_.size());
+        for (auto& g : available_generators_) {
+            gens.push_back(g.id);
+            if (g.id == previous_id) {
+                generator_ = &g;
+            }
+        }
+
+        config_.set_value_allowed("generator", gens);
+
         if (available_generators_.empty()) {
             out_.warning("no universe generator available");
-        } else {
+        } else if (!generator_) {
             set_generator(available_generators_.front().id);
         }
     }
 
-    bool configure::set_generator(const std::string& id) {
+    void configure::set_generator_(const std::string& id) {
         auto iter = available_generators_.find(id);
-        if (iter == available_generators_.end()) return false;
 
         generator_ = &*iter;
-        config_.clear();
-        config_.parse_from_file("generators/"+generator_->id+".conf");
-        config_.set_value("generator", generator_->id);
-
-        return true;
+        generator_config_.clear();
+        generator_config_.parse_from_file("generators/"+generator_->id+".conf");
     }
 
-    template<typename T>
-    void set_parameter_impl(config::shared_state& config, const std::string& key, const T& value) {
-        using failure_t = request::server::configure_change_parameter::failure;
-
-        std::string allowed_vals;
-        if (config.get_value(configure::config_meta_header+key+".allowed_values", allowed_vals)) {
-            bool found = false;
-            for (auto& s : string::split(allowed_vals, ",")) {
-                T v;
-                if (string::convert(s, v) && value == v) {
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found) {
-                throw failure_t{failure_t::reason::invalid_value};
-            }
-        } else {
-            std::string min_val;
-            if (config.get_value(configure::config_meta_header+key+".min_value", min_val)) {
-                T v;
-                if (string::convert(min_val, v) && value < v) {
-                    throw failure_t{failure_t::reason::invalid_value};
-                }
-            }
-
-            std::string max_val;
-            if (config.get_value(configure::config_meta_header+key+".max_value", min_val)) {
-                T v;
-                if (string::convert(min_val, v) && value > v) {
-                    throw failure_t{failure_t::reason::invalid_value};
-                }
-            }
-        }
-
-        config.set_value(key, value);
+    void configure::set_generator(const std::string& id) {
+        set_parameter("generator", id);
     }
 
-    void configure::set_parameter(const std::string& key, const std::string& value) {
+    void configure::set_parameter(const std::string& key, const std::string& value, bool nocreate) {
         using failure_t = request::server::configure_change_parameter::failure;
 
-        if (string::start_with(key, config_meta_header) || !config_.value_exists(key)) {
+        if (string::start_with(key, config::meta_header) ||
+            (nocreate && !config_.value_exists(key))) {
             throw failure_t{failure_t::reason::no_such_parameter};
         }
 
-        std::string type;
-        if (!config_.get_value(config_meta_header+key+".type", type)) {
-            type = "string";
+        if (!config_.set_raw_value(key, value)) {
+            throw failure_t{failure_t::reason::invalid_value};
+        }
+    }
+
+    void configure::set_generator_parameter(const std::string& key, const std::string& value, bool nocreate) {
+        using failure_t = request::server::configure_change_generator_parameter::failure;
+
+        if (string::start_with(key, config::meta_header) ||
+            (nocreate && !generator_config_.value_exists(key))) {
+            throw failure_t{failure_t::reason::no_such_parameter};
         }
 
-        if (type == "string") {
-            return set_parameter_impl(config_, key, value);
-        } else if (type == "int") {
-            int ival;
-            if (!string::convert(value, ival)) {
-                throw failure_t{failure_t::reason::invalid_value};
-            }
-            return set_parameter_impl(config_, key, ival);
-        } else if (type == "uint") {
-            unsigned int ival;
-            if (!string::convert(value, ival)) {
-                throw failure_t{failure_t::reason::invalid_value};
-            }
-            return set_parameter_impl(config_, key, ival);
-        } else if (type == "float") {
-            float fval;
-            if (!string::convert(value, fval)) {
-                throw failure_t{failure_t::reason::invalid_value};
-            }
-            return set_parameter_impl(config_, key, fval);
-        } else {
+        if (!generator_config_.set_raw_value(key, value)) {
             throw failure_t{failure_t::reason::invalid_value};
         }
     }
@@ -288,11 +256,24 @@ namespace state {
             serialized_config = ss.str();
         }
 
+        std::string serialized_generator_config; {
+            std::ostringstream ss;
+            generator_config_.save(ss);
+            serialized_generator_config = ss.str();
+        }
+
+
         // Save config
         {
-            std::ofstream file(save_dir_+"generator.conf");
+            std::ofstream file(save_dir_+"server.conf");
             file << serialized_config;
         }
+        {
+            std::ofstream file(save_dir_+"generator.conf");
+            file << serialized_generator_config;
+        }
+
+        serialized_config += serialized_generator_config;
 
         // Launch generation
         rw_pool_.block_all();
@@ -415,7 +396,9 @@ namespace state {
             // This is not needed if this function is called by generate()
             // since the corresponding configuration is already loaded.
             config_.clear();
-            config_.parse_from_file(dir+"generator.conf");
+            config_.parse_from_file(dir+"server.conf");
+            generator_config_.clear();
+            generator_config_.parse_from_file(dir+"generator.conf");
 
             std::string gid;
             config_.get_value("generator", gid);

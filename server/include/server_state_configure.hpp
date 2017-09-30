@@ -23,8 +23,6 @@ namespace state {
         using generator_list_t =
             ctl::sorted_vector<generator_info, mem_var_comp(&generator_info::id)>;
 
-        static const std::string config_meta_header;
-
     private :
         scoped_connection_pool pool_;
         scoped_connection_pool rw_pool_;
@@ -37,6 +35,7 @@ namespace state {
         std::string save_dir_;
 
         config::shared_state config_;
+        config::shared_state generator_config_;
 
         std::unique_ptr<server::player_list> plist_;
 
@@ -46,13 +45,16 @@ namespace state {
 
         void load_generated_saved_game_();
 
+        void set_generator_(const std::string& id);
+
     public :
         explicit configure(server::instance& serv);
         ~configure();
 
         void update_generator_list();
-        bool set_generator(const std::string& id);
-        void set_parameter(const std::string& key, const std::string& value);
+        void set_generator(const std::string& id);
+        void set_parameter(const std::string& key, const std::string& value, bool nocreate = false);
+        void set_generator_parameter(const std::string& key, const std::string& value, bool nocreate = false);
         void generate();
 
         void update_saved_game_list();
@@ -75,27 +77,22 @@ namespace state {
 
 namespace request {
 namespace server {
-    NETCOM_PACKET(configure_list_generators) {
-        struct answer {
-            ::server::state::configure::generator_list_t gens;
-        };
-        struct failure {};
-    };
-
-    NETCOM_PACKET(configure_set_current_generator) {
+    NETCOM_PACKET(configure_change_parameter) {
         NETCOM_REQUIRES("game_configurer");
 
-        std::string gen;
+        std::string key;
+        std::string value;
 
         struct answer {};
         struct failure {
             enum class reason {
-                no_such_generator
+                no_such_parameter,
+                invalid_value
             } rsn;
         };
     };
 
-    NETCOM_PACKET(configure_change_parameter) {
+    NETCOM_PACKET(configure_change_generator_parameter) {
         NETCOM_REQUIRES("game_configurer");
 
         std::string key;
