@@ -24,6 +24,7 @@
 
 #include <lua.hpp>
 #include <string>
+#include <vector>
 #include "traits.hpp"
 
 namespace sol {
@@ -106,13 +107,29 @@ template<typename T>
 struct is_optional<optional<T>> : std::true_type {};
 
 template<typename T>
-inline type selet_optional(std::true_type) {
+struct is_vector : std::false_type {};
+
+template<typename T>
+struct is_vector<std::vector<T>> : std::true_type {};
+
+template<typename T>
+inline type select_vector(std::true_type) {
+    return type::table;
+}
+
+template<typename T>
+inline type select_vector(std::false_type) {
+    return type::userdata;
+}
+
+template<typename T>
+inline type select_optional(std::true_type) {
     return type::poly;
 }
 
 template<typename T>
-inline type selet_optional(std::false_type) {
-    return type::userdata;
+inline type select_optional(std::false_type) {
+    return select_vector(is_vector<T>{});
 }
 
 template<typename T>

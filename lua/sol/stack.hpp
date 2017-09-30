@@ -31,6 +31,7 @@
 #include <array>
 #include <cstring>
 #include <functional>
+#include <vector>
 
 namespace sol {
 namespace detail {
@@ -338,6 +339,17 @@ struct pusher<optional<T>> {
             pusher<Unqualified<T>>::push(L, obj.get());
         } else {
             pusher<nil_t>::push(L, nil);
+        }
+    }
+};
+
+template<typename T>
+struct pusher<std::vector<T>> {
+    static void push(lua_State* L, const std::vector<T>& v) {
+        lua_createtable(L, v.size(), 0);
+        for (std::size_t i = 0; i < v.size(); ++i) {
+            pusher<Unqualified<T>>::push(L, v[i]);
+            lua_rawseti(L, -2, i);
         }
     }
 };

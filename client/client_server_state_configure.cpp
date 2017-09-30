@@ -72,12 +72,14 @@ namespace server_state {
             }
             return std::make_tuple(retmin, retmax);
         });
-        // TODO: need to implement std::vector support for this
-        // ctbl.set_function("get_parameter_allowed_values", [this](std::string key) {
-        //     std::string vals;
-        //     config_.get_value(config_meta_header+key+".allowed_values", vals);
-        //     return string::split(vals,",");
-        // });
+        ctbl.set_function("get_parameter_allowed_values", [this](std::string key) {
+            sol::optional<std::vector<std::string>> ret;
+            std::string vals;
+            if (config_.get_value(config_meta_header+key+".allowed_values", vals)) {
+                ret.set(string::split(vals,","));
+            }
+            return ret;
+        });
 
         ctbl.set_function("set_parameter", [this](std::string key, std::string value) {
             pool_ << net_.send_request(client::netcom::server_actor_id,
