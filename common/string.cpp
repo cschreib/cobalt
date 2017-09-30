@@ -112,6 +112,22 @@ namespace string {
         return ret;
     }
 
+    std::vector<std::string> split_any_of(const std::string& ts, const std::string& chars) {
+        std::vector<std::string> ret;
+        std::size_t op = ts.find_first_not_of(chars);
+        std::size_t p = op;
+        while ((p = ts.find_first_of(chars, op)) != ts.npos) {
+            ret.push_back(ts.substr(op, p - op));
+            op = ts.find_first_not_of(chars, p);
+        }
+
+        if (op != ts.npos) {
+            ret.push_back(ts.substr(op));
+        }
+
+        return ret;
+    }
+
     std::string collapse(const std::vector<std::string>& sv, const std::string& sep) {
         std::string ret = sv[0];
         for (std::size_t i : range(1, sv)) {

@@ -53,6 +53,7 @@ namespace string {
     bool start_with(const std::string& s, const std::string& pattern);
     bool end_with(const std::string& s, const std::string& pattern);
     std::vector<std::string> split(const std::string& ts, const std::string& pattern);
+    std::vector<std::string> split_any_of(const std::string& ts, const std::string& chars);
     std::string collapse(const std::vector<std::string>& sv, const std::string& sep);
 
     std::string uchar_to_hex(std::uint8_t i);
