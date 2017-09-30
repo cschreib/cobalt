@@ -97,6 +97,47 @@ void work_loop::execute(std::string cmd) {
     }
 }
 
+void work_loop::autocomplete_(const std::string& cmd) {
+    std::vector<std::string> candidates;
+
+    std::vector<std::string> fields = string::split_any_of(cmd, ":.");
+    if (fields.empty()) return;
+
+    auto p0 = cmd.find_last_of(":.");
+    std::string root = p0 == cmd.npos ? "" : cmd.substr(0, p0+1);
+
+    if (cmd.back() == '.' || cmd.back() == ':') {
+        fields.push_back("");
+    }
+
+    sol::table t = lua_.global_table();
+    for (std::size_t i = 0; i < fields.size()-1; ++i) {
+        auto px = t[fields[i]];
+        if (!px.is<sol::table>()) return;
+        t = px.get<sol::table>();
+    }
+
+    t.foreach_proxy([&](std::string k, sol::proxy<sol::table,std::string>) {
+        if (string::start_with(k, fields.back())) {
+            candidates.push_back(root+k);
+        }
+    });
+
+    std::sort(candidates.begin(), candidates.end());
+
+    autocompletion_results.push(std::move(candidates));
+}
+
+void work_loop::autocompletion_query(std::string cmd) {
+    if (server_) {
+        if (!cmd.empty()) {
+            ac_queries_.push(cmd);
+        }
+    } else {
+        autocomplete_(cmd);
+    }
+}
+
 bool work_loop::is_running() const {
     return running_;
 }
@@ -167,6 +208,9 @@ void work_loop::connect_() {
         std::string cmd;
         while (commands_.pop(cmd)) {
             execute_(cmd);
+        }
+        while (ac_queries_.pop(cmd)) {
+            autocomplete_(cmd);
         }
     });
 

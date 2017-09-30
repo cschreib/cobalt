@@ -88,6 +88,10 @@ int main(int argc, const char* argv[]) {
         worker.execute(string::to_utf8(s));
     });
 
+    edit_box.on_autocompletion_query.connect([&](const string::unicode& s) {
+        worker.autocompletion_query(string::to_utf8(s));
+    });
+
     // Configure console output
     std::size_t inter_line = 3;
     conf.get_value("console.inter_line", inter_line);
@@ -144,6 +148,38 @@ int main(int argc, const char* argv[]) {
         }
 
         message_list.poll_messages();
+
+        {
+            bool found = false;
+            std::vector<std::string> acq;
+            while (worker.autocompletion_results.pop(acq)) {
+                found = !acq.empty();
+            }
+
+            if (found) {
+                if (acq.size() == 1) {
+                    edit_box.autocomplete(string::to_unicode(acq[0]));
+                } else {
+                    out.print("autocompletion candidates:");
+                    std::string common = acq[0];
+                    for (std::size_t i = 0; i < acq.size(); ++i) {
+                        out.print("  ", acq[i]);
+                        if (i != 0) {
+                            std::size_t n = std::min(common.size(), acq[i].size());
+                            auto iter = std::mismatch(
+                                common.begin(), common.begin()+n, acq[i].begin()
+                            );
+
+                            common.erase(iter.first, common.end());
+                        }
+                    }
+
+                    if (!common.empty()) {
+                        edit_box.autocomplete(string::to_unicode(common));
+                    }
+                }
+            }
+        }
     }
 
     worker.wait_for_shutdown();

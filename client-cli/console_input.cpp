@@ -187,6 +187,37 @@ void console_input::move_last() {
     }
 }
 
+void console_input::ask_autocomplete() {
+    if (!selected_) {
+        auto p0 = content_.find_last_of(string::to_unicode("\t\n ()"), pos_);
+        if (p0 == content_.npos) {
+            p0 = 0;
+        } else {
+            ++p0;
+        }
+
+        string::unicode str = content_.substr(p0, pos_-p0);
+        on_autocompletion_query.dispatch(str);
+    }
+}
+
+void console_input::autocomplete(string::unicode text) {
+    selected_ = false;
+
+    auto p0 = content_.find_last_of(string::to_unicode("\t\n ()"), pos_);
+    if (p0 == content_.npos) {
+        p0 = 0;
+    } else {
+        ++p0;
+    }
+
+    content_.erase(p0, pos_-p0);
+    content_.insert(p0, text);
+    pos_ = p0 + text.size();
+
+    on_updated.dispatch(content_);
+}
+
 string::unicode console_input::content() const {
     return content_;
 }
@@ -201,6 +232,8 @@ void console_input::on_event(const sf::Event& e) {
             erase_before();
         } else if (e.text.unicode == 127) {
             erase_after();
+        } else if (e.text.unicode == 9) {
+            // Tab
         } else {
             insert(e.text.unicode);
         }
@@ -229,6 +262,9 @@ void console_input::on_event(const sf::Event& e) {
                 break;
             case sf::Keyboard::Key::End:
                 move_last();
+                break;
+            case sf::Keyboard::Key::Tab:
+                ask_autocomplete();
                 break;
             default: break;
         }

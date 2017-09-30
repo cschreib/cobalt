@@ -53,12 +53,16 @@ public :
     void move_first();
     void move_last();
 
+    void ask_autocomplete();
+    void autocomplete(string::unicode text);
+
     string::unicode content() const;
 
     void on_event(const sf::Event& e);
 
     signal_t<void(const string::unicode&)> on_updated;
     signal_t<void(const string::unicode&)> on_text_entered;
+    signal_t<void(const string::unicode&)> on_autocompletion_query;
 
     void draw(sf::RenderTarget& target) const;
 };
