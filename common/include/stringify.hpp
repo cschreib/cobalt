@@ -107,7 +107,7 @@ namespace string {
         }
         static void serialize(const std::vector<T>& v, std::string& value) {
             for (std::size_t i = 0; i < v.size(); ++i) {
-                if (i != 0) value += ", ";
+                if (i != 0) value += ",";
                 std::string tmp;
                 stringify<T>::serialize(v[i], tmp);
                 value += tmp;
