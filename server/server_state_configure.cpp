@@ -215,7 +215,7 @@ namespace state {
                 throw failure_t{failure_t::reason::invalid_value};
             }
             return set_parameter_impl(config_, key, ival);
-        } else if (type == "unit") {
+        } else if (type == "uint") {
             unsigned int ival;
             if (!string::convert(value, ival)) {
                 throw failure_t{failure_t::reason::invalid_value};
