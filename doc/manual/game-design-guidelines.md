@@ -14,6 +14,7 @@ These guidelines draft how to implement general concepts, and pitfalls to avoid.
 - [In a turn-based gameplay, allow maximal interaction with the game while the user is waiting for their turn.](#in-a-turn-based-gameplay-allow-maximal-interaction-with-the-game-while-the-user-is-waiting-for-their-turn)
 - [What is forbidden for gameplay reasons must be clear \(and, ideally, justified\) and known to the user as soon as possible.](#what-is-forbidden-for-gameplay-reasons-must-be-clear-and-ideally-justified-and-known-to-the-user-as-soon-as-possible)
 - [Do not give advantages to the AI that the user cannot have, and vice versa.](#do-not-give-advantages-to-the-ai-that-the-user-cannot-have-and-vice-versa)
+- [Randomly generated content must not be fully random, but retain a large amount of cohesion](#randomly-generated-content-must-not-be-fully-random-but-retain-a-large-amount-of-cohesion)
 
 <!-- /MarkdownTOC -->
 
@@ -33,7 +34,7 @@ There is no point in having the user try again and again the same action that de
 It should be possible to play the game without ever using a calculator or running a one month computer simulation. This means the user should have enough data to be able to make decisions without "calculating" anything (i.e., not having to do actual maths beyond mere strategical planning). It does not mean that any decision can be made without thinking, on the contrary. But this thinking must only involve simple cause-effect relationships (which, ideally, are taught to the user by the game using tooltips and other help mechanisms), intuition (to some extent), and experience. That being said, there can be elements of the gameplay that, to be used optimally, may require complex calculations (see for example factory yield calculations in X3 - The Threat). As long as this optimization is not essential to the gameplay, it is a good thing as it may create a whole different way to play the game for those of us who like playing with numbers.
 
 
-## Do not impose long gaming sessions to the user, and allow them to get away from their computer at any time.
+## Do not impose long gaming sessions to the user, and allow them to get away from their computer at any time.
 
 There are many games in which there are only fixed places and times where one can save the game to start again later (see, for example, the whole Final Fantasy series). This means the user cannot shut down their computer at any time they wish without loosing game progression. In these cases, a common workaround is to provide a "pause" function that halts the game until the user "un-pauses" it. The user can then leave the game paused for any period of time, and find it in the exact same state when they return. This is very close to a "saved game" mechanism, the only differences being that the computer must remain turned on during the whole process (which is not kind to Mother Earth), and that this "saved game" can only be used once (i.e., one cannot fail and reload indefinitely). To summarize, it should be possible to save the users progression at any time, so they can quit the game whenever they want to. Mechanisms can be implemented to avoid infinite reloading of a single saved state, if needed.
 
@@ -56,3 +57,8 @@ In an ideal world, it would be possible to create a game in which there are no r
 ## Do not give advantages to the AI that the user cannot have, and vice versa.
 
 It is always frustrating to play a game in which all players do not start as equals. Typical examples include games in which the AI always knows where the other players are located, even when they are supposed to be hidden by "fog-of-war" (see Starcraft for example). Rules should be the same for everyone, so that the winner is the most cunning, and not the most fortunate one. There are many games in which difficulty levels are implemented by giving bonuses to the player's opponents (for example in the Civilization series), rather than increasing how smart the opponents are. This is acceptable if chosen and known by the user (so as to create an extra challenge), but there are other ways to increase difficulty, either by algorithmic changes (for hard-coded AIs) or different/more extensive training (for machine-learned AIs).
+
+
+## Randomly generated content must not be fully random, but retain a large amount of cohesion
+
+
