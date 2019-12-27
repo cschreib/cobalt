@@ -21,6 +21,7 @@ target_link_libraries(cobalt-server-cli cobalt-common)
 target_link_libraries(cobalt-server-cli ${SFML_NETWORK_LIBRARY})
 target_link_libraries(cobalt-server-cli ${SFML_SYSTEM_LIBRARY})
 target_link_libraries(cobalt-server-cli ${TBB_LIBRARY})
+target_link_libraries(cobalt-server-cli ${CMAKE_THREAD_LIBS_INIT})
 
 if (UNIX)
     target_link_libraries(cobalt-server-cli ${LIBDL_LIBRARY})

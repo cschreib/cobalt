@@ -33,6 +33,7 @@ target_link_libraries(cobalt-client-cli ${SFML_SYSTEM_LIBRARY})
 target_link_libraries(cobalt-client-cli ${TBB_LIBRARY})
 target_link_libraries(cobalt-client-cli ${LUA_LIBRARY})
 target_link_libraries(cobalt-client-cli ${LUA_MATH_LIBRARY})
+target_link_libraries(cobalt-client-cli ${CMAKE_THREAD_LIBS_INIT})
 
 if (UNIX)
     target_link_libraries(cobalt-client-cli ${LIBDL_LIBRARY})
