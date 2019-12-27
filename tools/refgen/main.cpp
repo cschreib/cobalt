@@ -252,8 +252,10 @@ void generate_code(std::ostream& out, const packet& p) {
         out << "\n";
         for (auto& m : p.members) {
             if (m.is_enum) {
-                out << "    p >> reinterpret_cast<typename std::underlying_type<"
-                    << m.type << ">::type&>(t." << m.name << ");\n";
+                out << "    typename std::underlying_type<"
+                    << m.type << ">::type " << m.name << "_underlying;\n";
+                out << "    p >> " << m.name << "_underlying;\n";
+                out << "    t." << m.name << " = static_cast<" << m.type << ">(" << m.name << "_underlying);\n";
             } else {
                 out << "    p >> t." << m.name << ";\n";
             }
