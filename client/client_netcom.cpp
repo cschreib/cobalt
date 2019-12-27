@@ -115,13 +115,13 @@ namespace client {
                 wait_count = 0;
                 break;
             }
-            case sf::Socket::NotReady : break;
-            case sf::Socket::Error : break;
             case sf::Socket::Disconnected :
                 send_message(self_actor_id, make_packet<message::server::connection_failed>(
                     message::server::connection_failed::reason::unreachable
                 ));
                 return;
+            default :
+                break;
             }
 
             if (wait_count == 0) break;
@@ -147,13 +147,14 @@ namespace client {
             case sf::Socket::Done :
                 input_.push(std::move(ip));
                 break;
-            case sf::Socket::NotReady : break;
             case sf::Socket::Disconnected :
             case sf::Socket::Error :
                 send_message(self_actor_id, make_packet<message::server::connection_failed>(
                     message::server::connection_failed::reason::disconnected
                 ));
                 terminate_thread_ = true;
+                break;
+            default :
                 break;
             }
 
@@ -166,9 +167,7 @@ namespace client {
                 if (op.to == server_actor_id) {
                     switch (socket.send(op.impl)) {
                     case sf::Socket::Done : break;
-                    case sf::Socket::NotReady :
-                    case sf::Socket::Disconnected :
-                    case sf::Socket::Error :
+                    default :
                         send_message(self_actor_id, make_packet<message::server::connection_failed>(
                             message::server::connection_failed::reason::disconnected
                         ));

@@ -12,7 +12,7 @@ console_input::console_input(const string::unicode& prompt, const sf::Font& f,
     });
 
     text_.setPosition(0,0);
-    text_.setColor(to_sfml(col));
+    text_.setFillColor(to_sfml(col));
     carret_.setOrigin(0,-0.2*charsize_);
     carret_.setSize(sf::Vector2f(1.0, charsize_));
     highlight_.setOrigin(0,-0.2*charsize_);

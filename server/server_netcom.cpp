@@ -266,8 +266,8 @@ namespace server {
                     case sf::Socket::Error :
                         remove_list.push_back(c.id);
                         break;
-                    case sf::Socket::NotReady :
-                    default : break;
+                    default :
+                        break;
                     }
                 }
             }
@@ -285,8 +285,8 @@ namespace server {
                         case sf::Socket::Error :
                             remove_list.push_back(c.id);
                             break;
-                    case sf::Socket::NotReady :
-                        default : break;
+                        default :
+                            break;
                         }
                     }
                     // Including oneself
@@ -314,8 +314,8 @@ namespace server {
                     case sf::Socket::Error :
                         remove_list.push_back(iter->id);
                         break;
-                    case sf::Socket::NotReady :
-                    default : break;
+                    default :
+                        break;
                     }
                 }
             }

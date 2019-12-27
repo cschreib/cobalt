@@ -98,7 +98,7 @@ void console_output::draw(sf::RenderTarget& target) const {
 
         lines.back().push_back(sf::Text("", font_regular_, charsize_));
         auto& txt = current_text();
-        txt.setColor(to_sfml(color_));
+        txt.setFillColor(to_sfml(color_));
 
         if (nt != 0) {
             auto& prev = *(lines.back().end()-2);
@@ -140,7 +140,7 @@ void console_output::draw(sf::RenderTarget& target) const {
 
             auto& ntxt = current_text();
             ntxt.setString(ns);
-            ntxt.setColor(txt.getColor());
+            ntxt.setFillColor(txt.getFillColor());
             ntxt.setFont(*txt.getFont());
         }
     };
@@ -174,7 +174,7 @@ void console_output::draw(sf::RenderTarget& target) const {
                 ++color_char;
                 if (color_char == 8) {
                     new_text();
-                    current_text().setColor(col);
+                    current_text().setFillColor(col);
                     coloring = false;
                 }
             } else if (c == string::to_unicode('|')) {
@@ -188,7 +188,7 @@ void console_output::draw(sf::RenderTarget& target) const {
                 escape = false;
                 if (c == string::to_unicode('r')) {
                     new_text();
-                    current_text().setColor(to_sfml(color_));
+                    current_text().setFillColor(to_sfml(color_));
                 } else if (c == string::to_unicode('c')) {
                     col = sf::Color::White;
                     coloring = true;
