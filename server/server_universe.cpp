@@ -79,7 +79,7 @@ namespace server {
             if (obj.cell()) {
                 sp << obj.cell()->get_coordinates();
             } else {
-                sp << space::vec_t();
+                sp << space::vec_t::zero;
             }
 
             sp << obj.type();
