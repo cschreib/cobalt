@@ -108,8 +108,6 @@ namespace impl {
         static_assert(sizeof(chrono) == 2*sizeof(std::uint32_t),
                       "chrono::nanoseconds type must be 64bit");
 
-        using chrono_t = typename std::decay<decltype(chrono)>::type;
-
         id.data_[0] = std::uint32_t(chrono >> 32);
         id.data_[1] = std::uint32_t(chrono);
 
