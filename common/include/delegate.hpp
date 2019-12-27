@@ -12,8 +12,8 @@ namespace ctl {
         template<typename R, typename T>
         struct is_valid_function_signature;
 
-        template<typename R>
-        struct is_valid_function_signature<R, std::nullptr_t> : std::false_type {};
+        template<typename R, typename ... Args>
+        struct is_valid_function_signature<R(Args...), std::nullptr_t> : std::false_type {};
 
         template<typename R, typename ... Args, typename T>
         struct is_valid_function_signature<R(Args...), T> : std::integral_constant<bool,
@@ -172,7 +172,7 @@ namespace ctl {
         // }
 
         /// Put the delegate in "empty" state. See empty().
-        delegate& operator= (const std::nullptr_t&) {
+        delegate& operator= (std::nullptr_t) {
             clear();
             return *this;
         }
