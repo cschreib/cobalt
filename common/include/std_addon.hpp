@@ -4,15 +4,6 @@
 #include <memory>
 #include <algorithm>
 
-namespace std {
-    // For C++14 future support
-    // Construct an object inside an std::unique_ptr
-    template<typename T, typename... Args>
-    std::unique_ptr<T> make_unique(Args&&... args) {
-        return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-    }
-}
-
 namespace ctl {
     // Adapter to iterate over a range returned as std::pair<iterator>
     template<typename T>

@@ -124,14 +124,48 @@ std::string get_packet_name(packet_id_t id);
 bool is_packet_id(packet_id_t id);
 
 namespace packet_impl {
+    struct base_ {};
+
+    template<packet_id_t ID>
+    struct base : base_ {
+        static const packet_id_t packet_id__ = ID;
+        static const char* packet_name__;
+    };
+
+    template<packet_id_t ID>
+    const packet_id_t base<ID>::packet_id__;
+
+    template<typename T>
+    using is_packet = std::is_base_of<base_, T>;
+}
+
+#define NETCOM_PACKET(name) \
+    struct name : packet_impl::base<#name ## _crc32>
+
+namespace packet_impl {
     template<typename T>
     struct packet_builder;
+
+    template<typename T, typename ... Args>
+    T make_packet_impl(std::true_type, Args&& ... args) {
+        return {{}, std::forward<Args>(args)...};
+    }
+
+    template<typename T, typename ... Args>
+    T make_packet_impl(std::false_type, Args&& ... args) {
+        return {std::forward<Args>(args)...};
+    }
 }
 
 /// Create a packet and set its elements.
 template<typename T, typename ... Args>
 T make_packet(Args&& ... args) {
-    return packet_impl::packet_builder<T>()(std::forward<Args>(args)...);
+    return packet_impl::make_packet_impl<T>(packet_impl::is_packet<T>{}, std::forward<Args>(args)...);
+}
+
+template<typename T>
+T make_packet() {
+    return T{};
 }
 
 /// Write a list of objects into a packet.
@@ -153,24 +187,5 @@ void packet_read(P& p, T& t, Args& ... args) {
     p >> t;
     packet_read(p, args...);
 }
-
-namespace packet_impl {
-    struct base_ {};
-
-    template<packet_id_t ID>
-    struct base : base_ {
-        static const packet_id_t packet_id__ = ID;
-        static const char* packet_name__;
-    };
-
-    template<packet_id_t ID>
-    const packet_id_t base<ID>::packet_id__;
-
-    template<typename T>
-    using is_packet = std::is_base_of<base_, T>;
-}
-
-#define NETCOM_PACKET(name) \
-    struct name : packet_impl::base<#name ## _crc32>
 
 #endif

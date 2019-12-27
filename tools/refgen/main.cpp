@@ -268,33 +268,6 @@ void generate_code(std::ostream& out, const packet& p) {
     out << std::string(nsp.size(),'}');
     out << "\n";
 
-    if (p.parent == nullptr || p.simple_name == "answer" || p.simple_name == "failure") {
-        out << "namespace packet_impl { template<> struct packet_builder<" << p.name << "> {\n";
-        if (!p.members.empty()) {
-            out << "    template<";
-            for (std::size_t i = 0; i < p.members.size(); ++i) {
-                if (i != 0) out << ", ";
-                out << "typename T" << i;
-            }
-            out << ">\n";
-        }
-        out << "    " << p.name << " operator () (";
-        for (std::size_t i = 0; i < p.members.size(); ++i) {
-            if (i != 0) out << ", ";
-            out << "T" << i << "&& t" << i;
-        }
-        out << ") {\n";
-        out << "        " << p.name << " p;\n";
-        if (!p.members.empty()) {
-            for (std::size_t i = 0; i < p.members.size(); ++i) {
-                out << "        p." << p.members[i].name << " = std::forward<T" << i << ">(t" << i << ");\n";
-            }
-        }
-        out << "        return p;\n";
-        out << "    }\n";
-        out << "};}\n";
-    }
-
     out << "\n";
 }
 
