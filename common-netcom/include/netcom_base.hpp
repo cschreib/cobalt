@@ -239,7 +239,7 @@ namespace netcom_impl {
             r.answered_ = true;
         }
 
-        ~request_t() {
+        ~request_t() noexcept(false) {
             if (!answered_) {
                 throw netcom_exception::request_not_answered<RequestType>();
             }
