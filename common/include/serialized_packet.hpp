@@ -76,7 +76,7 @@ std::istream& operator >> (std::istream& in, serialized_packet& p);
 std::ostream& operator << (std::ostream& in, const serialized_packet& path);
 
 template<typename T, typename enable =
-    typename std::enable_if<!ctl::exclude_overload<T,serialized_packet>::value>::type>
+    typename std::enable_if<!std::is_same<T,serialized_packet>::value>::type>
 serialized_packet& operator << (serialized_packet& p, T&& t) {
     serialized_packet::base& bp = p;
     bp << std::forward<T>(t);
@@ -84,7 +84,7 @@ serialized_packet& operator << (serialized_packet& p, T&& t) {
 }
 
 template<typename T, typename enable =
-    typename std::enable_if<!ctl::exclude_overload<T,serialized_packet>::value>::type>
+    typename std::enable_if<!std::is_same<T,serialized_packet>::value>::type>
 serialized_packet& operator >> (serialized_packet& p, T&& t) {
     serialized_packet::base& bp = p;
     bp >> std::forward<T>(t);
