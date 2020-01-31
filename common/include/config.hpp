@@ -50,6 +50,15 @@ namespace config {
     **/
     class state {
     public :
+        struct parsing_failure : public std::exception {
+            explicit parsing_failure(const std::string& message) : message(message) {}
+            parsing_failure(const parsing_failure&) = default;
+            parsing_failure(parsing_failure&&) = default;
+            virtual ~parsing_failure() noexcept {}
+            const char* what() const noexcept override { return message.c_str(); }
+            std::string message;
+        };
+
         /// Default constructor.
         /** Constructs an empty configuration state, no data is loaded.
         **/
@@ -81,31 +90,6 @@ namespace config {
         /// Remove all configuration items and bonds.
         void clear();
 
-        /// Set the value of a parameter.
-        /** If the parameter already exists, then its value is updated and all bound objects are
-            notified of the change (only if the value is different than the previous one). Else, the
-            parameter is created. This function will throw if the current tree structure is not
-            compatible with the provided parameter name.
-        **/
-        template<typename T>
-        void set_value(const std::string& name, const T& value) {
-            config_node& node = tree_.reach(name);
-            if (!node.is_empty) {
-                std::string old_value = node.value;
-                string::stringify<T>::serialize(value, node.value);
-                if (node.value != old_value) {
-                    on_value_changed.dispatch(name, node.value);
-                    node.signal.dispatch(node.value);
-                    dirty_ = true;
-                }
-            } else {
-                string::stringify<T>::serialize(value, node.value);
-                on_value_changed.dispatch(name, node.value);
-                node.is_empty = false;
-                dirty_ = true;
-            }
-        }
-
         /// Set the value of a parameter as a string.
         /** If the parameter already exists, then its value is updated and all bound objects are
             notified of the change (only if the value is different than the previous one). Else, the
@@ -116,19 +100,22 @@ namespace config {
         **/
         void set_raw_value(const std::string& name, std::string value) {
             config_node& node = tree_.reach(name);
-            if (!node.is_empty) {
-                if (node.value != value) {
-                    node.value = std::move(value);
-                    on_value_changed.dispatch(name, node.value);
-                    node.signal.dispatch(node.value);
-                    dirty_ = true;
-                }
-            } else {
-                node.value = std::move(value);
-                on_value_changed.dispatch(name, node.value);
-                node.is_empty = false;
-                dirty_ = true;
-            }
+            set_raw_value_(node, value);
+        }
+
+        /// Set the value of a parameter.
+        /** If the parameter already exists, then its value is updated and all bound objects are
+            notified of the change (only if the value is different than the previous one). Else, the
+            parameter is created. This function will throw if the current tree structure is not
+            compatible with the provided parameter name. It will also throw if an exception is
+            raised by any of the callbacks registered to this particular parameter; in such a case,
+            the value of the parameter is left unchanged.
+        **/
+        template<typename T>
+        void set_value(const std::string& name, const T& value) {
+            std::string string_value;
+            string::stringify<T>::serialize(value, string_value)
+            set_raw_value(name, std::move(string_value));
         }
 
         /// Retrieve the value of a parameter from this configuration state.
@@ -164,17 +151,18 @@ namespace config {
 
         /// Retrieve a the value from this configuration state with a default value.
         /** If the parameter exists, then its value is written in "value", and 'true' is returned.
-            Else, the default value is stored in the configuration tree, and deserialized into
+            Else, the default value is stored in the configuration tree, and parsingd into
             "value". This function will return 'false' only if the deserialization fails, and will
-            throw if the tree structure is incompatible with the provided name.
+            throw if the tree structure is incompatible with the provided name, or if setting the
+            default value raises an exception in one of the registered callbacks
         **/
         template<typename T, typename N>
         bool get_value(const std::string& name, T& value, const N& def) {
             config_node& node = tree_.reach(name);
             if (node.is_empty) {
-                string::stringify<N>::serialize(def, node.value);
-                node.is_empty = false;
-                dirty_ = true;
+                std::string string_value;
+                string::stringify<N>::serialize(def, string_value);
+                set_raw_value_(node, std::move(string_value));
             }
 
             return string::stringify<T>::parse(value, node.value);
@@ -183,6 +171,23 @@ namespace config {
         /// Check if a parameter exists.
         bool value_exists(const std::string& name) const {
             return tree_.try_reach(name) != nullptr;
+        }
+
+        /// Return the list of children values in a given root key.
+        /** Will return an empty list if the root key does not exist.
+        **/
+        std::vector<std::string> list_values(const std::string& name = "") const {
+            std::vector<std::string> ret;
+
+            const auto* branch = (name == "" ? &tree_.root() : tree_.try_reach_branch(name));
+            if (branch != nullptr) {
+                ret.reserve(branch->children.size());
+                for (const auto& c : branch->children) {
+                    ret.push_back(c->name);
+                }
+            }
+
+            return ret;
         }
 
         /// Bind a variable to a configurable parameter.
@@ -197,17 +202,25 @@ namespace config {
                 "bound variable must be configurable");
 
             config_node& node = tree_.reach(name);
-            signal_connection_base& sc = node.signal.connect([&var](const std::string& value) {
-                string::stringify<T>::parse(var, value);
-            });
 
-            if (node.is_empty) {
-                string::stringify<T>::serialize(var, node.value);
-                on_value_changed.dispatch(name, node.value);
-                node.is_empty = false;
-                dirty_ = true;
+            auto parse_to_var = [&var,name](const std::string& value) {
+                if (!string::stringify<T>::parse(var, value)) {
+                    throw parsing_failure("could not parse "+name+" from value '"+value+"'");
+                }
+            };
+
+            signal_connection_base& sc = node.signal.connect(parse_to_var);
+
+            if (node.empty) {
+                // Parameter does not yet have a value, set it from variable we just bound
+                // and trigger signals
+                std::string string_value;
+                string::stringify<T>::serialize(var, std::move(string_value));
+                set_raw_value_(node, string_value);
             } else {
-                string::stringify<T>::parse(var, node.value);
+                // Parameter has a value, set the variable to this value
+                // (but no need to trigger the signal has the parameter has not changed)
+                parse_to_var(node.value);
             }
 
             return sc;
@@ -229,18 +242,22 @@ namespace config {
                 "configuration callback argument must be configurable");
 
             config_node& node = tree_.reach(name);
-            signal_connection_base& sc = node.signal.connect([func](const std::string& value) {
+
+            auto parse_to_callback = [func,name](const std::string& value) {
                 ArgType t;
                 if (string::stringify<ArgType>::parse(t, value)) {
                     func(t);
+                } else {
+                    throw parsing_failure("could not parse "+name+" from value '"+value+"'");
                 }
-            });
+            };
+
+            signal_connection_base& sc = node.signal.connect(parse_to_callback);
 
             if (!node.is_empty) {
-                ArgType t;
-                if (string::stringify<ArgType>::parse(t, node.value)) {
-                    func(t);
-                }
+                // Parameter has a value, send it to the callback
+                // (but no need to trigger the signal as the parameter has not changed)
+                parse_to_callback(node.value);
             }
 
             return sc;
@@ -261,24 +278,27 @@ namespace config {
                 "configuration callback argument must be configurable");
 
             config_node& node = tree_.reach(name);
-            signal_connection_base& sc = node.signal.connect([func](const std::string& value) {
+
+            auto parse_to_callback = [func,name](const std::string& value) {
                 ArgType t;
                 if (string::stringify<ArgType>::parse(t, value)) {
                     func(t);
+                } else {
+                    throw parsing_failure("could not parse "+name+" from value '"+value+"'");
                 }
-            });
+            };
+
+            signal_connection_base& sc = node.signal.connect(parse_to_callback);
 
             if (node.is_empty) {
-                string::stringify<N>::serialize(def, node.value);
-                on_value_changed.dispatch(name, node.value);
-                node.signal.dispatch(node.value);
-                node.is_empty = false;
-                dirty_ = true;
+                // Parameter does not yet have a value, set it from default and trigger signals
+                std::string string_value;
+                string::stringify<N>::serialize(def, string_value);
+                set_raw_value_(node, std::move(string_value));
             } else {
-                ArgType t;
-                if (string::stringify<ArgType>::parse(t, node.value)) {
-                    func(t);
-                }
+                // Parameter has a value, send it to the callback
+                // (but no need to trigger the signal as the parameter has not changed)
+                parse_to_callback(node.value);
             }
 
             return sc;
@@ -293,6 +313,23 @@ namespace config {
 
         void save_node_(std::ostream& f, const ctl::string_tree<config_node>::branch& node,
             const std::string& name) const;
+
+        void set_raw_value_(config_node& node, std::string value) {
+            try {
+                on_value_changed.dispatch(name, value);
+                node.signal.dispatch(value);
+
+                // No exception thrown by now, we can commit the change to the state
+                node.is_empty = false;
+                node.value = value;
+                dirty_ = true;
+            } catch (...) {
+                // Exception thrown, trigger callbacks again with old value in case some
+                // callbacks had registered the change, which needs to be rolled back
+                on_value_changed.dispatch(name, node.value);
+                node.signal.dispatch(node.value);
+            }
+        }
 
         ctl::string_tree<config_node> tree_;
         mutable bool dirty_;

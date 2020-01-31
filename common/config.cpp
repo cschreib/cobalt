@@ -60,7 +60,7 @@ namespace config {
     void state::save_node_(std::ostream& f, const ctl::string_tree<config_node>::branch& node,
         const std::string& name) const {
 
-        for (auto& n : node.childs) {
+        for (auto& n : node.children) {
             if (n->is_branch) {
                 auto& b = static_cast<const ctl::string_tree<config_node>::branch&>(*n);
                 save_node_(f, b, name + n->name + '.');
