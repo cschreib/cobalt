@@ -81,6 +81,9 @@ namespace client {
         // Signals for administative rights
         signal_t<void(request::server::admin_rights::failure::reason)> on_admin_rights_denied;
         signal_t<void()> on_admin_rights_granted;
+
+        // Signals for debugging
+        signal_t<void(std::string)> on_debug_message;
     };
 }
 
