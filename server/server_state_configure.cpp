@@ -163,11 +163,21 @@ namespace state {
     }
 
     void configure::set_generator_(const std::string& id) {
-        auto iter = available_generators_.find(id);
+        using failure_t = request::server::configure_change_parameter::failure;
 
-        generator_ = &*iter;
-        generator_config_.clear();
-        generator_config_.parse_from_file("generators/"+generator_->id+".conf");
+        auto iter = available_generators_.find(id);
+        if (iter == available_generators_.end()) {
+            throw failure_t{failure_t::reason::invalid_value};
+        }
+
+        if (generator_ != &*iter) {
+            generator_ = &*iter;
+            generator_config_.clear();
+            generator_config_.parse_from_file("generators/"+generator_->id+".conf");
+
+            net_.send_message(server::netcom::all_actor_id,
+                make_packet<message::server::configure_current_generator_changed>(generator_->id));
+        }
     }
 
     void configure::set_generator(const std::string& id) {
