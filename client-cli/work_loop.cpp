@@ -278,6 +278,10 @@ void work_loop::connect_() {
         out_.note("server is now in the '", s.name(), "' state");
     });
 
+    serv.on_debug_message.connect([this](std::string msg) {
+        out_.note(msg);
+    });
+
     pool_ << net.watch_message([this](const message::server::will_shutdown& msg) {
         out_.note("server will shutdown in less than ", msg.countdown, "sec");
     });
