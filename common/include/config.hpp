@@ -100,7 +100,7 @@ namespace config {
         template<typename T>
         void set_value(const std::string& name, const T& value) {
             std::string string_value;
-            string::stringify<T>::serialize(value, string_value)
+            string::stringify<T>::serialize(value, string_value);
             set_raw_value(name, std::move(string_value));
         }
 
@@ -115,7 +115,7 @@ namespace config {
         **/
         void set_raw_value(const std::string& name, std::string value) {
             config_node& node = tree_.reach(name);
-            set_raw_value_(node, std::move(value));
+            set_raw_value_(node, name, std::move(value));
         }
 
         /// Retrieve the value of a parameter from this configuration state.
@@ -164,7 +164,7 @@ namespace config {
             if (node.is_empty) {
                 std::string string_value;
                 string::stringify<N>::serialize(def, string_value);
-                set_raw_value_(node, std::move(string_value));
+                set_raw_value_(node, name, std::move(string_value));
             }
 
             return string::stringify<T>::parse(value, node.value);
@@ -216,12 +216,12 @@ namespace config {
 
             signal_connection_base& sc = node.signal.connect(parse_to_var);
 
-            if (node.empty) {
+            if (node.is_empty) {
                 // Parameter does not yet have a value, set it from variable we just bound
                 // and trigger signals
                 std::string string_value;
                 string::stringify<T>::serialize(var, std::move(string_value));
-                set_raw_value_(node, string_value);
+                set_raw_value_(node, name, string_value);
             } else {
                 try {
                     // Parameter has a value, set the variable to this value
@@ -315,7 +315,7 @@ namespace config {
                 // Parameter does not yet have a value, set it from default and trigger signals
                 std::string string_value;
                 string::stringify<N>::serialize(def, string_value);
-                set_raw_value_(node, std::move(string_value));
+                set_raw_value_(node, name, std::move(string_value));
             } else {
                 try {
                     // Parameter has a value, send it to the callback
@@ -341,7 +341,7 @@ namespace config {
         void save_node_(std::ostream& f, const ctl::string_tree<config_node>::branch& node,
             const std::string& name) const;
 
-        void set_raw_value_(config_node& node, std::string value) {
+        void set_raw_value_(config_node& node, const std::string& name, std::string value) {
             try {
                 on_value_changed.dispatch(name, value);
                 node.signal.dispatch(value);
