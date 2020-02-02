@@ -220,8 +220,8 @@ namespace config {
                 // Parameter does not yet have a value, set it from variable we just bound
                 // and trigger signals
                 std::string string_value;
-                string::stringify<T>::serialize(var, std::move(string_value));
-                set_raw_value_(node, name, string_value);
+                string::stringify<T>::serialize(var, string_value);
+                set_raw_value_(node, name, std::move(string_value));
             } else {
                 try {
                     // Parameter has a value, set the variable to this value
