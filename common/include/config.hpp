@@ -90,26 +90,12 @@ namespace config {
         /// Remove all configuration items and bonds.
         void clear();
 
-        /// Set the value of a parameter as a string.
-        /** If the parameter already exists, then its value is updated and all bound objects are
-            notified of the change (only if the value is different than the previous one). Else, the
-            parameter is created. This function will throw if the current tree structure is not
-            compatible with the provided parameter name.
-            Compared to set_value(), this version takes directly a string for the new value of the
-            parameter, which is stored untouched into the configuration tree.
-        **/
-        void set_raw_value(const std::string& name, std::string value) {
-            config_node& node = tree_.reach(name);
-            set_raw_value_(node, value);
-        }
-
         /// Set the value of a parameter.
         /** If the parameter already exists, then its value is updated and all bound objects are
-            notified of the change (only if the value is different than the previous one). Else, the
-            parameter is created. This function will throw if the current tree structure is not
-            compatible with the provided parameter name. It will also throw if an exception is
-            raised by any of the callbacks registered to this particular parameter; in such a case,
-            the value of the parameter is left unchanged.
+            notified of the change. Else, the parameter is created. This function will throw if the
+            current tree structure is not compatible with the provided parameter name. It will also
+            throw if an exception is raised by any of the callbacks registered to this particular
+            parameter; in such a case, the value of the parameter is left unchanged.
         **/
         template<typename T>
         void set_value(const std::string& name, const T& value) {
@@ -118,9 +104,24 @@ namespace config {
             set_raw_value(name, std::move(string_value));
         }
 
+        /// Set the value of a parameter as a string.
+        /** If the parameter already exists, then its value is updated and all bound objects are
+            notified of the change. Else, the parameter is created. This function will throw if
+            the current tree structure is not compatible with the provided parameter name. It will
+            also throw if an exception is raised by any of the callbacks registered to this
+            particular parameter; in such a case, the value of the parameter is left unchanged.
+            Compared to set_value(), this version takes directly a string for the new value of the
+            parameter, which is stored untouched into the configuration tree.
+        **/
+        void set_raw_value(const std::string& name, std::string value) {
+            config_node& node = tree_.reach(name);
+            set_raw_value_(node, std::move(value));
+        }
+
         /// Retrieve the value of a parameter from this configuration state.
-        /** If the parameter exists, then its value is written in "value", and 'true' is returned.
-            Else 'false' is returned.
+        /** If the parameter exists, then its value is written in "value", and 'true' is returned
+            if the parsing to type T was successful. Else 'false' is returned and "value" is left
+            untouched.
         **/
         template<typename T>
         bool get_value(const std::string& name, T& value) const {
@@ -134,7 +135,7 @@ namespace config {
 
         /// Retrieve the value of a parameter from this configuration state as a string.
         /** If the parameter exists, then its value is written in "value", and 'true' is returned.
-            Else 'false' is returned.
+            Else 'false' is returned and "value" is left untouched.
             Compared to get_value(), this version will write the value as a string, whatever the
             real underlying type is.
         **/
@@ -150,11 +151,12 @@ namespace config {
         }
 
         /// Retrieve a the value from this configuration state with a default value.
-        /** If the parameter exists, then its value is written in "value", and 'true' is returned.
-            Else, the default value is stored in the configuration tree, and parsingd into
-            "value". This function will return 'false' only if the deserialization fails, and will
-            throw if the tree structure is incompatible with the provided name, or if setting the
-            default value raises an exception in one of the registered callbacks
+        /** If the parameter exists, then its value is parsed into "value", and 'true' is returned
+            if the parsing to type T was successful. Else, the default value is stored in the
+            configuration tree, and parsed into "value". This function will return 'false' only if
+            the parsing fails, and will throw if the tree structure is incompatible with the
+            provided name, or if setting the default value raises an exception in one of the
+            registered callbacks
         **/
         template<typename T, typename N>
         bool get_value(const std::string& name, T& value, const N& def) {
@@ -193,8 +195,11 @@ namespace config {
         /// Bind a variable to a configurable parameter.
         /** Using this method, one can bind a C++ variable to a parameter in this configuration
             state. When the value of the parameter changes, this variable is automatically updated.
-            This function will throw if the current tree structure is not compatible with the
-            provided parameter name.
+            However, if parsing the string value of the parameter into a type T is not successful,
+            an exception will be thrown, and the value will be rejected. If, when calling this
+            function, the parameter already contains a value and it cannot be parsed into a type T,
+            the binding will not be preserved. This function will throw if the current tree
+            structure is not compatible with the provided parameter name.
         **/
         template<typename T>
         signal_connection_base& bind(const std::string& name, T& var) {
@@ -218,9 +223,15 @@ namespace config {
                 string::stringify<T>::serialize(var, std::move(string_value));
                 set_raw_value_(node, string_value);
             } else {
-                // Parameter has a value, set the variable to this value
-                // (but no need to trigger the signal has the parameter has not changed)
-                parse_to_var(node.value);
+                try {
+                    // Parameter has a value, set the variable to this value
+                    // (but no need to trigger the signal as the parameter has not changed)
+                    parse_to_var(node.value);
+                } catch (...) {
+                    // Cancel the binding on exception
+                    sc.stop();
+                    throw;
+                }
             }
 
             return sc;
@@ -228,9 +239,13 @@ namespace config {
 
         /// Bind a callback function to a configurable parameter.
         /** This method can be used to register a callback function that will be executed each time
-            the bound parameter is modified. This callback function is a functor, and can only take
-            a single configurable argument. This function will throw if the current tree structure
-            is not compatible with the provided parameter name.
+            the bound parameter is modified. This callback function is a lambda or functor, and can
+            only take a single configurable argument. The lambda is allowed to throw, which will
+            be interpreted as an "invalid value" signal; any parameter value which triggers an
+            exception will not be accepted inside the configuration. If the parameter currently has
+            a value, and this value is "invalid" (lambda throws), the binding will not be preserved.
+            This function will throw if the  current tree structure is not compatible with the
+            provided parameter name.
         **/
         template<typename F, typename enable =
             typename std::enable_if<!impl::is_configurable<F>::value>::type>
@@ -255,9 +270,15 @@ namespace config {
             signal_connection_base& sc = node.signal.connect(parse_to_callback);
 
             if (!node.is_empty) {
-                // Parameter has a value, send it to the callback
-                // (but no need to trigger the signal as the parameter has not changed)
-                parse_to_callback(node.value);
+                try {
+                    // Parameter has a value, send it to the callback
+                    // (but no need to trigger the signal as the parameter has not changed)
+                    parse_to_callback(node.value);
+                } catch (...) {
+                    // Cancel the binding on exception
+                    sc.stop();
+                    throw;
+                }
             }
 
             return sc;
@@ -296,9 +317,15 @@ namespace config {
                 string::stringify<N>::serialize(def, string_value);
                 set_raw_value_(node, std::move(string_value));
             } else {
-                // Parameter has a value, send it to the callback
-                // (but no need to trigger the signal as the parameter has not changed)
-                parse_to_callback(node.value);
+                try {
+                    // Parameter has a value, send it to the callback
+                    // (but no need to trigger the signal as the parameter has not changed)
+                    parse_to_callback(node.value);
+                } catch (...) {
+                    // Cancel the binding on exception
+                    sc.stop();
+                    throw;
+                }
             }
 
             return sc;
@@ -328,6 +355,7 @@ namespace config {
                 // callbacks had registered the change, which needs to be rolled back
                 on_value_changed.dispatch(name, node.value);
                 node.signal.dispatch(node.value);
+                throw;
             }
         }
 
