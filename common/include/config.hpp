@@ -49,14 +49,25 @@ namespace config {
         iostream operators, it is "configurable" by default.
     **/
     class state {
+        struct config_node {
+            std::string value;
+            bool        is_empty = true;
+            signal_t<void(const std::string&)> signal;
+        };
+
+        using tree_t = ctl::string_tree<config_node>;
+
+        tree_t tree_;
+        mutable bool dirty_;
+
     public :
-        struct parsing_failure : public std::exception {
-            explicit parsing_failure(const std::string& message) : message(message) {}
-            parsing_failure(const parsing_failure&) = default;
-            parsing_failure(parsing_failure&&) = default;
-            virtual ~parsing_failure() noexcept {}
+        struct exception : public std::exception {
+            explicit exception(const std::string& message) : message(message) {}
             const char* what() const noexcept override { return message.c_str(); }
             std::string message;
+        };
+        struct parsing_failure : public exception {
+            explicit parsing_failure(const std::string& message) : exception(message) {}
         };
 
         /// Default constructor.
@@ -93,9 +104,9 @@ namespace config {
         /// Set the value of a parameter.
         /** If the parameter already exists, then its value is updated and all bound objects are
             notified of the change. Else, the parameter is created. This function will throw if the
-            current tree structure is not compatible with the provided parameter name. It will also
-            throw if an exception is raised by any of the callbacks registered to this particular
-            parameter; in such a case, the value of the parameter is left unchanged.
+            current tree structure is not compatible with the provided parameter name, or if an
+            exception is raised by any of the callbacks registered to this particular parameter.
+            In all cases where an exception is thrown, the value of the parameter is left unchanged.
         **/
         template<typename T>
         void set_value(const std::string& name, const T& value) {
@@ -107,9 +118,9 @@ namespace config {
         /// Set the value of a parameter as a string.
         /** If the parameter already exists, then its value is updated and all bound objects are
             notified of the change. Else, the parameter is created. This function will throw if
-            the current tree structure is not compatible with the provided parameter name. It will
-            also throw if an exception is raised by any of the callbacks registered to this
-            particular parameter; in such a case, the value of the parameter is left unchanged.
+            the current tree structure is not compatible with the provided parameter name, or if an
+            exception is raised by any of the callbacks registered to this particular parameter.
+            In all cases where an exception is thrown, the value of the parameter is left unchanged.
             Compared to set_value(), this version takes directly a string for the new value of the
             parameter, which is stored untouched into the configuration tree.
         **/
@@ -119,9 +130,9 @@ namespace config {
         }
 
         /// Retrieve the value of a parameter from this configuration state.
-        /** If the parameter exists, then its value is written in "value", and 'true' is returned
-            if the parsing to type T was successful. Else 'false' is returned and "value" is left
-            untouched.
+        /** If the parameter exists, then its value is written in "value", and 'true' is returned.
+            Else 'false' is returned and "value" is left untouched. This function will throw an
+            exception if the parameter value cannot be serialized into a type T.
         **/
         template<typename T>
         bool get_value(const std::string& name, T& value) const {
@@ -130,14 +141,18 @@ namespace config {
                 return false;
             }
 
-            return string::stringify<T>::parse(value, node->value);
+            if (!string::stringify<T>::parse(value, node->value)) {
+                throw parsing_failure("could not parse '"+name+"' from value '"+node->value+"'");
+            }
+
+            return true;
         }
 
         /// Retrieve the value of a parameter from this configuration state as a string.
         /** If the parameter exists, then its value is written in "value", and 'true' is returned.
-            Else 'false' is returned and "value" is left untouched.
-            Compared to get_value(), this version will write the value as a string, whatever the
-            real underlying type is.
+            Else 'false' is returned and "value" is left untouched. Compared to get_value(), this
+            function will always retrieve the value as a string, whatever the real underlying type
+            is.
         **/
         template<typename T>
         bool get_raw_value(const std::string& name, std::string& value) const {
@@ -151,15 +166,14 @@ namespace config {
         }
 
         /// Retrieve a the value from this configuration state with a default value.
-        /** If the parameter exists, then its value is parsed into "value", and 'true' is returned
-            if the parsing to type T was successful. Else, the default value is stored in the
-            configuration tree, and parsed into "value". This function will return 'false' only if
-            the parsing fails, and will throw if the tree structure is incompatible with the
-            provided name, or if setting the default value raises an exception in one of the
-            registered callbacks
+        /** If the parameter exists, then its value is parsed into "value". Else, the default value
+            is stored in the configuration tree, and parsed back into "value". This function will
+            throw if the parsing to T fails, or if the tree structure is incompatible with the
+            provided parameter name, or if setting the default value raises an exception in one of
+            the registered callbacks
         **/
         template<typename T, typename N>
-        bool get_value(const std::string& name, T& value, const N& def) {
+        void get_value(const std::string& name, T& value, const N& def) {
             config_node& node = tree_.reach(name);
             if (node.is_empty) {
                 std::string string_value;
@@ -167,7 +181,9 @@ namespace config {
                 set_raw_value_(node, name, std::move(string_value));
             }
 
-            return string::stringify<T>::parse(value, node.value);
+            if (!string::stringify<T>::parse(value, node.value)) {
+                throw parsing_failure("could not parse '"+name+"' from value '"+node.value+"'");
+            }
         }
 
         /// Check if a parameter exists.
@@ -176,13 +192,16 @@ namespace config {
         }
 
         /// Return the list of children values in a given root key.
-        /** Will return an empty list if the root key does not exist.
+        /** Will throw an exception if the requested root key does not exist.
         **/
         std::vector<std::string> list_values(const std::string& name = "") const {
             std::vector<std::string> ret;
 
             const auto* branch = (name == "" ? &tree_.root() : tree_.try_reach_branch(name));
-            if (branch != nullptr) {
+
+            if (branch == nullptr) {
+                throw tree_t::expecting_branch_exception(name);
+            } else {
                 ret.reserve(branch->children.size());
                 for (const auto& c : branch->children) {
                     ret.push_back(c->name);
@@ -210,7 +229,7 @@ namespace config {
 
             auto parse_to_var = [&var,name](const std::string& value) {
                 if (!string::stringify<T>::parse(var, value)) {
-                    throw parsing_failure("could not parse "+name+" from value '"+value+"'");
+                    throw parsing_failure("could not parse '"+name+"' from value '"+value+"'");
                 }
             };
 
@@ -263,7 +282,7 @@ namespace config {
                 if (string::stringify<ArgType>::parse(t, value)) {
                     func(t);
                 } else {
-                    throw parsing_failure("could not parse "+name+" from value '"+value+"'");
+                    throw parsing_failure("could not parse '"+name+"' from value '"+value+"'");
                 }
             };
 
@@ -305,7 +324,7 @@ namespace config {
                 if (string::stringify<ArgType>::parse(t, value)) {
                     func(t);
                 } else {
-                    throw parsing_failure("could not parse "+name+" from value '"+value+"'");
+                    throw parsing_failure("could not parse '"+name+"' from value '"+value+"'");
                 }
             };
 
@@ -332,14 +351,8 @@ namespace config {
         }
 
     private :
-        struct config_node {
-            std::string value;
-            bool        is_empty = true;
-            signal_t<void(const std::string&)> signal;
-        };
 
-        void save_node_(std::ostream& f, const ctl::string_tree<config_node>::branch& node,
-            const std::string& name) const;
+        void save_node_(std::ostream& f, const tree_t::branch& node, const std::string& name) const;
 
         void set_raw_value_(config_node& node, const std::string& name, std::string value) {
             try {
@@ -358,9 +371,326 @@ namespace config {
                 throw;
             }
         }
+    };
 
-        ctl::string_tree<config_node> tree_;
-        mutable bool dirty_;
+    extern const std::string meta_header;
+
+    /// config::state with typed parameters
+    class typed_state : private state {
+    public:
+        struct incorrect_type : public state::exception {
+            explicit incorrect_type(const std::string& name, const std::string& type) :
+                state::exception("value has incorrect type for parameter '"+name+"', "
+                        "which is of type '"+type+"'") {}
+        };
+
+        struct incorrect_value : public state::exception {
+            explicit incorrect_value(const std::string& message) : state::exception(message) {}
+        };
+
+        struct accessing_meta_parameter : public state::exception {
+            explicit accessing_meta_parameter(const std::string& name) :
+                state::exception("cannot set value for meta-parameter '"+name+"'") {}
+        };
+
+    private:
+        /// Set new value, checking against allowed values and ranges.
+        template<typename T>
+        void set_value_(const std::string& name, const T& value) {
+            std::vector<T> allowed_vals;
+            if (get_value_allowed(name, allowed_vals)) {
+                bool found = false;
+                for (auto& a : allowed_vals) {
+                    if (value == a) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    std::string string_value;
+                    string::stringify<T>::serialize(value, string_value);
+                    throw incorrect_value("value '"+string_value+"' is not in list of allowed "
+                        "values for parameter '"+name+"'");
+                }
+            } else {
+                T min_val;
+                if (get_value_min(name, min_val) && value < min_val) {
+                    std::string string_value, string_min;
+                    string::stringify<T>::serialize(value, string_value);
+                    string::stringify<T>::serialize(min_val, string_min);
+                    throw incorrect_value("value '"+string_value+"' is lower than minimum allowed "
+                        "value of '"+string_min+"' for parameter '"+name+"'");
+                }
+
+                T max_val;
+                if (get_value_max(name, max_val) && value > max_val) {
+                    std::string string_value, string_max;
+                    string::stringify<T>::serialize(value, string_value);
+                    string::stringify<T>::serialize(max_val, string_max);
+                    throw incorrect_value("value '"+string_value+"' is larger than maximum allowed "
+                        "value of '"+string_max+"' for parameter '"+name+"'");
+                }
+            }
+
+            state::set_value(name, value);
+        }
+
+        /// Check if new value type T (arithmetic) matches stored type.
+        template<typename T>
+        bool check_type_(const std::string& type, const T& value, std::true_type) {
+            if (std::is_floating_point<T>::value) {
+                return type == "float";
+            }
+
+            if (std::is_signed<T>::value) {
+                return type == "int" || (type == "uint" && value >= 0);
+            }
+
+            if (std::is_unsigned<T>::value) {
+                return type == "int" || type == "uint";
+            }
+
+            return type == "string";
+        }
+
+        /// Check if new value type T (string) matches stored type.
+        template<typename T>
+        bool check_type_(const std::string& type, const T& value, std::false_type) {
+            return type == "string";
+        }
+
+        /// Check if new value type T matches stored type.
+        template<typename T>
+        bool check_type_(const std::string& type, const T& value) {
+            return check_type_(type, value, std::is_arithmetic<T>{});
+        }
+
+        /// Check if a given parameter is a meta-parameter.
+        bool is_meta(const std::string& name) const;
+
+    public :
+
+        /// Set the value of a parameter.
+        /** If the parameter already exists, then its value is updated and all bound objects are
+            notified of the change. Else, the parameter is created. This function will throw if the
+            current tree structure is not compatible with the provided parameter name, or if the
+            new value does not satisfy the type or value requirements, or if an exception is raised
+            by any of the callbacks registered to this particular parameter. In all cases where
+            exceptions are thrown, the value of the parameter is left unchanged.
+        **/
+        template<typename T>
+        void set_value(const std::string& name, const T& value) {
+            if (is_meta(name)) {
+                throw accessing_meta_parameter(name);
+            }
+
+            std::string type;
+            if (get_value_type(name, type) && !check_type_(type, value)) {
+                throw incorrect_type(name, type);
+            }
+
+            set_value_(name, value);
+        }
+
+        /// Set the value of a parameter as a string.
+        /** If the parameter already exists, then its value is updated and all bound objects are
+            notified of the change. Else, the parameter is created. This function will throw if
+            the current tree structure is not compatible with the provided parameter name, or if the
+            new value does not satisfy the type or value requirements, or if an exception is raised
+            by any of the callbacks registered to this particular parameter. In all cases where an
+            exception is thrown, the value of the parameter is left unchanged. Compared to
+            set_value(), this version takes directly a string for the new value of the parameter,
+            which is stored untouched into the configuration tree.
+        **/
+        void set_raw_value(const std::string& name, std::string value) {
+            if (is_meta(name)) {
+                throw accessing_meta_parameter(name);
+            }
+
+            std::string type;
+            if (!get_value_type(name, type)) {
+                type = "string";
+            }
+
+            if (type == "int") {
+                int ival;
+                if (!string::stringify<int>::parse(ival, value)) {
+                    throw parsing_failure("could not parse parameter '"+name+"' of type '"+type
+                        +"' from value '"+value+"'");
+                }
+
+                set_value_(name, ival);
+            } else if (type == "uint") {
+                unsigned int ival;
+                if (!string::stringify<unsigned int>::parse(ival, value)) {
+                    throw parsing_failure("could not parse parameter '"+name+"' of type '"+type
+                        +"' from value '"+value+"'");
+                }
+
+                set_value_(name, ival);
+            } else if (type == "float") {
+                float fval;
+                if (!string::stringify<float>::parse(fval, value)) {
+                    throw parsing_failure("could not parse parameter '"+name+"' of type '"+type
+                        +"' from value '"+value+"'");
+                }
+
+                set_value_(name, fval);
+            } else {
+                set_value_(name, value);
+            }
+        }
+
+        /// Get the type of a parameter
+        /** Will return 'true' and store the type in the 'type' argument if a type is specified.
+            Otherwise the function will return 'false', which can signify either that the parameter
+            does not exist, or that it has no type.
+        **/
+        bool get_value_type(const std::string& name, std::string& type) {
+            return state::get_value(meta_header+"."+name+".type", type);
+        }
+
+        /// Get the minimum value of a parameter.
+        /** Will return 'true' and store the minimum in the 'min_val' argument if a minimum is
+            specified. Otherwise the function will return 'false', which can signify either that the
+            parameter does not exist, or that it has no minimum value. This function can throw if
+            the minimum value cannot be parsed into a type T.
+        **/
+        template<typename T>
+        bool get_value_min(const std::string& name, T& min_val) {
+            return state::get_value(meta_header+"."+name+".min_value", min_val);
+        }
+
+        /// Get the maximum value of a parameter.
+        /** Will return 'true' and store the maximum in the 'max_val' argument if a maximum is
+            specified. Otherwise the function will return 'false', which can signify either that the
+            parameter does not exist, or that it has no maximum value. This function can throw if
+            the maximum value cannot be parsed into a type T.
+        **/
+        template<typename T>
+        bool get_value_max(const std::string& name, T& max_val) {
+            return state::get_value(meta_header+"."+name+".max_value", max_val);
+        }
+
+        /// Get the minimum and maximum values of a parameter.
+        /** Will return 'true' and store the minimum and maximum in the 'min_val' and 'max_val'
+            arguments if a minimum and a maximum are specified. Otherwise the function will return
+            'false', which can signify either that the parameter does not exist, or that it has no
+            minimum or maximum value. This function can throw if the minimum or maximum value cannot
+            be parsed into a type T.
+        **/
+        template<typename T>
+        bool get_value_range(const std::string& name, T& min_val, T& max_val) {
+            return state::get_value(meta_header+"."+name+".min_value", min_val) &&
+                   state::get_value(meta_header+"."+name+".max_value", max_val);
+        }
+
+        /// Get the list of allowed values of a parameter.
+        /** Will return 'true' and store the list in the 'vals' argument if a list of allowed values
+            is specified. Otherwise the function will return 'false', which can signify either that
+            the parameter does not exist, or that it has no list of allowed value. This function can
+            throw if the list cannot be parsed into a type vector<T>.
+        **/
+        template<typename T>
+        bool get_value_allowed(const std::string& name, std::vector<T>& vals) {
+            return state::get_value(meta_header+"."+name+".allowed_values", vals);
+        }
+
+        /// Set the type of a parameter.
+        /** Supported types are "int", "uint", "float", and "string". Any other type will be
+            interpreted as "string". This function will throw if the tree structure is incompatible
+            with the required parameter name.
+        **/
+        void set_value_type(const std::string& name, std::string type) {
+            state::set_value(meta_header+"."+name+".type", type);
+        }
+
+        /// Set the minimum value of a parameter.
+        /** This function will throw if the tree structure is incompatible with the required
+            parameter name, or if the provided minimum value has an incompatible type.
+        **/
+        template<typename T>
+        void set_value_min(const std::string& name, const T& min_val) {
+            std::string type;
+            if (get_value_type(name, type) && !check_type_(type, min_val)) {
+                throw incorrect_type(name, type);
+            }
+
+            state::set_value(meta_header+"."+name+".min_value", min_val);
+        }
+
+        /// Set the maximum value of a parameter.
+        /** This function will throw if the tree structure is incompatible with the required
+            parameter name, or if the provided maximum value has an incompatible type.
+        **/
+        template<typename T>
+        void set_value_max(const std::string& name, const T& max_val) {
+            std::string type;
+            if (get_value_type(name, type) && !check_type_(type, max_val)) {
+                throw incorrect_type(name, type);
+            }
+
+            state::set_value(meta_header+"."+name+".max_value", max_val);
+        }
+
+        /// Set the minimum and maximum values of a parameter.
+        /** This function will throw if the tree structure is incompatible with the required
+            parameter name, or if the provided minimum or maximum value have an incompatible type.
+        **/
+        template<typename T>
+        void set_value_range(const std::string& name, const T& min_val, const T& max_val) {
+            std::string type;
+            if (get_value_type(name, type) &&
+                (!check_type_(type, min_val) || !check_type_(type, max_val))) {
+                throw incorrect_type(name, type);
+            }
+
+            state::set_value(meta_header+"."+name+".min_value", min_val);
+            state::set_value(meta_header+"."+name+".max_value", max_val);
+        }
+
+        /// Set the list of allowed values of a parameter.
+        /** This function will throw if the tree structure is incompatible with the required
+            parameter name, or if any value in the provided list has an incompatible type.
+        **/
+        template<typename T>
+        void set_value_allowed(const std::string& name, const std::vector<T>& vals) {
+            std::string type;
+            if (get_value_type(name, type)) {
+                for (auto& v : vals) {
+                    if (!check_type_(type, v)) {
+                        throw incorrect_type(name, type);
+                    }
+                }
+            }
+
+            state::set_value(meta_header+"."+name+".allowed_values", vals);
+        }
+
+        /// Return the list of children values in a given root key.
+        /** Will throw an exception if the requested root key does not exist.
+        **/
+        std::vector<std::string> list_values(const std::string& name = "") const {
+            // Filter out __meta entry
+            std::vector<std::string> ret = state::list_values(name);
+            if (name == "") {
+                ctl::erase_if(ret, [](const std::string& v) { return v == meta_header; });
+            }
+
+            return ret;
+        }
+
+        using state::on_value_changed;
+        using state::parse;
+        using state::parse_from_file;
+        using state::save;
+        using state::save_to_file;
+        using state::get_value;
+        using state::get_raw_value;
+        using state::value_exists;
+        using state::bind;
+        using state::clear;
     };
 }
 

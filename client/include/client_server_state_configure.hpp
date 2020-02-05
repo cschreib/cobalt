@@ -30,6 +30,8 @@ namespace server_state {
 
         void register_lua(sol::state& lua) override;
         void unregister_lua(sol::state& lua) override;
+
+        signal_t<void(const std::string&)> on_generator_changed;
     };
 }
 }

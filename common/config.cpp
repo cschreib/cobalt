@@ -1,7 +1,10 @@
 #include "config.hpp"
 #include <fstream>
+#include <string.hpp>
 
 namespace config {
+    const std::string meta_header = "__meta";
+
     state::state() : dirty_(false) {}
 
     void state::parse_from_file(const std::string& file) {
@@ -70,5 +73,9 @@ namespace config {
                 f << '(' << l.data.value << ')' << '\n';
             }
         }
+    }
+
+    bool typed_state::is_meta(const std::string& name) const {
+        return string::start_with(name, meta_header+".");
     }
 }

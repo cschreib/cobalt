@@ -121,7 +121,7 @@ public :
         ostream_logger_base<O>(out_) {
 
         std::string file;
-        if (conf.get_value("log."+name+".file", file, "") && !file.empty()) {
+        if (conf.get_value("log."+name+".file", file) && !file.empty()) {
             bool append = true;
             conf.get_value("log."+name+".append", append, append);
             if (append) {

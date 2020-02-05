@@ -187,12 +187,13 @@ namespace state {
     void configure::set_parameter(const std::string& key, const std::string& value, bool nocreate) {
         using failure_t = request::server::configure_change_parameter::failure;
 
-        if (string::start_with(key, config::meta_header) ||
-            (nocreate && !config_.value_exists(key))) {
+        if (nocreate && !config_.value_exists(key)) {
             throw failure_t{failure_t::reason::no_such_parameter};
         }
 
-        if (!config_.set_raw_value(key, value)) {
+        try {
+            config_.set_raw_value(key, value);
+        } catch (const config::state::exception&) {
             throw failure_t{failure_t::reason::invalid_value};
         }
     }
@@ -200,12 +201,13 @@ namespace state {
     void configure::set_generator_parameter(const std::string& key, const std::string& value, bool nocreate) {
         using failure_t = request::server::configure_change_generator_parameter::failure;
 
-        if (string::start_with(key, config::meta_header) ||
-            (nocreate && !generator_config_.value_exists(key))) {
+        if (nocreate && !generator_config_.value_exists(key)) {
             throw failure_t{failure_t::reason::no_such_parameter};
         }
 
-        if (!generator_config_.set_raw_value(key, value)) {
+        try {
+            generator_config_.set_raw_value(key, value);
+        } catch (const config::state::exception&) {
             throw failure_t{failure_t::reason::invalid_value};
         }
     }
