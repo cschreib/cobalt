@@ -20,7 +20,13 @@ namespace state {
         config_.bind("generator", [this](std::string id) {
             set_generator_(id);
         });
+    }
 
+    configure::~configure() {
+        if (thread_.joinable()) thread_.join();
+    }
+
+    void configure::register_callbacks() {
         rw_pool_ << net_.watch_request(
             [this](server::netcom::request_t<request::server::configure_change_parameter>&& req) {
             try {
@@ -101,10 +107,6 @@ namespace state {
             serv_.set_state<server::state::idle>();
             req.answer();
         });
-    }
-
-    configure::~configure() {
-        if (thread_.joinable()) thread_.join();
     }
 
     void configure::update_saved_game_list() {
@@ -356,7 +358,7 @@ namespace state {
         // Try loading
         try {
             load_saved_game(save_dir_, true);
-        } catch (failure& fail) {
+        } catch (const failure& fail) {
             message::server::configure_generated out_msg;
             out_msg.failed = true;
             switch (fail.rsn) {

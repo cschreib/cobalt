@@ -90,6 +90,7 @@ namespace server {
 
             T& ret = *st;
             current_state_ = std::move(st);
+            current_state_->register_callbacks();
             return ret;
         }
     };

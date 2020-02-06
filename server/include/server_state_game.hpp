@@ -26,6 +26,8 @@ namespace state {
     public :
         explicit game(server::instance& serv);
 
+        void register_callbacks() override;
+
         void set_player_list(std::unique_ptr<server::player_list> plist);
 
         void save_to_directory(const std::string& dir);

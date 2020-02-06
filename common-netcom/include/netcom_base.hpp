@@ -938,7 +938,9 @@ public :
 
         // Find the signal corresponding to this request
         request_signal_impl<RequestType>& netsig = get_request_signal_<RequestType>();
-        if (!netsig.empty()) throw netcom_exception::request_already_watched<RequestType>();
+        if (!netsig.empty()) {
+            throw netcom_exception::request_already_watched<RequestType>();
+        }
 
         // Register slot
         return netsig.signal.template connect<WP>(std::forward<FR>(receive_func));

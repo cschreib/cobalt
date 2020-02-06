@@ -10,6 +10,8 @@ namespace state {
 
     public :
         explicit idle(server::instance& serv);
+
+        void register_callbacks() override;
     };
 }
 }

@@ -29,6 +29,8 @@ namespace server {
 
             const std::string& name() const;
             state_id id() const;
+
+            virtual void register_callbacks() {}
         };
     }
 }

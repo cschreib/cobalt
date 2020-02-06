@@ -51,6 +51,8 @@ namespace state {
         explicit configure(server::instance& serv);
         ~configure();
 
+        void register_callbacks() override;
+
         void update_generator_list();
         void set_generator(const std::string& id);
         void set_parameter(const std::string& key, const std::string& value, bool nocreate = false);
