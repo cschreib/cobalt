@@ -196,14 +196,17 @@ std::size_t hex_to_uint(const std::string& s) {
 
 std::istream& operator >> (std::istream& s, color32& c) {
     auto pos = s.tellg();
-    char ch; s >> ch;
+    char ch = '\0'; s >> ch;
     if (ch == '#') {
-        char h[3]; h[2] = '\0';
+        char h[3] = {'\0'};
         s >> h[0] >> h[1];
+        if (!s) return s;
         c.r = hex_to_uint(h);
         s >> h[0] >> h[1];
+        if (!s) return s;
         c.g = hex_to_uint(h);
         s >> h[0] >> h[1];
+        if (!s) return s;
         c.b = hex_to_uint(h);
 
         pos = s.tellg();
@@ -219,6 +222,7 @@ std::istream& operator >> (std::istream& s, color32& c) {
         }
 
         s.seekg(pos);
+        s.clear(std::ios::eofbit);
         c.a = 255u;
     } else {
         s.seekg(pos);
