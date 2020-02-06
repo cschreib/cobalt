@@ -154,6 +154,35 @@ namespace server_state {
                 [this](const client::netcom::request_answer_t<request::server::configure_change_generator_parameter>& msg) {}
             );
         });
+
+        ctbl.set_function("generate", [this]() {
+            pool_ << net_.send_request(client::netcom::server_actor_id,
+                make_packet<request::server::configure_generate>(),
+                [this](const client::netcom::request_answer_t<request::server::configure_generate>& msg) {
+                    using failure = request::server::configure_generate::failure;
+                    if (msg.failed) {
+                        switch (msg.failure.rsn) {
+                        case failure::reason::no_generator_set:
+                            serv_.on_debug_message.dispatch("error: cannot generate, no generator set");
+                            break;
+                        case failure::reason::invalid_generator:
+                            serv_.on_debug_message.dispatch("error: cannot generate, invalid generator");
+                            break;
+                        case failure::reason::already_generating:
+                            serv_.on_debug_message.dispatch("error: cannot generate, already generating");
+                            break;
+                        case failure::reason::cannot_generate_while_loading:
+                            serv_.on_debug_message.dispatch("error: cannot generate while loading");
+                            break;
+                        }
+
+                        if (!msg.failure.details.empty()) {
+                            serv_.on_debug_message.dispatch("error: "+msg.failure.details);
+                        }
+                    }
+                }
+            );
+        });
     }
 
     void configure::unregister_lua(sol::state& lua) {
