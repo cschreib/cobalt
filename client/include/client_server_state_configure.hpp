@@ -31,7 +31,13 @@ namespace server_state {
         void register_lua(sol::state& lua) override;
         void unregister_lua(sol::state& lua) override;
 
-        signal_t<void(const std::string&)> on_generator_changed;
+        signal_t<void(const std::string&)> on_generator_changed; /// Parameter: name of new generator
+        signal_t<void()>                   on_generating_started;
+        signal_t<void()>                   on_generating_success;
+        signal_t<void(const std::string&)> on_generating_failure; /// Parameter: reason for failure
+        signal_t<void()>                   on_loading_started;
+        signal_t<void()>                   on_loading_success;
+        signal_t<void(const std::string&)> on_loading_failure; /// Parameter: reason for failure
     };
 }
 }

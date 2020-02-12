@@ -18,6 +18,36 @@ namespace server_state {
             on_generator_changed.dispatch(generator_);
             serv_.on_debug_message.dispatch("new generator set: "+msg.gen);
         });
+
+        pool_ << net_.watch_message([this](const message::server::configure_generating&) {
+            on_generating_started.dispatch();
+            serv_.on_debug_message.dispatch("started generating...");
+        });
+
+        pool_ << net_.watch_message([this](const message::server::configure_generated& msg) {
+            if (msg.failed) {
+                on_generating_failure.dispatch(msg.reason);
+                serv_.on_debug_error.dispatch("generating failed, reason: "+msg.reason);
+            } else {
+                on_generating_success.dispatch();
+                serv_.on_debug_message.dispatch("generated successfuly");
+            }
+        });
+
+        pool_ << net_.watch_message([this](const message::server::configure_loading&) {
+            on_loading_started.dispatch();
+            serv_.on_debug_message.dispatch("started loading...");
+        });
+
+        pool_ << net_.watch_message([this](const message::server::configure_loaded& msg) {
+            if (msg.failed) {
+                on_loading_failure.dispatch(msg.reason);
+                serv_.on_debug_error.dispatch("loading failed, reason: "+msg.reason);
+            } else {
+                on_loading_success.dispatch();
+                serv_.on_debug_message.dispatch("loaded successfuly");
+            }
+        });
     }
 
     void configure::transition_to_(server_state::base& st) {
