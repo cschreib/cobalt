@@ -214,6 +214,7 @@ void console_input::autocomplete(string::unicode text) {
     content_.erase(p0, pos_-p0);
     content_.insert(p0, text);
     pos_ = p0 + text.size();
+    if (!text.empty() && text.back() == ')') --pos_;
 
     on_updated.dispatch(content_);
 }

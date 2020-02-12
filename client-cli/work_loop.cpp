@@ -119,7 +119,11 @@ void work_loop::autocomplete_(const std::string& cmd) {
 
     t.foreach_proxy([&](std::string k, sol::proxy<sol::table,std::string>) {
         if (string::start_with(k, fields.back())) {
-            candidates.push_back(root+k);
+            if (t.is<sol::function>(k)) {
+                candidates.push_back(root+k+"()");
+            } else {
+                candidates.push_back(root+k);
+            }
         }
     });
 
