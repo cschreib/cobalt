@@ -75,7 +75,7 @@ public:
         lua_gettable(state(), -2);
         auto expected = type_of<T>();
         auto actual = lua_type(state(), -1);
-        lua_pop(state(), 1);
+        lua_pop(state(), 2);
         return (static_cast<int>(expected) == actual) || (expected == type::poly);
     }
 
@@ -131,6 +131,7 @@ public:
               stack::getter<Unqualified<Value>>::get(state(),-1));
             lua_pop(state(), 1);
         }
+        lua_pop(state(), 1);
     }
 
     template<typename Fun>
@@ -145,6 +146,7 @@ public:
             f(k, proxy<table,Key>(*this, k));
             lua_pop(state(), 1);
         }
+        lua_pop(state(), 1);
     }
 
     size_t size() const {
