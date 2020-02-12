@@ -285,6 +285,9 @@ void work_loop::connect_() {
     serv.on_debug_message.connect([this](std::string msg) {
         out_.note(msg);
     });
+    serv.on_debug_error.connect([this](std::string msg) {
+        out_.error(msg);
+    });
 
     pool_ << net.watch_message([this](const message::server::will_shutdown& msg) {
         out_.note("server will shutdown in less than ", msg.countdown, "sec");

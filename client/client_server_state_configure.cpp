@@ -93,10 +93,10 @@ namespace server_state {
                     if (msg.failed) {
                         switch (msg.failure.rsn) {
                         case request::server::configure_change_parameter::failure::reason::no_such_parameter:
-                            serv_.on_debug_message.dispatch("error: no server configuration parameter '"+key+"'");
+                            serv_.on_debug_error.dispatch("no server configuration parameter '"+key+"'");
                             break;
                         case request::server::configure_change_parameter::failure::reason::invalid_value:
-                            serv_.on_debug_message.dispatch("error: invalid value for '"+key+"' ('"+value+"')");
+                            serv_.on_debug_error.dispatch("invalid value for '"+key+"' ('"+value+"')");
                             break;
                         }
                     }
@@ -163,21 +163,21 @@ namespace server_state {
                     if (msg.failed) {
                         switch (msg.failure.rsn) {
                         case failure::reason::no_generator_set:
-                            serv_.on_debug_message.dispatch("error: cannot generate, no generator set");
+                            serv_.on_debug_error.dispatch("cannot generate, no generator set");
                             break;
                         case failure::reason::invalid_generator:
-                            serv_.on_debug_message.dispatch("error: cannot generate, invalid generator");
+                            serv_.on_debug_error.dispatch("cannot generate, invalid generator");
                             break;
                         case failure::reason::already_generating:
-                            serv_.on_debug_message.dispatch("error: cannot generate, already generating");
+                            serv_.on_debug_error.dispatch("cannot generate, already generating");
                             break;
                         case failure::reason::cannot_generate_while_loading:
-                            serv_.on_debug_message.dispatch("error: cannot generate while loading");
+                            serv_.on_debug_error.dispatch("cannot generate while loading");
                             break;
                         }
 
                         if (!msg.failure.details.empty()) {
-                            serv_.on_debug_message.dispatch("error: "+msg.failure.details);
+                            serv_.on_debug_error.dispatch(msg.failure.details);
                         }
                     }
                 }

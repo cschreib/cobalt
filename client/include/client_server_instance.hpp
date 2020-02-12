@@ -84,6 +84,7 @@ namespace client {
 
         // Signals for debugging
         signal_t<void(std::string)> on_debug_message;
+        signal_t<void(std::string)> on_debug_error;
     };
 }
 
