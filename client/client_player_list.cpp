@@ -3,6 +3,7 @@
 #include "client_server_instance.hpp"
 #include "client_player.hpp"
 #include <string.hpp>
+#include <stringify.hpp>
 #include <sol.hpp>
 
 namespace client {
