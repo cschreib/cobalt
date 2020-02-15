@@ -445,14 +445,31 @@ namespace state {
         // Do the actual work in a thread
         if (thread_.joinable()) thread_.join();
         thread_ = std::thread([this, dir]() {
+            using failure = request::server::game_load::failure;
+
             message::server::configure_loaded_internal msg;
             msg.failed = false;
 
             try {
                 loaded_game_->load_from_directory(dir);
-            } catch (request::server::game_load::failure& fail) {
+            } catch (const failure& fail) {
                 msg.failed = true;
-                msg.reason = fail.details;
+
+                switch (fail.rsn) {
+                    case failure::reason::cannot_load_while_saving:
+                        msg.reason = "cannot load while saving";
+                        break;
+                    case failure::reason::no_such_saved_game:
+                        msg.reason = "no such saved game";
+                        break;
+                    case failure::reason::invalid_saved_game:
+                        msg.reason = "invalid saved game";
+                        break;
+                }
+
+                if (!fail.details.empty()) {
+                    msg.reason += ", " + fail.details;
+                }
             } catch (...) {
                 msg.failed = true;
                 msg.reason = "unknown";
