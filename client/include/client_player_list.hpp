@@ -9,10 +9,19 @@
 #include "server_player_list.hpp"
 #include "client_player.hpp"
 
+namespace sol {
+    class table;
+}
+
 namespace client {
+    class server_instance;
+
     class player_list {
     public :
-        explicit player_list(netcom& net);
+        explicit player_list(server_instance& serv);
+
+        void register_lua(sol::table& root);
+        void unregister_lua(sol::table& root);
 
         void connect();
         signal_t<void()> on_list_received;
@@ -52,6 +61,7 @@ namespace client {
         void request_join_(const std::string& name, const color32& col, bool as_ai);
         void request_leave_();
 
+        server_instance& serv_;
         netcom& net_;
 
         ctl::ptr_vector<player> players_;

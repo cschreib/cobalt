@@ -11,7 +11,8 @@ namespace server_state {
         config_(net_, client::netcom::server_actor_id, "server_state_configure"),
         generator_config_(net_, client::netcom::server_actor_id, "server_state_configure_generator") {
 
-        plist_ = std::make_unique<client::player_list>(net_);
+        plist_ = std::make_unique<client::player_list>(serv_);
+        plist_->connect();
 
         pool_ << net_.watch_message([this](const message::server::configure_current_generator_changed& msg) {
             generator_ = msg.gen;
@@ -70,6 +71,7 @@ namespace server_state {
         }
 
         auto stbl = px.get<sol::table>();
+        plist_->register_lua(stbl);
 
         auto ctbl = stbl.create_table("config");
         ctbl.set_function("list_parameters", [this](std::string key) {
@@ -244,7 +246,7 @@ namespace server_state {
 
     void configure::unregister_lua(sol::state& lua) {
         auto tbl = lua["server"].get<sol::table>();
-
+        plist_->unregister_lua(tbl);
         tbl["config"] = sol::nil;
     }
 }

@@ -50,41 +50,6 @@ namespace client {
         pool_ << net_.watch_message([this](const message::server::changed_state& msg) {
             set_state_(msg.new_state);
         });
-
-        // TODO: move the player list to the configure state
-        // pool_ << plist_.on_list_received.connect([this]() {
-        //     if (plist_.empty()) {
-        //         out_.note("player list received (empty)");
-        //     } else {
-        //         out_.note("player list received:");
-        //         for (const client::player& p : plist_) {
-        //             out_.note(" - id=", p.id, ", ip=", p.ip, ", name=", p.name, ", color=",
-        //                 p.color, ", ai=", p.is_ai);
-        //         }
-        //     }
-        // });
-        // pool_ << plist_.on_connect_fail.connect([]() {
-        //     out_.error("could not read player list");
-        // });
-        // pool_ << plist_.on_join.connect([](client::player& p) {
-        //     out_.note("joined as player \"", p.name, "\"");
-        // });
-        // pool_ << plist_.on_leave.connect([]() {
-        //     out_.note("left player list");
-        // });
-        // pool_ << plist_.on_join_fail.connect([]() {
-        //     out_.error("could not join as player");
-        // });
-        // pool_ << plist_.on_player_connected.connect([](client::player& p) {
-        //     out_.note("new player connected: id=", p.id, ", ip=", p.ip, ", name=",
-        //         p.name, ", color=", p.color, ", ai=", p.is_ai);
-        // });
-        // pool_ << plist_.on_player_disconnected.connect([](const client::player& p) {
-        //     out_.note("player disconnected: id=", p.id, ", name=", p.name);
-        // });
-        // pool_ << plist_.on_disconnect.connect([]() {
-        //     out_.note("player list was disconnected");
-        // });
     }
 
     void server_instance::set_state_(server::state_id sid) {

@@ -14,6 +14,9 @@ namespace server_state {
     public :
         explicit game(server_instance& serv);
 
+        void register_lua(sol::state& lua) override;
+        void unregister_lua(sol::state& lua) override;
+
         void set_player_list(std::unique_ptr<client::player_list> plist);
     };
 }

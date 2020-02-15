@@ -1,10 +1,49 @@
 #include "client_player_list.hpp"
 #include <server_player_list.hpp>
+#include "client_server_instance.hpp"
 #include "client_player.hpp"
+#include <string.hpp>
+#include <sol.hpp>
 
 namespace client {
-    player_list::player_list(netcom& net) : net_(net), self_(nullptr),
-        joining_(false), leaving_(false) {}
+    player_list::player_list(server_instance& serv) : serv_(serv), net_(serv.get_netcom()),
+        self_(nullptr), joining_(false), leaving_(false) {
+
+        pool_ << on_list_received.connect([this]() {
+            if (empty()) {
+                serv_.on_debug_message.dispatch("player list received (empty)");
+            } else {
+                serv_.on_debug_message.dispatch("player list received:");
+                for (const client::player& p : players_) {
+                    serv_.on_debug_message.dispatch(string::to_string(
+                        " - id=", p.id, ", ip=", p.ip, ", name=", p.name,
+                        ", color=", p.color, ", ai=", p.is_ai));
+                }
+            }
+        });
+        pool_ << on_connect_fail.connect([this]() {
+            serv_.on_debug_error.dispatch("could not read player list");
+        });
+        pool_ << on_join.connect([this](client::player& p) {
+            serv_.on_debug_message.dispatch("joined as player \""+p.name+"\"");
+        });
+        pool_ << on_leave.connect([this]() {
+            serv_.on_debug_message.dispatch("left player list");
+        });
+        pool_ << on_join_fail.connect([this]() {
+            serv_.on_debug_error.dispatch("could not join as player");
+        });
+        pool_ << on_player_connected.connect([this](client::player& p) {
+            serv_.on_debug_message.dispatch(string::to_string("new player connected: id=", p.id, ", ip=", p.ip, ", name=",
+                p.name, ", color=", p.color, ", ai=", p.is_ai));
+        });
+        pool_ << on_player_disconnected.connect([this](const client::player& p) {
+            serv_.on_debug_message.dispatch(string::to_string("player disconnected: id=", p.id, ", name=", p.name));
+        });
+        pool_ << on_disconnect.connect([this]() {
+            serv_.on_debug_message.dispatch("player list was disconnected");
+        });
+    }
 
     void player_list::connect() {
         pool_ << net_.send_request(netcom::server_actor_id,
@@ -181,5 +220,14 @@ namespace client {
 
     player_list::const_iterator player_list::end() const {
         return players_.end();
+    }
+
+    void player_list::register_lua(sol::table& root) {
+        auto ptbl = root.create_table("player_list");
+        // TODO: register all functions
+    }
+
+    void player_list::unregister_lua(sol::table& root) {
+        root["player_list"] = sol::nil;
     }
 }
