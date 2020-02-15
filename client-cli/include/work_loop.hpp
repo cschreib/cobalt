@@ -3,7 +3,7 @@
 
 #include <lock_free_queue.hpp>
 #include <client_server_instance.hpp>
-#include <sol.hpp>
+#include <sol/sol.hpp>
 
 class work_loop {
     config::state& conf_;

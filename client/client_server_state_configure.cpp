@@ -2,7 +2,7 @@
 #include "client_server_state_game.hpp"
 #include "client_server_instance.hpp"
 #include <string.hpp>
-#include <sol.hpp>
+#include <sol/sol.hpp>
 
 namespace client {
 namespace server_state {
@@ -65,29 +65,26 @@ namespace server_state {
     }
 
     void configure::register_lua(sol::state& lua) {
-        auto px = lua["server"];
-        if (px.is<sol::nil_t>()) {
-            lua.create_table("server");
-        }
+        auto stbl = lua["server"].get_or_create<sol::table>();
 
-        auto stbl = px.get<sol::table>();
-        plist_->register_lua(stbl);
+        player_list::register_lua_type(lua);
+        stbl["player_list"] = plist_.get();
 
-        auto ctbl = stbl.create_table("config");
+        auto ctbl = stbl["config"].get_or_create<sol::table>();
         ctbl.set_function("list_parameters", [this](std::string key) {
             sol::optional<std::vector<std::string>> ret;
             try {
-                ret.set(config_.list_values(key));
+                ret = config_.list_values(key);
             } catch (const std::exception& e) {
                 serv_.on_debug_message.dispatch(e.what());
             }
-            return config_.list_values(key);
+            return ret;
         });
         ctbl.set_function("get_parameter", [this](std::string key) {
             sol::optional<std::string> ret;
             std::string val;
             if (config_.get_value(key, val)) {
-                ret.set(std::move(val));
+                ret = std::move(val);
             }
             return ret;
         });
@@ -102,10 +99,10 @@ namespace server_state {
             sol::optional<std::string> retmin, retmax;
             std::string minval, maxval;
             if (config_.get_value_min(key, minval)) {
-                retmin.set(minval);
+                retmin = minval;
             }
             if (config_.get_value_max(key, maxval)) {
-                retmax.set(maxval);
+                retmax = maxval;
             }
             return std::make_tuple(retmin, retmax);
         });
@@ -113,7 +110,7 @@ namespace server_state {
             sol::optional<std::vector<std::string>> ret;
             std::vector<std::string> vals;
             if (config_.get_value_allowed(key, vals)) {
-                ret.set(std::move(vals));
+                ret = std::move(vals);
             }
             return ret;
         });
@@ -139,7 +136,7 @@ namespace server_state {
         ctbl.set_function("list_generator_parameters", [this](std::string key) {
             sol::optional<std::vector<std::string>> ret;
             try {
-                ret.set(generator_config_.list_values(key));
+                ret = generator_config_.list_values(key);
             } catch (const std::exception& e) {
                 serv_.on_debug_message.dispatch(e.what());
             }
@@ -149,7 +146,7 @@ namespace server_state {
             sol::optional<std::string> ret;
             std::string val;
             if (generator_config_.get_value(key, val)) {
-                ret.set(std::move(val));
+                ret = std::move(val);
             }
             return ret;
         });
@@ -164,10 +161,10 @@ namespace server_state {
             sol::optional<std::string> retmin, retmax;
             std::string minval, maxval;
             if (generator_config_.get_value_min(key, minval)) {
-                retmin.set(minval);
+                retmin = minval;
             }
             if (generator_config_.get_value_max(key, maxval)) {
-                retmax.set(maxval);
+                retmax = maxval;
             }
             return std::make_tuple(retmin, retmax);
         });
@@ -175,7 +172,7 @@ namespace server_state {
             sol::optional<std::vector<std::string>> ret;
             std::vector<std::string> vals;
             if (generator_config_.get_value_allowed(key, vals)) {
-                ret.set(std::move(vals));
+                ret = std::move(vals);
             }
             return ret;
         });
@@ -245,9 +242,9 @@ namespace server_state {
     }
 
     void configure::unregister_lua(sol::state& lua) {
-        auto tbl = lua["server"].get<sol::table>();
-        plist_->unregister_lua(tbl);
-        tbl["config"] = sol::nil;
+        auto stbl = lua["server"].get<sol::table>();
+        stbl["player_list"] = sol::nil;
+        stbl["config"] = sol::nil;
     }
 }
 }

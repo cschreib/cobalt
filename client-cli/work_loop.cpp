@@ -17,20 +17,16 @@ work_loop::~work_loop() {
 
 void work_loop::open_lua_() {
     lua_.open_libraries(sol::lib::base, sol::lib::math);
-    lua_.set_function("print", [this](std::vector<sol::optional<std::string>> vals) {
+    lua_.set_function("print", [this](sol::variadic_args vals) {
         std::string msg;
-        for (std::size_t i = 0; i < vals.size(); ++i) {
-            if (i != 0) msg += ",";
-            if (vals[i]) {
-                msg += vals[i].get();
-            } else {
-                msg += "nil";
-            }
+        std::function<std::string(sol::object)> to_string = lua_["tostring"];
+        for (auto va : vals) {
+            msg += to_string(va);
         }
         out_.print(msg);
     });
 
-    auto stbl = lua_.create_table("server");
+    auto stbl = lua_["server"].get_or_create<sol::table>();
     stbl.set_function("connect", [this] {
         if (server_) {
             out_.error("server is already connected");
@@ -56,7 +52,7 @@ void work_loop::open_lua_() {
         }
     });
 
-    auto ctbl = lua_.create_table("config");
+    auto ctbl = lua_["config"].get_or_create<sol::table>();
     ctbl.set_function("set", [this](std::string key, std::string value) {
         conf_.set_value(key, value);
     });
@@ -66,7 +62,7 @@ void work_loop::open_lua_() {
         if (!conf_.get_value(key, value)) {
             out_.error("no value exists for '", key, "'");
         } else {
-            ret.set(value);
+            ret = std::move(value);
         }
         return ret;
     });
@@ -110,22 +106,25 @@ void work_loop::autocomplete_(const std::string& cmd) {
         fields.push_back("");
     }
 
-    sol::table t = lua_.global_table();
+    sol::table t = lua_.globals();
     for (std::size_t i = 0; i < fields.size()-1; ++i) {
         auto px = t[fields[i]];
-        if (!px.is<sol::table>()) return;
+        if (px.get_type() != sol::type::table) return;
         t = px.get<sol::table>();
     }
 
-    t.foreach_proxy([&](std::string k, sol::proxy<sol::table,std::string>) {
-        if (string::start_with(k, fields.back())) {
-            if (t.is<sol::function>(k)) {
-                candidates.push_back(root+k+"()");
-            } else {
-                candidates.push_back(root+k);
-            }
+    for (const auto& kv : t) {
+        if (kv.first.get_type() != sol::type::string) continue;
+
+        const std::string& key = kv.first.as<std::string>();
+        if (!string::start_with(key, fields.back())) continue;
+
+        if (kv.second.get_type() == sol::type::function) {
+            candidates.push_back(root+key+"()");
+        } else {
+            candidates.push_back(root+key);
         }
-    });
+    }
 
     std::sort(candidates.begin(), candidates.end());
 

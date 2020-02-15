@@ -1,5 +1,5 @@
 #include "client_server_state_game.hpp"
-#include <sol.hpp>
+#include <sol/sol.hpp>
 
 namespace client {
 namespace server_state {
@@ -18,21 +18,18 @@ namespace server_state {
     }
 
     void game::register_lua(sol::state& lua) {
-        auto px = lua["server"];
-        if (px.is<sol::nil_t>()) {
-            lua.create_table("server");
-        }
+        auto stbl = lua["server"].get_or_create<sol::table>();
 
-        auto stbl = px.get<sol::table>();
-        plist_->register_lua(stbl);
+        player_list::register_lua_type(lua);
+        stbl["player_list"] = plist_.get();
 
-        auto gtbl = stbl.create_table("game");
+        auto gtbl = stbl["game"].get_or_create<sol::table>();
     }
 
     void game::unregister_lua(sol::state& lua) {
-        auto tbl = lua["game"].get<sol::table>();
-        plist_->unregister_lua(tbl);
-        tbl["game"] = sol::nil;
+        auto stbl = lua["server"].get<sol::table>();
+        stbl["player_list"] = sol::nil;
+        stbl["game"] = sol::nil;
     }
 }
 }

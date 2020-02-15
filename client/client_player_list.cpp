@@ -4,7 +4,7 @@
 #include "client_player.hpp"
 #include <string.hpp>
 #include <stringify.hpp>
-#include <sol.hpp>
+#include <sol/sol.hpp>
 
 namespace client {
     player_list::player_list(server_instance& serv) : serv_(serv), net_(serv.get_netcom()),
@@ -223,23 +223,19 @@ namespace client {
         return players_.end();
     }
 
-    void player_list::register_lua(sol::table& root) {
-        auto ptbl = root.create_table("player_list");
-
-        ptbl.set_function("empty",     &player_list::empty,     *this);
-        ptbl.set_function("is_joined", &player_list::is_joined, *this);
-        ptbl.set_function("leave",     &player_list::leave,     *this);
-        ptbl.set_function("join_as",   [this](const std::string& name, const std::string& scolor, bool as_ai) {
-            color32 color;
-            if (string::stringify<color32>::parse(color, scolor)) {
-                join_as(name, color, as_ai);
+    void player_list::register_lua_type(sol::state& lua) {
+        lua.new_usertype<player_list>("player_list", sol::no_constructor,
+            "empty", &player_list::empty,
+            "is_joined", &player_list::is_joined,
+            "leave", &player_list::leave,
+            "join_as", [](player_list* self, const std::string& name, const std::string& scolor, bool as_ai) {
+                color32 color;
+                if (string::stringify<color32>::parse(color, scolor)) {
+                    self->join_as(name, color, as_ai);
+                }
             }
-        });
+        );
 
-        // TODO: register functions to iterate over list
-    }
-
-    void player_list::unregister_lua(sol::table& root) {
-        root["player_list"] = sol::nil;
+        // TODO: add iteration
     }
 }

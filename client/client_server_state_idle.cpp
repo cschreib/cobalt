@@ -1,7 +1,7 @@
 #include "client_server_state_idle.hpp"
 #include "client_server_instance.hpp"
 #include <server_state_idle.hpp>
-#include <sol.hpp>
+#include <sol/sol.hpp>
 
 namespace client {
 namespace server_state {
@@ -25,12 +25,7 @@ namespace server_state {
     }
 
     void idle::register_lua(sol::state& lua) {
-        auto px = lua["server"];
-        if (px.is<sol::nil_t>()) {
-            lua.create_table("server");
-        }
-
-        auto tbl = px.get<sol::table>();
+        auto tbl = lua["server"].get_or_create<sol::table>();
 
         tbl.set_function("start_new_game", [this]() {
             start_new_game();

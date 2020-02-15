@@ -5,7 +5,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR}/../common/include)
 include_directories(${PROJECT_SOURCE_DIR}/../common-netcom/include)
 include_directories(${PROJECT_SOURCE_DIR}/../server/include)
-include_directories(${PROJECT_SOURCE_DIR}/../lua SYSTEM)
+include_directories(${PROJECT_SOURCE_DIR}/../lua/sol2/include SYSTEM)
 include_directories(${SFML_INCLUDE_DIR})
 include_directories(${LUA_INCLUDE_DIR} SYSTEM)
 

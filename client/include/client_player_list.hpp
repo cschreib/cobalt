@@ -10,7 +10,7 @@
 #include "client_player.hpp"
 
 namespace sol {
-    class table;
+    class state;
 }
 
 namespace client {
@@ -20,8 +20,7 @@ namespace client {
     public :
         explicit player_list(server_instance& serv);
 
-        void register_lua(sol::table& root);
-        void unregister_lua(sol::table& root);
+        static void register_lua_type(sol::state& lua);
 
         void connect();
         signal_t<void()> on_list_received;
