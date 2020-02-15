@@ -225,7 +225,18 @@ namespace client {
 
     void player_list::register_lua(sol::table& root) {
         auto ptbl = root.create_table("player_list");
-        // TODO: register all functions
+
+        ptbl.set_function("empty",     &player_list::empty,     *this);
+        ptbl.set_function("is_joined", &player_list::is_joined, *this);
+        ptbl.set_function("leave",     &player_list::leave,     *this);
+        ptbl.set_function("join_as",   [this](const std::string& name, const std::string& scolor, bool as_ai) {
+            color32 color;
+            if (string::stringify<color32>::parse(color, scolor)) {
+                join_as(name, color, as_ai);
+            }
+        });
+
+        // TODO: register functions to iterate over list
     }
 
     void player_list::unregister_lua(sol::table& root) {
