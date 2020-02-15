@@ -63,6 +63,13 @@ namespace string {
     unicode to_unicode(const std::string& s);
     std::string to_utf8(unicode_char s);
     std::string to_utf8(const unicode& s);
+
+    template<typename ... Args>
+    std::string to_string(Args&& ... args) {
+        std::ostringstream ss;
+        (void)(int[]){0, ((void)(ss << args), 0)...};
+        return ss.str();
+    }
 }
 
 #endif
