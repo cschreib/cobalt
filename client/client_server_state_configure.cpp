@@ -213,6 +213,33 @@ namespace server_state {
                 }
             );
         });
+
+        ctbl.set_function("run_game", [this]() {
+            pool_ << net_.send_request(client::netcom::server_actor_id,
+                make_packet<request::server::configure_run_game>(),
+                [this](const client::netcom::request_answer_t<request::server::configure_run_game>& msg) {
+                    using failure = request::server::configure_run_game::failure;
+
+                    if (msg.failed) {
+                        switch (msg.failure.rsn) {
+                        case failure::reason::cannot_run_while_generating:
+                            serv_.on_debug_error.dispatch("cannot run game, generating in progress");
+                            break;
+                        case failure::reason::cannot_run_while_loading:
+                            serv_.on_debug_error.dispatch("cannot run game, loading in progress");
+                            break;
+                        case failure::reason::no_game_loaded:
+                            serv_.on_debug_error.dispatch("cannot run game, no game loaded");
+                            break;
+                        }
+
+                        if (!msg.failure.details.empty()) {
+                            serv_.on_debug_error.dispatch(msg.failure.details);
+                        }
+                    }
+                }
+            );
+        });
     }
 
     void configure::unregister_lua(sol::state& lua) {
