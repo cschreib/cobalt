@@ -1,0 +1,3 @@
+[submodule "lua/sol2"]
+	path = lua/sol2
+	url = https://github.com/ThePhD/sol2
