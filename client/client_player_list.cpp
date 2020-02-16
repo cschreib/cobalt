@@ -241,12 +241,7 @@ namespace client {
             "is_joined", &player_list::is_joined,
             "leave",     &player_list::leave,
             "get_self",  &player_list::get_self,
-            "join_as", [](player_list* self, const std::string& name, const std::string& scolor, bool as_ai) {
-                color32 color;
-                if (string::stringify<color32>::parse(color, scolor)) {
-                    self->join_as(name, color, as_ai);
-                }
-            }
+            "join_as",   &player_list::join_as
         );
     }
 }

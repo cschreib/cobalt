@@ -31,11 +31,24 @@ void work_loop::open_lua_() {
     });
 
     // Register common types
-    lua_.new_usertype<color32>("color32",
+    lua_.new_usertype<color32>("color",
+        sol::constructors<
+            color32(),
+            color32(color32::chanel,color32::chanel,color32::chanel),
+            color32(color32::chanel,color32::chanel,color32::chanel,color32::chanel)
+        >{},
         "r", &color32::r,
         "g", &color32::g,
         "b", &color32::b,
-        "a", &color32::a
+        "a", &color32::a,
+        "from_string", [](std::string v) -> sol::optional<color32> {
+            color32 c;
+            if (string::stringify<color32>::parse(c, v)) {
+                return c;
+            } else {
+                return {};
+            }
+        }
     );
 
     // Register connect/disconnect

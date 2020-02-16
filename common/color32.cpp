@@ -16,6 +16,8 @@ color32::color32() {}
 color32::color32(chanel nr, chanel ng, chanel nb, chanel na) :
     r(nr), g(ng), b(nb), a(na) {}
 
+color32::color32(chanel nr, chanel ng, chanel nb) : color32(nr, ng, nb, 255) {}
+
 color32::chanel* color32::data() {
     return &r;
 }

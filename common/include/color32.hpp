@@ -14,7 +14,8 @@ public :
     using chanel = std::uint8_t;
 
     color32();
-    color32(chanel nr, chanel ng, chanel nb, chanel na = 255u);
+    color32(chanel nr, chanel ng, chanel nb);
+    color32(chanel nr, chanel ng, chanel nb, chanel na);
 
     chanel*       data();
     const chanel* data() const;
