@@ -1,4 +1,5 @@
 #include "work_loop.hpp"
+#include <color32.hpp>
 #include <string.hpp>
 
 work_loop::work_loop(config::state& conf, logger& log) : conf_(conf), out_(log),
@@ -16,7 +17,10 @@ work_loop::~work_loop() {
 }
 
 void work_loop::open_lua_() {
+    // Open base libraries
     lua_.open_libraries(sol::lib::base, sol::lib::math);
+
+    // Define our own print() that will forward to graphical output
     lua_.set_function("print", [this](sol::variadic_args vals) {
         std::string msg;
         std::function<std::string(sol::object)> to_string = lua_["tostring"];
@@ -26,6 +30,15 @@ void work_loop::open_lua_() {
         out_.print(msg);
     });
 
+    // Register common types
+    lua_.new_usertype<color32>("color32",
+        "r", &color32::r,
+        "g", &color32::g,
+        "b", &color32::b,
+        "a", &color32::a
+    );
+
+    // Register connect/disconnect
     auto stbl = lua_["server"].get_or_create<sol::table>();
     stbl.set_function("connect", [this] {
         if (server_) {
@@ -52,6 +65,7 @@ void work_loop::open_lua_() {
         }
     });
 
+    // Register configuration
     auto ctbl = lua_["config"].get_or_create<sol::table>();
     ctbl.set_function("set", [this](std::string key, std::string value) {
         conf_.set_value(key, value);
