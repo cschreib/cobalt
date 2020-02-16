@@ -46,6 +46,7 @@ namespace client {
         bool is_joined() const;
         const player* get_self() const;
 
+        using value_type = player&;
         using iterator = ctl::ptr_vector<player>::iterator;
         using const_iterator = ctl::ptr_vector<player>::const_iterator;
 

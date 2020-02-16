@@ -248,7 +248,5 @@ namespace client {
                 }
             }
         );
-
-        // TODO: add iteration
     }
 }
