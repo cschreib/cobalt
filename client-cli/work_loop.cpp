@@ -93,37 +93,56 @@ void work_loop::execute(std::string cmd) {
     }
 }
 
+template<typename T>
+void fill_autocomplete(const T& object, std::vector<std::string>& candidates,
+    const std::string& root, const std::string& connector, const std::string& start) {
+
+    for (const auto& kv : object) {
+        // Key is not a string, ignore (could convert to string?)
+        if (kv.first.get_type() != sol::type::string) continue;
+
+        // Get key and skip if it doesn't start with the right characters
+        std::string key = kv.first.template as<std::string>();
+        if (!string::start_with(key, start)) continue;
+
+        // Add item to candidate list, with () if this is a function
+        if (kv.second.get_type() == sol::type::function) {
+            key += "()";
+        }
+
+        candidates.push_back(root+connector+key);
+    }
+}
+
 void work_loop::autocomplete_(const std::string& cmd) {
     std::vector<std::string> candidates;
 
-    std::vector<std::string> fields = string::split_any_of(cmd, ":.");
-    if (fields.empty()) return;
-
+    // Split the command until the last . or :
     auto p0 = cmd.find_last_of(":.");
-    std::string root = p0 == cmd.npos ? "" : cmd.substr(0, p0+1);
+    std::string root = (p0 == cmd.npos ? "" : cmd.substr(0, p0));
+    std::string connector = (p0 == cmd.npos ? "" : cmd.substr(p0, 1));
+    std::string start = (p0 == cmd.npos ? cmd : cmd.substr(p0+1));
 
-    if (cmd.back() == '.' || cmd.back() == ':') {
-        fields.push_back("");
+    // Evalute the base object
+    sol::object base;
+    if (root.empty()) {
+        base = lua_.globals();
+    } else {
+        auto ret = lua_.safe_script("return "+root);
+        if (!ret.valid()) return;
+        base = ret.get<sol::object>();
     }
 
-    sol::table t = lua_.globals();
-    for (std::size_t i = 0; i < fields.size()-1; ++i) {
-        auto px = t[fields[i]];
-        if (px.get_type() != sol::type::table) return;
-        t = px.get<sol::table>();
-    }
-
-    for (const auto& kv : t) {
-        if (kv.first.get_type() != sol::type::string) continue;
-
-        const std::string& key = kv.first.as<std::string>();
-        if (!string::start_with(key, fields.back())) continue;
-
-        if (kv.second.get_type() == sol::type::function) {
-            candidates.push_back(root+key+"()");
-        } else {
-            candidates.push_back(root+key);
-        }
+    if (base.get_type() == sol::type::table) {
+        // We got a table, just list its fields
+        fill_autocomplete(base.as<sol::table>(), candidates, root, connector, start);
+    } else if (base.get_type() == sol::type::userdata) {
+        // We got a class, list is meta fields
+        auto ret = lua_.safe_script("return getmetatable("+root+")");
+        if (!ret.valid()) return;
+        fill_autocomplete(ret.get<sol::metatable>(), candidates, root, connector, start);
+    } else {
+        return;
     }
 
     std::sort(candidates.begin(), candidates.end());
