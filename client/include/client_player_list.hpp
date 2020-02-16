@@ -44,12 +44,13 @@ namespace client {
         signal_t<void()> on_leave;
 
         bool is_joined() const;
-        const player& get_self() const;
+        const player* get_self() const;
 
         using iterator = ctl::ptr_vector<player>::iterator;
         using const_iterator = ctl::ptr_vector<player>::const_iterator;
 
         bool empty() const;
+        std::size_t size() const;
 
         iterator begin();
         iterator end();

@@ -199,12 +199,16 @@ namespace client {
         return self_ != nullptr;
     }
 
-    const player& player_list::get_self() const {
-        return *self_;
+    const player* player_list::get_self() const {
+        return self_;
     }
 
     bool player_list::empty() const {
         return players_.empty();
+    }
+
+    std::size_t player_list::size() const {
+        return players_.size();
     }
 
     player_list::iterator player_list::begin() {
