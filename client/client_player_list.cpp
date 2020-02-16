@@ -228,10 +228,19 @@ namespace client {
     }
 
     void player_list::register_lua_type(sol::state& lua) {
+        lua.new_usertype<player>("player", sol::no_constructor,
+            "id",    sol::readonly(&player::id),
+            "ip",    sol::readonly(&player::ip),
+            "name",  sol::readonly(&player::name),
+            "color", sol::readonly(&player::color),
+            "is_ai", sol::readonly(&player::is_ai)
+        );
+
         lua.new_usertype<player_list>("player_list", sol::no_constructor,
-            "empty", &player_list::empty,
+            "empty",     &player_list::empty,
             "is_joined", &player_list::is_joined,
-            "leave", &player_list::leave,
+            "leave",     &player_list::leave,
+            "get_self",  &player_list::get_self,
             "join_as", [](player_list* self, const std::string& name, const std::string& scolor, bool as_ai) {
                 color32 color;
                 if (string::stringify<color32>::parse(color, scolor)) {
