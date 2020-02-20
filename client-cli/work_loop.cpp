@@ -102,8 +102,21 @@ void work_loop::execute_(const std::string& cmd) {
         shutdown();
     } else {
         try {
-            lua_.script(cmd);
-        } catch (sol::error& e) {
+            // Add "return" in from, so we can inspect the return value of the command
+            std::string adjusted_cmd = string::trim(cmd);
+            if (!string::start_with(adjusted_cmd, "return") && !string::start_with(adjusted_cmd, "print")) {
+                adjusted_cmd = "return "+adjusted_cmd;
+            }
+
+            // Run the command
+            auto ret = lua_.script(adjusted_cmd);
+
+            // Print the output
+            if (ret.get_type() != sol::type::nil && ret.get_type() != sol::type::none && ret.get_type() != sol::type::poly) {
+                std::function<std::string(sol::object)> to_string = lua_["tostring"];
+                out_.note(to_string(ret));
+            }
+        } catch (const sol::error& e) {
             out_.error(string::erase_begin(e.what(), std::string("lua: error: ").size()));
         }
     }
