@@ -187,15 +187,24 @@ void console_input::move_last() {
     }
 }
 
+std::size_t locate_autocompletion_start(const string::unicode& content, std::size_t end_pos) {
+    if (end_pos != 0) --end_pos;
+    auto p0 = content.find_last_of(string::to_unicode("\t\n (),+-*/^=~<>#;"), end_pos);
+    if (p0 == content.npos) {
+        p0 = 0;
+    } else {
+        ++p0;
+    }
+
+    return p0;
+}
+
 void console_input::ask_autocomplete() {
     if (!selected_) {
-        auto p0 = content_.find_last_of(string::to_unicode("\t\n ()"), pos_);
-        if (p0 == content_.npos) {
-            p0 = 0;
-        } else {
-            ++p0;
-        }
+        // Skip autocompletion if we're just after a function call
+        if (pos_ != 0 && content_[pos_-1] == ')') return;
 
+        auto p0 = locate_autocompletion_start(content_, pos_);
         string::unicode str = content_.substr(p0, pos_-p0);
         on_autocompletion_query.dispatch(str);
     }
@@ -204,13 +213,7 @@ void console_input::ask_autocomplete() {
 void console_input::autocomplete(string::unicode text) {
     selected_ = false;
 
-    auto p0 = content_.find_last_of(string::to_unicode("\t\n ()"), pos_);
-    if (p0 == content_.npos) {
-        p0 = 0;
-    } else {
-        ++p0;
-    }
-
+    auto p0 = locate_autocompletion_start(content_, pos_);
     content_.erase(p0, pos_-p0);
     content_.insert(p0, text);
     pos_ = p0 + text.size();
