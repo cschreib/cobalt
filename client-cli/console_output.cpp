@@ -222,7 +222,7 @@ void console_output::draw(sf::RenderTarget& target) const {
         }
     }
 
-    for (std::size_t i : range(firstline, lines)) {
+    for (std::size_t i : range(firstline, lastline)) {
         auto& line = lines[i];
         for (auto& t : line) {
             sf::Vector2f p = t.getPosition();
