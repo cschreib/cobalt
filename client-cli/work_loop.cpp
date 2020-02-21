@@ -104,7 +104,9 @@ void work_loop::execute_(const std::string& cmd) {
         try {
             // Add "return" in from, so we can inspect the return value of the command
             std::string adjusted_cmd = string::trim(cmd);
-            if (!string::start_with(adjusted_cmd, "return") && !string::start_with(adjusted_cmd, "print")) {
+            if (!string::start_with(adjusted_cmd, "return") &&
+                !string::start_with(adjusted_cmd, "print") &&
+                adjusted_cmd.find('=') == adjusted_cmd.npos) {
                 adjusted_cmd = "return "+adjusted_cmd;
             }
 
