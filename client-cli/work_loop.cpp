@@ -144,6 +144,8 @@ void fill_autocomplete(const T& object, std::vector<std::string>& candidates,
         // Get key and skip if it doesn't start with the right characters
         std::string key = kv.first.template as<std::string>();
         if (!string::start_with(key, start)) continue;
+        // Skip internal fields
+        if (!string::start_with(start, "__") && string::start_with(key, "__")) continue;
 
         // Add item to candidate list, with () if this is a function
         if (kv.second.get_type() == sol::type::function) {
