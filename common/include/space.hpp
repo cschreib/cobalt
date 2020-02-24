@@ -154,7 +154,7 @@ namespace space {
         /** \param c The cell into which to move the content of this cell
             \note An exception is thrown if the other cell already contains an object.
                   See cell_occupied_exception.
-            \note If this cell doens't contain anything, then this function does nothing.
+            \note If this cell doesn't contain anything, then this function does nothing.
             \note If T provides an accessible member function named 'notify_parent_cell'
                   that takes a naked pointer to a space::cell<T> as its first and only
                   argument, then this function will call it to notify T of its new
@@ -385,12 +385,12 @@ namespace space {
         **/
         template<typename T, std::size_t N, std::size_t D>
         struct split_cell {
-            any_cell<T,N+1,D> childs[4];
+            any_cell<T,N+1,D> children[4];
 
         private :
             friend any_cell<T,N,D>;
 
-            explicit split_cell(any_cell<T,N,D>& self) : childs{
+            explicit split_cell(any_cell<T,N,D>& self) : children{
                 any_cell<T,N+1,D>(self), any_cell<T,N+1,D>(self),
                 any_cell<T,N+1,D>(self), any_cell<T,N+1,D>(self)
             } {}
@@ -437,7 +437,7 @@ namespace space {
             /// Called when a child cell is emptied, in order to free
             /// some memory when the space in unoccupied.
             void on_cell_empty_() {
-                for (auto& c : split->childs) {
+                for (auto& c : split->children) {
                     if (!c.empty()) return;
                 }
 
@@ -454,7 +454,7 @@ namespace space {
             void get_coordinates_(const any_cell<T,N+1,D>& c, vec_t& pos) const {
                 static const std::size_t half_size = 1 << (D-N-1);
 
-                std::size_t i = &c - &split->childs[0];
+                std::size_t i = &c - &split->children[0];
                 switch (i) {
                 case sub_cell::TL :                                         break;
                 case sub_cell::TR : pos.x += half_size;                     break;
@@ -476,7 +476,7 @@ namespace space {
                 any_cell<T,N,D>* next = parent.reach_(*this, dir);
                 if (next) {
                     if (!next->split) next->make_split();
-                    return &next->split->childs[id];
+                    return &next->split->children[id];
                 } else {
                     return nullptr;
                 }
@@ -493,7 +493,7 @@ namespace space {
                 const any_cell<T,N,D>* next = parent.try_reach_(*this, dir);
                 if (next) {
                     if (!next->split) return nullptr;
-                    else return &next->split->childs[id];
+                    else return &next->split->children[id];
                 } else {
                     return nullptr;
                 }
@@ -507,8 +507,8 @@ namespace space {
             **/
             any_cell<T,N+1,D>* reach_(any_cell<T,N+1,D>& c, direction dir) {
                 std::size_t next_id;
-                if (get_cell_id(&c - &split->childs[0], dir, next_id)) {
-                    return &split->childs[next_id];
+                if (get_cell_id(&c - &split->children[0], dir, next_id)) {
+                    return &split->children[next_id];
                 } else {
                     return get_neighbor_cell_(dir, next_id);
                 }
@@ -522,8 +522,8 @@ namespace space {
             **/
             const any_cell<T,N+1,D>* try_reach_(const any_cell<T,N+1,D>& c, direction dir) const {
                 std::size_t next_id;
-                if (get_cell_id(&c - &split->childs[0], dir, next_id)) {
-                    return &split->childs[next_id];
+                if (get_cell_id(&c - &split->children[0], dir, next_id)) {
+                    return &split->children[next_id];
                 } else {
                     return try_get_neighbor_cell_(dir, next_id);
                 }
@@ -599,7 +599,7 @@ namespace space {
 
             /// @copydoc space::impl::any_cell::on_cell_empty_
             void on_cell_empty_() {
-                for (auto& c : split->childs) {
+                for (auto& c : split->children) {
                     if (!c.empty()) return;
                 }
 
@@ -610,7 +610,7 @@ namespace space {
             void get_coordinates_(const any_cell<T,2,D>& c, vec_t& pos) const {
                 static const std::size_t half_size = 1 << (D-2);
 
-                std::size_t i = &c - &split->childs[0];
+                std::size_t i = &c - &split->children[0];
                 switch (i) {
                 case sub_cell::TL :                                         break;
                 case sub_cell::TR : pos.x += half_size;                     break;
@@ -622,8 +622,8 @@ namespace space {
             /// @copydoc space::impl::any_cell::reach_
             any_cell<T,2,D>* reach_(any_cell<T,2,D>& c, direction dir) {
                 std::size_t next_id;
-                if (get_cell_id(&c - &split->childs[0], dir, next_id)) {
-                    return &split->childs[next_id];
+                if (get_cell_id(&c - &split->children[0], dir, next_id)) {
+                    return &split->children[next_id];
                 } else {
                     return nullptr;
                 }
@@ -632,8 +632,8 @@ namespace space {
             /// @copydoc space::impl::any_cell::try_reach_
             const any_cell<T,2,D>* try_reach_(const any_cell<T,2,D>& c, direction dir) const {
                 std::size_t next_id;
-                if (get_cell_id(&c - &split->childs[0], dir, next_id)) {
-                    return &split->childs[next_id];
+                if (get_cell_id(&c - &split->children[0], dir, next_id)) {
+                    return &split->children[next_id];
                 } else {
                     return nullptr;
                 }
@@ -758,7 +758,7 @@ namespace space {
             template<std::size_t N>
             cell<T>& reach_(any_cell<T,N,D>& c, vec_t& pos) {
                 if (!c.split) c.make_split();
-                return reach_(c.split->childs[get_id_<N>(pos)], pos);
+                return reach_(c.split->children[get_id_<N>(pos)], pos);
             }
 
             /// Recursively traverse the quad-tree to reach the provided position.
@@ -778,7 +778,7 @@ namespace space {
             template<std::size_t N>
             const cell<T>* try_reach_(const any_cell<T,N,D>& c, vec_t& pos) const {
                 if (!c.split) return nullptr;
-                return try_reach_(c.split->childs[get_id_<N>(pos)], pos);
+                return try_reach_(c.split->children[get_id_<N>(pos)], pos);
             }
 
             /// Recursively traverse the quad-tree to reach the provided position.
@@ -814,9 +814,9 @@ namespace space {
                 };
 
                 if (!c.split) return;
-                for (std::size_t i : range(c.split->childs)) {
+                for (std::size_t i : range(c.split->children)) {
                     if (box.contains(cell_boxes[i])) {
-                        clip_(c.split->childs[i], box - offsets[i], list);
+                        clip_(c.split->children[i], box - offsets[i], list);
                     }
                 }
             }
@@ -843,7 +843,7 @@ namespace space {
                 const ctl::delegate<bool(const T&)>& callback) const {
 
                 if (!c.split) return;
-                for (auto& sc : c.split->childs) {
+                for (auto& sc : c.split->children) {
                     for_each_cell_(sc, callback);
                 }
             }
